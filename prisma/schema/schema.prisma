@@ -1,0 +1,17 @@
+// QEPEX India Work Tracker — Prisma schema (multi-file).
+// Conventions (docs/data-model.md):
+//  - every model has createdAt / updatedAt / createdById / updatedById
+//  - money = Int paise, durations = Int minutes, leave = Int half-days
+//  - business dates = String "YYYY-MM-DD" (IST); timestamps = DateTime (UTC)
+//  - enum-like fields = String validated in /server/domain/enums.ts (portable to PostgreSQL)
+//  - fields ending in `Enc` hold AES-256-GCM ciphertext ("v1:<iv>:<tag>:<data>")
+// The data model is FROZEN at the end of Phase 1: later changes are additive migrations only.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}

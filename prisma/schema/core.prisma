@@ -1,0 +1,834 @@
+// ---------------------------------------------------------------------------
+// Core: people, roles, teams, clients, engagements, tasks, work entries
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique // PARTNER | MANAGER | STAFF | ARTICLE | PRACTICE_ADMIN | HR_ADMIN | PORTAL
+  name        String
+  description String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  displayName        String
+  email              String?
+  mobile             String?
+  passwordHash       String
+  mustChangePassword Boolean   @default(false)
+  role               String // Role.code (not PORTAL — portal users live in PortalUser)
+  isSenior           Boolean   @default(false) // Staff/Senior may review junior work (spec 3.3)
+  designationId      String?
+  reportingManagerId String?
+  defaultLocation    String    @default("OFFICE") // OFFICE | CLIENT_SITE | WFH (P1-17)
+  locationChangeable Boolean   @default(true)
+  totpSecretEnc      String?
+  totpEnabled        Boolean   @default(false)
+  totpEnrolledAt     DateTime?
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  sessionEpoch       Int       @default(0)
+  active             Boolean   @default(true)
+  deactivatedAt      DateTime?
+  deactivatedById    String?
+  isSystem           Boolean   @default(false) // SYSTEM user for scheduled jobs
+  searchName         String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdById        String?
+  updatedById        String?
+
+  designation      Designation?           @relation(fields: [designationId], references: [id])
+  reportingManager User?                  @relation("Reports", fields: [reportingManagerId], references: [id])
+  reports          User[]                 @relation("Reports")
+  employeeProfile  EmployeeProfile?
+  sessions         UserSession[]
+  teamMemberships  ClientTeamMember[]
+  ledTeams         ClientTeam[]           @relation("TeamLead")
+  partnerOf        Client[]               @relation("ClientPartner")
+  managerOf        Client[]               @relation("ClientManager")
+  engagementRoles  EngagementAssignment[]
+  taskRoles        TaskAssignment[]
+  workEntries      WorkEntry[]
+
+  @@index([role])
+  @@index([active])
+}
+
+model UserSession {
+  id           String    @id @default(cuid())
+  userId       String?
+  portalUserId String?
+  createdAt    DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  revokeReason String?
+  ip           String?
+  userAgent    String?
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  user       User?       @relation(fields: [userId], references: [id])
+  portalUser PortalUser? @relation(fields: [portalUserId], references: [id])
+
+  @@index([userId])
+  @@index([portalUserId])
+}
+
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  username    String
+  realm       String   @default("STAFF") // STAFF | PORTAL
+  success     Boolean
+  reason      String?
+  ip          String?
+  at          DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@index([username, at])
+}
+
+model Designation {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  level       Int      @default(0)
+  roleHint    String   @default("STAFF")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  users     User[]
+  costRates CostRate[]
+}
+
+/// Internal cost of an hour per designation (Partner/HR only). Effective-dated.
+model CostRate {
+  id               String   @id @default(cuid())
+  designationId    String
+  ratePaisePerHour Int
+  effectiveFrom    String
+  effectiveTo      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  designation Designation @relation(fields: [designationId], references: [id])
+
+  @@index([designationId, effectiveFrom])
+}
+
+model ClientTeam {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  leadManagerId String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  leadManager User?              @relation("TeamLead", fields: [leadManagerId], references: [id])
+  members     ClientTeamMember[]
+  clients     Client[]
+}
+
+model ClientTeamMember {
+  id          String   @id @default(cuid())
+  teamId      String
+  userId      String
+  fromDate    String
+  toDate      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  team ClientTeam @relation(fields: [teamId], references: [id])
+  user User       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([teamId])
+}
+
+model State {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. MH
+  gstCode     String   @unique // e.g. 27
+  name        String
+  isUT        Boolean  @default(false)
+  ptLevied    Boolean  @default(false) // Professional Tax levied (open-questions Q-02)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model ClientGroup {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  searchName  String   @default("")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  clients Client[]
+}
+
+model Client {
+  id                        String    @id @default(cuid())
+  code                      String    @unique // CL-0142
+  name                      String
+  searchName                String    @default("")
+  groupId                   String?
+  constitution              String // INDIVIDUAL | HUF | PROPRIETORSHIP | PARTNERSHIP | LLP | PRIVATE_COMPANY | PUBLIC_COMPANY | TRUST | SOCIETY | OTHER
+  pan                       String?
+  tan                       String?
+  cinLlpin                  String?
+  udyam                     String?
+  stateCode                 String?
+  address                   String    @default("")
+  incorporationDate         String?
+  fyEnd                     String    @default("03-31") // MM-DD
+  booksBy                   String    @default("CLIENT") // FIRM | CLIENT
+  status                    String    @default("ACTIVE") // ACTIVE | DORMANT | DISCONTINUED | DISCONTINUED_CLOSED
+  statusEffectiveFrom       String?
+  partnerId                 String?
+  managerId                 String?
+  teamId                    String?
+  category                  String? // A | B | C
+  tags                      String    @default("")
+  isFirm                    Boolean   @default(false) // the firm itself (spec 13.6)
+  publicInterest            Boolean   @default(false) // EQR trigger (open-questions Q-14)
+  leadSource                String?
+  onboardingDate            String?
+  kycStatus                 String    @default("PENDING") // PENDING | PARTIAL | COMPLETE
+  portalEnabled             Boolean   @default(false)
+  preferredChannel          String    @default("EMAIL") // EMAIL | WHATSAPP | PHONE
+  // Applicability flags (Product Spec 4.1 + Rules Spec 1.1). GST flags live on GSTIN.
+  tdsApplicable             Boolean   @default(false)
+  tdsSalary                 Boolean   @default(false)
+  tdsNonSalary              Boolean   @default(false)
+  tdsNonResident            Boolean   @default(false)
+  tcsApplicable             Boolean   @default(false)
+  taxAuditApplicable        Boolean   @default(false)
+  transferPricingApplicable Boolean   @default(false)
+  statutoryAuditApplicable  Boolean   @default(false)
+  advanceTaxApplicable      Boolean   @default(false)
+  pfApplicable              Boolean   @default(false)
+  esiApplicable             Boolean   @default(false)
+  msmeApplicable            Boolean   @default(false) // MSME Form 1
+  dpt3Applicable            Boolean   @default(false) // companies only (Q-03)
+  archivedAt                DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  createdById               String?
+  updatedById               String?
+
+  group            ClientGroup?                   @relation(fields: [groupId], references: [id])
+  partner          User?                          @relation("ClientPartner", fields: [partnerId], references: [id])
+  manager          User?                          @relation("ClientManager", fields: [managerId], references: [id])
+  team             ClientTeam?                    @relation(fields: [teamId], references: [id])
+  gstins           GSTIN[]
+  directors        ClientDirector[]
+  primaryDirectors Director[]                     @relation("DirectorPrimaryClient")
+  contacts         Contact[]
+  flagHistory      ClientFlagHistory[]
+  ptRegistrations  ClientPtRegistration[]
+  engagements      Engagement[]
+  tasks            Task[]
+  workEntries      WorkEntry[]
+  subscriptions    ClientComplianceSubscription[]
+  eventDates       EventDate[]
+
+  @@index([groupId])
+  @@index([partnerId])
+  @@index([managerId])
+  @@index([teamId])
+  @@index([status])
+  @@index([searchName])
+}
+
+/// Every change to an applicability flag or status (Rules Spec 7).
+model ClientFlagHistory {
+  id            String   @id @default(cuid())
+  clientId      String
+  flag          String
+  partyKey      String   @default("-")
+  oldValue      String?
+  newValue      String?
+  effectiveDate String
+  reason        String   @default("")
+  changedAt     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([clientId, flag])
+}
+
+model GSTIN {
+  id                     String   @id @default(cuid())
+  clientId               String
+  gstin                  String   @unique
+  stateCode              String
+  tradeName              String?
+  frequency              String   @default("MONTHLY") // MONTHLY | QRMP | COMPOSITION
+  frequencyEffectiveFrom String?
+  iffOpted               Boolean  @default(false)
+  annualReturnApplicable Boolean  @default(false) // GSTR-9
+  gstr9cApplicable       Boolean  @default(false)
+  registrationDate       String?
+  cancellationDate       String?
+  status                 String   @default("ACTIVE") // ACTIVE | CANCELLED | SUSPENDED
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  createdById            String?
+  updatedById            String?
+
+  client Client @relation(fields: [clientId], references: [id])
+  tasks  Task[]
+
+  @@index([clientId])
+}
+
+model Director {
+  id              String   @id @default(cuid())
+  din             String   @unique
+  name            String
+  searchName      String   @default("")
+  panEnc          String?
+  email           String?
+  mobile          String?
+  primaryClientId String? // DIR-3 KYC task sits here (Q-04: one per director)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  primaryClient Client?          @relation("DirectorPrimaryClient", fields: [primaryClientId], references: [id])
+  clients       ClientDirector[]
+  tasks         Task[]
+}
+
+model ClientDirector {
+  id          String   @id @default(cuid())
+  clientId    String
+  directorId  String
+  designation String   @default("DIRECTOR") // DIRECTOR | DESIGNATED_PARTNER | MANAGING_DIRECTOR | ...
+  appointedOn String?
+  ceasedOn    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  client   Client   @relation(fields: [clientId], references: [id])
+  director Director @relation(fields: [directorId], references: [id])
+
+  @@unique([clientId, directorId])
+}
+
+model Contact {
+  id               String   @id @default(cuid())
+  clientId         String
+  name             String
+  role             String   @default("") // promoter, accountant, CFO, director
+  email            String?
+  phone            String?
+  whatsapp         String?
+  preferredChannel String   @default("EMAIL")
+  isPrimary        Boolean  @default(false)
+  isBilling        Boolean  @default(false)
+  birthday         String?
+  optOutCampaigns  Boolean  @default(false)
+  notes            String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([clientId])
+}
+
+model ClientPtRegistration {
+  id             String   @id @default(cuid())
+  clientId       String
+  stateCode      String
+  kind           String   @default("EMPLOYER") // EMPLOYER (return/payment) | ENROLMENT
+  registrationNo String?
+  frequency      String   @default("MONTHLY")
+  effectiveFrom  String
+  effectiveTo    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@unique([clientId, stateCode, kind])
+}
+
+// ---------------------------------------------------------------------------
+// Engagements, stage templates, tasks
+// ---------------------------------------------------------------------------
+
+model StageTemplate {
+  id             String   @id @default(cuid())
+  code           String   @unique // GST_RETURN, INCOME_TAX_RETURN, TDS_RETURN, AUDIT, BOOKKEEPING, ROC_ANNUAL, NOTICE, OTHER, PAYROLL_STATUTORY
+  name           String
+  engagementType String
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  versions StageTemplateVersion[]
+}
+
+model StageTemplateVersion {
+  id            String   @id @default(cuid())
+  templateId    String
+  version       Int
+  status        String   @default("ACTIVE") // DRAFT | ACTIVE | RETIRED
+  effectiveFrom String
+  approvedById  String?
+  note          String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  template    StageTemplate @relation(fields: [templateId], references: [id])
+  stages      StageDef[]
+  engagements Engagement[]
+  tasks       Task[]
+
+  @@unique([templateId, version])
+}
+
+model StageDef {
+  id               String   @id @default(cuid())
+  versionId        String
+  index            Int
+  name             String
+  reviewLevel      String   @default("NONE") // NONE | SENIOR | MANAGER | PARTNER
+  isClientApproval Boolean  @default(false)
+  isFiling         Boolean  @default(false)
+  requiresUdin     Boolean  @default(false)
+  requiresDsc      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  version StageTemplateVersion @relation(fields: [versionId], references: [id])
+
+  @@unique([versionId, index])
+}
+
+/// Stage mapping used when an admin moves open tasks to a new template version (P2-24).
+model StageMapping {
+  id             String   @id @default(cuid())
+  fromVersionId  String
+  toVersionId    String
+  fromStageIndex Int
+  toStageIndex   Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  @@unique([fromVersionId, toVersionId, fromStageIndex])
+}
+
+model Engagement {
+  id                     String    @id @default(cuid())
+  code                   String    @unique // EN-00001
+  clientId               String
+  name                   String
+  serviceLine            String // ACCOUNTING | AUDIT | DIRECT_TAX | GST | COMPANY_LAW | ADVISORY
+  engagementType         String // StageTemplate.code
+  recurrence             String    @default("ONE_TIME") // RECURRING | ONE_TIME
+  complianceTypeCode     String?
+  stageTemplateVersionId String?
+  feeBasis               String    @default("FIXED") // FIXED | RETAINER | TIME
+  feePaise               Int       @default(0)
+  ratePaisePerHour       Int       @default(0)
+  budgetMinutes          Int       @default(0)
+  chargeable             Boolean   @default(true)
+  status                 String    @default("ACTIVE") // ACTIVE | ON_HOLD | COMPLETED | CANCELLED | ARCHIVED
+  startDate              String?
+  endDate                String?
+  partnerId              String?
+  managerId              String?
+  eqrRequired            Boolean   @default(false)
+  proposalId             String?
+  engagementLetterId     String?
+  closedAt               DateTime?
+  archivedAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  createdById            String?
+  updatedById            String?
+
+  client               Client                   @relation(fields: [clientId], references: [id])
+  stageTemplateVersion StageTemplateVersion?    @relation(fields: [stageTemplateVersionId], references: [id])
+  assignments          EngagementAssignment[]
+  budgetPeriods        EngagementBudgetPeriod[]
+  tasks                Task[]
+  workEntries          WorkEntry[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model EngagementAssignment {
+  id           String   @id @default(cuid())
+  engagementId String
+  userId       String
+  role         String   @default("MEMBER") // MEMBER | MAKER | CHECKER | EQR
+  fromDate     String
+  toDate       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  engagement Engagement @relation(fields: [engagementId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([engagementId])
+}
+
+model EngagementBudgetPeriod {
+  id            String   @id @default(cuid())
+  engagementId  String
+  periodKey     String
+  budgetMinutes Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  engagement Engagement @relation(fields: [engagementId], references: [id])
+
+  @@unique([engagementId, periodKey])
+}
+
+/// One trackable unit of work. Compliance tasks are keyed by
+/// (clientId, complianceTypeCode, partyKey, periodKey) — decisions D-05.
+model Task {
+  id                     String    @id @default(cuid())
+  clientId               String
+  engagementId           String?
+  complianceTypeCode     String?
+  partyKey               String    @default("-") // GSTIN id | Director id | PT state | "-"
+  periodKey              String    @default("-")
+  gstinId                String?
+  directorId             String?
+  title                  String
+  periodLabel            String    @default("")
+  originalDueDate        String?
+  effectiveDueDate       String?
+  isProvisional          Boolean   @default(false)
+  status                 String    @default("UPCOMING") // UPCOMING | IN_PROGRESS | PENDING_FROM_CLIENT | UNDER_REVIEW | FILED | FILED_LATE | NOT_APPLICABLE
+  stageTemplateVersionId String?
+  stageIndex             Int       @default(0)
+  pendingFromClient      Boolean   @default(false)
+  pendingSince           String?
+  underReview            Boolean   @default(false)
+  ackType                String? // ARN | SRN | ITR_ACK | CIN | TOKEN | CHALLAN
+  ackNumber              String?
+  filedDate              String?
+  filedById              String?
+  signoffRecorded        Boolean   @default(false)
+  udinRecordId           String?
+  notApplicableReason    String?
+  supersededByTaskId     String?
+  amendsTaskId           String?
+  budgetMinutes          Int       @default(0)
+  isOneOff               Boolean   @default(false)
+  closedAt               DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  createdById            String?
+  updatedById            String?
+
+  client               Client                @relation(fields: [clientId], references: [id])
+  engagement           Engagement?           @relation(fields: [engagementId], references: [id])
+  gstin                GSTIN?                @relation(fields: [gstinId], references: [id])
+  director             Director?             @relation(fields: [directorId], references: [id])
+  stageTemplateVersion StageTemplateVersion? @relation(fields: [stageTemplateVersionId], references: [id])
+  assignments          TaskAssignment[]
+  stages               TaskStage[]
+  statusHistory        TaskStatusHistory[]
+  dueDateHistory       DueDateHistory[]
+  acknowledgments      Acknowledgment[]
+  workEntries          WorkEntry[]
+
+  @@unique([clientId, complianceTypeCode, partyKey, periodKey])
+  @@index([engagementId])
+  @@index([status])
+  @@index([effectiveDueDate])
+}
+
+model TaskAssignment {
+  id          String   @id @default(cuid())
+  taskId      String
+  userId      String
+  role        String // ASSIGNEE | MAKER | CHECKER | EQR
+  fromDate    String
+  toDate      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([taskId])
+}
+
+model TaskStage {
+  id            String    @id @default(cuid())
+  taskId        String
+  stageIndex    Int
+  name          String
+  startedAt     DateTime?
+  completedAt   DateTime?
+  completedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, stageIndex])
+}
+
+model TaskStatusHistory {
+  id          String   @id @default(cuid())
+  taskId      String
+  fromStatus  String?
+  toStatus    String
+  reason      String   @default("")
+  changedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+}
+
+/// Every change to effective_due_date (Rules Spec 5.1).
+model DueDateHistory {
+  id          String   @id @default(cuid())
+  taskId      String
+  oldValue    String?
+  newValue    String
+  source      String // GENERATION | EXTENSION | EVENT_CORRECTION | HOLIDAY_SHIFT | MASTER_UPDATE
+  reference   String   @default("")
+  changedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+}
+
+model Acknowledgment {
+  id          String   @id @default(cuid())
+  taskId      String
+  ackType     String
+  number      String
+  date        String
+  documentId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+}
+
+// ---------------------------------------------------------------------------
+// Work entries and time
+// ---------------------------------------------------------------------------
+
+model InternalCategory {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  chargeable     Boolean  @default(false)
+  feedsCpe       Boolean  @default(false)
+  linksLead      Boolean  @default(false)
+  linksKnowledge Boolean  @default(false)
+  sortOrder      Int      @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  workEntries WorkEntry[]
+}
+
+model DescriptionChip {
+  id          String   @id @default(cuid())
+  label       String   @unique
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model WorkEntry {
+  id                 String    @id @default(cuid())
+  userId             String
+  date               String
+  clientId           String?
+  engagementId       String?
+  taskId             String?
+  internalCategoryId String?
+  stageIndex         Int?
+  stageName          String?
+  minutes            Int // 15-minute steps, 15..720
+  description        String    @default("")
+  chips              String    @default("")
+  location           String    @default("OFFICE") // OFFICE | CLIENT_SITE | WFH
+  clientSiteClientId String?
+  outcomeType        String? // ARN | SRN | ITR_ACK | CIN | TOKEN
+  outcomeRef         String?
+  chargeable         Boolean   @default(false)
+  leadId             String?
+  knowledgeArticleId String?
+  clientUuid         String?   @unique // offline idempotency key
+  source             String    @default("WEB") // WEB | OFFLINE | TIMER | COPY | IMPORT
+  locked             Boolean   @default(false)
+  lockedAt           DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdById        String?
+  updatedById        String?
+
+  user             User              @relation(fields: [userId], references: [id])
+  client           Client?           @relation(fields: [clientId], references: [id])
+  engagement       Engagement?       @relation(fields: [engagementId], references: [id])
+  task             Task?             @relation(fields: [taskId], references: [id])
+  internalCategory InternalCategory? @relation(fields: [internalCategoryId], references: [id])
+
+  @@index([userId, date])
+  @@index([clientId])
+  @@index([engagementId])
+  @@index([taskId])
+}
+
+model RecentPair {
+  id           String   @id @default(cuid())
+  userId       String
+  clientId     String
+  engagementId String   @default("-")
+  taskId       String   @default("-")
+  lastUsedAt   DateTime @default(now())
+  useCount     Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@unique([userId, clientId, engagementId, taskId])
+}
+
+model WorkTimer {
+  id           String    @id @default(cuid())
+  userId       String
+  clientId     String?
+  engagementId String?
+  taskId       String?
+  startedAt    DateTime
+  stoppedAt    DateTime?
+  workEntryId  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@index([userId])
+}
+
+model WeeklyLock {
+  id            String    @id @default(cuid())
+  weekStart     String // Monday
+  scope         String    @default("FIRM") // FIRM | USER
+  userId        String?
+  lockAt        DateTime
+  lockedAt      DateTime?
+  extendedUntil DateTime?
+  extendedById  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  @@unique([weekStart, scope, userId])
+}
+
+model CorrectionRequest {
+  id            String    @id @default(cuid())
+  workEntryId   String
+  requestedById String
+  reason        String
+  proposedJson  String
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approverId    String?
+  decidedAt     DateTime?
+  decisionNote  String    @default("")
+  appliedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  @@index([workEntryId])
+  @@index([status])
+}

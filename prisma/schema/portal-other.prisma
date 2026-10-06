@@ -1,0 +1,788 @@
+// ---------------------------------------------------------------------------
+// Client portal (spec 12) — invite-link login, no OTP delivery service
+// ---------------------------------------------------------------------------
+
+model PortalUser {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  mobile        String?
+  passwordHash  String?
+  totpSecretEnc String?
+  totpEnabled   Boolean   @default(false)
+  active        Boolean   @default(true)
+  sessionEpoch  Int       @default(0)
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  lastLoginAt   DateTime?
+  contactId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  clients  PortalUserClient[]
+  invites  PortalInvite[]
+  sessions UserSession[]
+}
+
+model PortalUserClient {
+  id           String   @id @default(cuid())
+  portalUserId String
+  clientId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id])
+
+  @@unique([portalUserId, clientId])
+}
+
+model PortalInvite {
+  id           String    @id @default(cuid())
+  portalUserId String
+  tokenHash    String    @unique // sha256 of the one-time token
+  expiresAt    DateTime
+  usedAt       DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  portalUser PortalUser @relation(fields: [portalUserId], references: [id])
+}
+
+model PortalUpload {
+  id              String    @id @default(cuid())
+  portalUserId    String
+  clientId        String
+  engagementId    String?
+  taskId          String?
+  checklistItemId String?
+  documentId      String
+  autoTag         String? // keyword-based suggestion (Phase 4)
+  confirmedById   String?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  @@index([clientId])
+}
+
+model MessageThread {
+  id                String    @id @default(cuid())
+  clientId          String
+  engagementId      String?
+  subject           String
+  lastMessageAt     DateTime?
+  firstUnansweredAt DateTime? // response-time tracking
+  closedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  messages     Message[]
+  participants MessageThreadParticipant[]
+
+  @@index([clientId])
+}
+
+model MessageThreadParticipant {
+  id          String    @id @default(cuid())
+  threadId    String
+  userId      String
+  removedAt   DateTime? // set at offboarding
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  thread MessageThread @relation(fields: [threadId], references: [id])
+
+  @@unique([threadId, userId])
+}
+
+model Message {
+  id                 String    @id @default(cuid())
+  threadId           String
+  authorUserId       String?
+  authorPortalUserId String?
+  body               String
+  documentId         String?
+  sentAt             DateTime  @default(now())
+  readByClientAt     DateTime?
+  readByFirmAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdById        String?
+  updatedById        String?
+
+  thread MessageThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId])
+}
+
+model ClientApproval {
+  id           String   @id @default(cuid())
+  taskId       String
+  portalUserId String
+  decision     String // APPROVED | REJECTED
+  comment      String   @default("")
+  documentId   String?
+  decidedAt    DateTime @default(now())
+  ip           String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@index([taskId])
+}
+
+// ---------------------------------------------------------------------------
+// Documents and working papers (13.1)
+// ---------------------------------------------------------------------------
+
+model Folder {
+  id           String   @id @default(cuid())
+  parentId     String?
+  clientId     String?
+  engagementId String?
+  periodKey    String?
+  name         String
+  path         String // human-readable path, e.g. CL-0142/EN-00031/FY2026-27
+  kind         String   @default("OTHER") // CLIENT | ENGAGEMENT | PERIOD | AUDIT_SECTION | EMPLOYEE | SYSTEM | OTHER
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  documents Document[]
+
+  @@index([clientId])
+  @@index([engagementId])
+}
+
+model Document {
+  id               String    @id @default(cuid())
+  folderId         String?
+  clientId         String?
+  engagementId     String?
+  taskId           String?
+  employeeUserId   String? // HR documents: visible to HR / the employee / Partner only
+  name             String
+  kind             String    @default("OTHER")
+  sourceType       String    @default("UPLOAD") // UPLOAD | PORTAL | NOTICE | UDIN | MESSAGE | GENERATED | IMPORT | BACKUP
+  confidentiality  String    @default("NORMAL") // NORMAL | FINANCIALS | NOTICE | SALARY | HR | BILLING
+  tagsCsv          String    @default("")
+  sharedWithClient Boolean   @default(false)
+  currentVersion   Int       @default(1)
+  checkedOutById   String?
+  checkedOutAt     DateTime?
+  auditSectionCode String?
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  folder   Folder?           @relation(fields: [folderId], references: [id])
+  versions DocumentVersion[]
+
+  @@index([clientId])
+  @@index([engagementId])
+  @@index([employeeUserId])
+}
+
+model DocumentVersion {
+  id                     String   @id @default(cuid())
+  documentId             String
+  version                Int
+  storagePath            String // relative to STORAGE_DIR
+  originalName           String
+  mimeType               String
+  sizeBytes              Int
+  sha256                 String
+  uploadedByPortalUserId String?
+  note                   String   @default("")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  createdById            String?
+  updatedById            String?
+
+  document Document @relation(fields: [documentId], references: [id])
+
+  @@unique([documentId, version])
+}
+
+/// Portable full-text index (decisions D-11).
+model DocumentSearchToken {
+  id          String   @id @default(cuid())
+  documentId  String
+  token       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([documentId, token])
+  @@index([token])
+}
+
+model AuditFileSection {
+  id           String   @id @default(cuid())
+  engagementId String
+  code         String // PLANNING | RISK | FIELDWORK | QUERIES | REPORTS
+  name         String
+  required     Boolean  @default(true)
+  complete     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@unique([engagementId, code])
+}
+
+// ---------------------------------------------------------------------------
+// Quality control (13.2)
+// ---------------------------------------------------------------------------
+
+model QCChecklist {
+  id            String    @id @default(cuid())
+  engagementId  String
+  templateCode  String
+  status        String    @default("OPEN") // OPEN | COMPLETE
+  completedById String?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  items QCChecklistItem[]
+
+  @@index([engagementId])
+}
+
+model QCChecklistItem {
+  id          String   @id @default(cuid())
+  checklistId String
+  label       String
+  response    String   @default("") // YES | NO | NA
+  note        String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  checklist QCChecklist @relation(fields: [checklistId], references: [id])
+}
+
+model IndependenceDeclaration {
+  id           String   @id @default(cuid())
+  engagementId String
+  userId       String
+  declaredAt   DateTime @default(now())
+  hasConflict  Boolean  @default(false)
+  note         String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@unique([engagementId, userId])
+}
+
+model QCInspection {
+  id          String    @id @default(cuid())
+  name        String
+  periodFrom  String
+  periodTo    String
+  inspectorId String
+  status      String    @default("OPEN")
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  samples  QCInspectionSample[]
+  findings QCFinding[]
+}
+
+model QCInspectionSample {
+  id           String   @id @default(cuid())
+  inspectionId String
+  engagementId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  inspection QCInspection @relation(fields: [inspectionId], references: [id])
+
+  @@unique([inspectionId, engagementId])
+}
+
+model QCFinding {
+  id               String    @id @default(cuid())
+  inspectionId     String
+  engagementId     String?
+  finding          String
+  severity         String    @default("MEDIUM")
+  correctiveAction String    @default("")
+  ownerId          String?
+  dueDate          String?
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  inspection QCInspection @relation(fields: [inspectionId], references: [id])
+}
+
+model PeerReviewPack {
+  id          String   @id @default(cuid())
+  periodFrom  String
+  periodTo    String
+  documentId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+// ---------------------------------------------------------------------------
+// Templates, knowledge base, comments, meetings, notifications, helpdesk, applause
+// ---------------------------------------------------------------------------
+
+model Template {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  category     String // BOARD_RESOLUTION | MEETING_NOTICE | MINUTES | CERTIFICATE | ENGAGEMENT_LETTER | REPRESENTATION_LETTER | NOTICE_REPLY | HR_LETTER | REMINDER_MESSAGE | PROPOSAL
+  outputFormat String   @default("PDF") // PDF | DOCX | TEXT
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  versions TemplateVersion[]
+}
+
+model TemplateVersion {
+  id             String    @id @default(cuid())
+  templateId     String
+  version        Int
+  body           String
+  mergeFieldsCsv String    @default("")
+  status         String    @default("DRAFT") // DRAFT | APPROVED | RETIRED
+  approvedById   String?
+  approvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  template Template @relation(fields: [templateId], references: [id])
+
+  @@unique([templateId, version])
+}
+
+model KnowledgeArticle {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  kind        String // CIRCULAR | NOTIFICATION | EXTENSION | SOP | FAQ
+  serviceLine String?
+  sourceRef   String    @default("")
+  tagsCsv     String    @default("")
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  links KnowledgeArticleLink[]
+}
+
+model KnowledgeArticleLink {
+  id                 String   @id @default(cuid())
+  articleId          String
+  complianceTypeCode String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdById        String?
+  updatedById        String?
+
+  article KnowledgeArticle @relation(fields: [articleId], references: [id])
+
+  @@unique([articleId, complianceTypeCode])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  entityType  String // TASK | ENGAGEMENT | NOTICE | LEAD
+  entityId    String
+  authorId    String
+  body        String
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  mentions Mention[]
+
+  @@index([entityType, entityId])
+}
+
+model Mention {
+  id          String    @id @default(cuid())
+  commentId   String
+  userId      String
+  notifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  comment Comment @relation(fields: [commentId], references: [id])
+}
+
+model Meeting {
+  id              String   @id @default(cuid())
+  clientId        String
+  engagementId    String?
+  title           String
+  scheduledAt     String // YYYY-MM-DDTHH:mm IST
+  durationMinutes Int      @default(60)
+  location        String   @default("")
+  agenda          String   @default("")
+  notes           String   @default("")
+  organizerId     String
+  status          String   @default("SCHEDULED") // SCHEDULED | HELD | CANCELLED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  attendees   MeetingAttendee[]
+  actionItems ActionItem[]
+}
+
+model MeetingAttendee {
+  id          String   @id @default(cuid())
+  meetingId   String
+  userId      String?
+  contactId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  meeting Meeting @relation(fields: [meetingId], references: [id])
+}
+
+model ActionItem {
+  id          String   @id @default(cuid())
+  meetingId   String
+  title       String
+  ownerId     String
+  dueDate     String?
+  taskId      String?
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  meeting Meeting @relation(fields: [meetingId], references: [id])
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String?
+  portalUserId String?
+  kind         String
+  title        String
+  body         String    @default("")
+  link         String    @default("")
+  entityType   String?
+  entityId     String?
+  priority     String    @default("NORMAL") // NORMAL | HIGH | ESCALATION
+  dedupeKey    String?   @unique
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@index([userId, readAt])
+  @@index([portalUserId, readAt])
+}
+
+model NotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  quietFrom      String? // HH:mm
+  quietTo        String?
+  browserEnabled Boolean  @default(true)
+  mutedKindsCsv  String   @default("") // escalations can never be muted
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+}
+
+model HelpdeskTicket {
+  id              String    @id @default(cuid())
+  number          Int       @unique
+  raisedById      String
+  category        String // BUG | HOW_DO_I | DATA_CORRECTION | ACCESS | HR_QUERY | OTHER
+  queue           String    @default("ADMIN") // ADMIN | HR
+  subject         String
+  description     String
+  screenshotDocId String?
+  status          String    @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
+  assigneeId      String?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  reopenedCount   Int       @default(0)
+  faqArticleId    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  replies TicketReply[]
+
+  @@index([status, queue])
+}
+
+model TicketReply {
+  id          String   @id @default(cuid())
+  ticketId    String
+  authorId    String
+  body        String
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  ticket HelpdeskTicket @relation(fields: [ticketId], references: [id])
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  code        String   @unique // DEADLINE_HERO | CLEAN_REVIEW | CLIENT_CHAMPION | FAST_LEARNER | TEAM_PLAYER | PROBLEM_SOLVER
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+/// Immutable: no update/delete path in code (spec 7.3).
+model Applause {
+  id          String   @id @default(cuid())
+  toUserId    String
+  fromUserId  String
+  badgeCode   String?
+  message     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@index([toUserId])
+}
+
+// ---------------------------------------------------------------------------
+// Retention and system
+// ---------------------------------------------------------------------------
+
+model RetentionRule {
+  id           String    @id @default(cuid())
+  recordType   String    @unique
+  retainYears  Int?
+  basis        String    @default("")
+  purgeEnabled Boolean   @default(false)
+  source       String    @default("")
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+}
+
+model PurgeRequest {
+  id            String    @id @default(cuid())
+  recordType    String
+  entityIdsJson String
+  count         Int
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED | EXECUTED
+  requestedById String
+  approvedById  String?
+  decidedAt     DateTime?
+  executedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+}
+
+/// Append-only. No update/delete function exists in /server/audit.
+model AuditLog {
+  id                String   @id @default(cuid())
+  at                DateTime @default(now())
+  actorType         String   @default("USER") // USER | PORTAL | SYSTEM
+  actorUserId       String?
+  actorPortalUserId String?
+  entityType        String
+  entityId          String
+  action            String // CREATE | UPDATE | DELETE | STATUS | LOGIN | LOGOUT | EXPORT | IMPORT | BACKUP | RESTORE | ...
+  beforeJson        String?
+  afterJson         String?
+  reason            String   @default("")
+  lockState         String?
+  ip                String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  @@index([entityType, entityId])
+  @@index([actorUserId, at])
+  @@index([at])
+}
+
+model SensitiveViewLog {
+  id                String   @id @default(cuid())
+  at                DateTime @default(now())
+  actorUserId       String?
+  actorPortalUserId String?
+  kind              String // CREDENTIAL | FINANCIALS | NOTICE | SALARY | BILLING
+  entityType        String
+  entityId          String
+  detail            String   @default("")
+  ip                String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  @@index([actorUserId, at])
+  @@index([entityType, entityId])
+}
+
+model ImportJob {
+  id          String    @id @default(cuid())
+  kind        String // CLIENTS | USERS | CLIENT_TEAMS | EMPLOYEES | SALARY_STRUCTURES | LEAVE_BALANCES | RECEIVABLES | LEADS
+  fileName    String
+  status      String    @default("UPLOADED") // UPLOADED | VALIDATED | APPLIED | FAILED
+  totalRows   Int       @default(0)
+  validRows   Int       @default(0)
+  errorRows   Int       @default(0)
+  summaryJson String    @default("{}")
+  appliedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  rows ImportRow[]
+}
+
+model ImportRow {
+  id          String   @id @default(cuid())
+  jobId       String
+  rowNumber   Int
+  dataJson    String
+  errorsJson  String   @default("[]")
+  status      String   @default("PENDING") // VALID | INVALID | APPLIED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  job ImportJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+
+model ExportJob {
+  id          String   @id @default(cuid())
+  kind        String
+  paramsJson  String   @default("{}")
+  rowCount    Int      @default(0)
+  fileName    String   @default("")
+  status      String   @default("DONE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  valueJson   String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model BackupRecord {
+  id                   String    @id @default(cuid())
+  fileName             String    @unique
+  sizeBytes            Int
+  sha256               String
+  kind                 String // AUTO | MANUAL | PRE_RESTORE
+  schemaVersion        String
+  status               String    @default("OK") // OK | RESTORE_REQUESTED | RESTORE_APPROVED | RESTORED | MISSING
+  restoreRequestedById String?
+  restoreRequestedAt   DateTime?
+  restoreApprovedById  String?
+  restoreApprovedAt    DateTime?
+  restoredAt           DateTime?
+  note                 String    @default("")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  createdById          String?
+  updatedById          String?
+}
+
+model JobRun {
+  id            String    @id @default(cuid())
+  jobCode       String
+  trigger       String // CRON | MANUAL | BOOT
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  status        String    @default("RUNNING") // RUNNING | SUCCESS | FAILED
+  summaryJson   String    @default("{}")
+  error         String?
+  triggeredById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  @@index([jobCode, startedAt])
+}

@@ -1,0 +1,784 @@
+// ---------------------------------------------------------------------------
+// HRMS (spec 11). Salary, bank, Aadhaar and employee PAN are encrypted with PII_KEY.
+// ---------------------------------------------------------------------------
+
+model EmployeeProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  employeeCode     String   @unique // internal, never typed by the user at login (3.9)
+  employeeCategory String   @default("STAFF") // PARTNER | STAFF | ARTICLE | ADMIN | SUPPORT
+  dateOfBirth      String?
+  gender           String?
+  personalEmail    String?
+  personalMobile   String?
+  address          String   @default("")
+  emergencyName    String   @default("")
+  emergencyPhone   String   @default("")
+  bankNameEnc      String?
+  bankAccountEnc   String?
+  bankIfscEnc      String?
+  panEnc           String?
+  aadhaarEnc       String?
+  aadhaarLast4     String? // display only, masked
+  uan              String?
+  esiNumber        String?
+  qualifications   String   @default("")
+  membershipBody   String? // ICAI | ICSI | ICMAI
+  membershipNo     String?
+  joiningDate      String?
+  confirmationDate String?
+  exitDate         String?
+  workStateCode    String? // drives Professional Tax slab
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  user      User               @relation(fields: [userId], references: [id])
+  documents EmployeeDocument[]
+}
+
+model EmployeeDocument {
+  id          String   @id @default(cuid())
+  employeeId  String
+  documentId  String
+  kind        String // KYC | CERTIFICATE | OFFER | APPOINTMENT | OTHER
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  employee EmployeeProfile @relation(fields: [employeeId], references: [id])
+}
+
+model Attendance {
+  id          String    @id @default(cuid())
+  userId      String
+  date        String
+  status      String // PRESENT | HALF_DAY | ABSENT | LEAVE | HOLIDAY | WEEK_OFF
+  location    String?
+  clientId    String?
+  source      String    @default("DERIVED") // DERIVED | CHECK_IN | REGULARISED
+  checkInAt   DateTime?
+  checkInNote String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([userId, date])
+}
+
+model Regularisation {
+  id              String    @id @default(cuid())
+  userId          String
+  date            String
+  requestedStatus String
+  reason          String
+  status          String    @default("PENDING")
+  approverId      String?
+  decidedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  @@index([userId])
+}
+
+model LeavePolicy {
+  id                      String   @id @default(cuid())
+  name                    String
+  employeeCategory        String
+  leaveType               String // PERSONAL | SICK | EXAM_STUDY | OTHER ...
+  quotaHalfDays           Int
+  accrual                 String   @default("ANNUAL") // ANNUAL | MONTHLY
+  carryForwardMaxHalfDays Int      @default(0)
+  encashable              Boolean  @default(false)
+  effectiveFrom           String
+  source                  String   @default("")
+  verifiedById            String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  createdById             String?
+  updatedById             String?
+}
+
+model LeaveBalance {
+  id               String   @id @default(cuid())
+  userId           String
+  leaveType        String
+  fy               String
+  openingHalfDays  Int      @default(0)
+  accruedHalfDays  Int      @default(0)
+  takenHalfDays    Int      @default(0)
+  encashedHalfDays Int      @default(0)
+  adjustedHalfDays Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  @@unique([userId, leaveType, fy])
+}
+
+model LeaveRequest {
+  id                  String    @id @default(cuid())
+  userId              String
+  leaveType           String
+  reason              String // PERSONAL | SICK | HOLIDAY | EXAM_STUDY | OTHER
+  note                String    @default("")
+  fromDate            String
+  toDate              String
+  halfDayStart        Boolean   @default(false)
+  halfDayEnd          Boolean   @default(false)
+  halfDays            Int
+  status              String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  approverId          String?
+  decidedAt           DateTime?
+  decisionNote        String    @default("")
+  conflictsReviewedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String?
+  updatedById         String?
+
+  @@index([userId, fromDate])
+  @@index([status])
+}
+
+model SalaryStructure {
+  id                   String    @id @default(cuid())
+  userId               String
+  effectiveFrom        String
+  kind                 String    @default("SALARY") // SALARY | STIPEND
+  componentsEnc        String // JSON: basic, hra, allowances[], variable (paise)
+  monthlyGrossPaiseEnc String
+  regime               String    @default("NEW") // NEW | OLD
+  status               String    @default("DRAFT") // DRAFT | APPROVED | SUPERSEDED
+  approvedById         String?
+  approvedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  createdById          String?
+  updatedById          String?
+
+  @@index([userId, effectiveFrom])
+}
+
+model PayrollRun {
+  id           String    @id @default(cuid())
+  month        String // YYYY-MM
+  kind         String    @default("SALARY") // SALARY | STIPEND
+  status       String    @default("DRAFT") // DRAFT | REVIEWED | APPROVED | PAID | LOCKED
+  reviewedById String?
+  reviewedAt   DateTime?
+  approvedById String?
+  approvedAt   DateTime?
+  paidAt       DateTime?
+  lockedAt     DateTime?
+  totalsEnc    String?
+  notes        String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  payslips Payslip[]
+
+  @@unique([month, kind])
+}
+
+model Payslip {
+  id            String    @id @default(cuid())
+  runId         String
+  userId        String
+  daysInMonth   Int
+  lopHalfDays   Int       @default(0)
+  linesEnc      String // JSON: earnings[], deductions[] (paise)
+  grossPaiseEnc String
+  netPaiseEnc   String
+  pfPaise       Int       @default(0) // statutory amounts needed for returns data
+  esiPaise      Int       @default(0)
+  ptPaise       Int       @default(0)
+  tdsPaise      Int       @default(0)
+  pdfDocumentId String?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  run PayrollRun @relation(fields: [runId], references: [id])
+
+  @@unique([runId, userId])
+}
+
+model InvestmentDeclaration {
+  id                String    @id @default(cuid())
+  userId            String
+  fy                String
+  regime            String    @default("NEW")
+  itemsEnc          String
+  status            String    @default("DRAFT") // DRAFT | SUBMITTED | PROOFS_SUBMITTED | VERIFIED
+  proofsSubmittedAt DateTime?
+  verifiedById      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  proofs InvestmentProof[]
+
+  @@unique([userId, fy])
+}
+
+model InvestmentProof {
+  id            String   @id @default(cuid())
+  declarationId String
+  section       String
+  amountPaise   Int
+  documentId    String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  declaration InvestmentDeclaration @relation(fields: [declarationId], references: [id])
+}
+
+model Form16 {
+  id            String    @id @default(cuid())
+  userId        String
+  fy            String
+  partADocId    String?
+  pdfDocumentId String?
+  generatedAt   DateTime?
+  issuedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  @@unique([userId, fy])
+}
+
+// ---- Statutory payroll parameters (admin-editable, effective-dated, verified by a Partner)
+
+model PfRate {
+  id                  String    @id @default(cuid())
+  effectiveFrom       String
+  employeeBp          Int
+  employerEpfBp       Int
+  employerEpsBp       Int
+  epsWageCeilingPaise Int
+  pfWageCeilingPaise  Int
+  adminBp             Int       @default(0)
+  edliBp              Int       @default(0)
+  source              String    @default("")
+  verifiedById        String?
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String?
+  updatedById         String?
+}
+
+model EsiRate {
+  id               String    @id @default(cuid())
+  effectiveFrom    String
+  employeeBp       Int
+  employerBp       Int
+  wageCeilingPaise Int
+  source           String    @default("")
+  verifiedById     String?
+  verifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdById      String?
+  updatedById      String?
+}
+
+model ProfessionalTaxSlab {
+  id                  String    @id @default(cuid())
+  stateCode           String
+  fromPaise           Int
+  toPaise             Int?
+  amountPaise         Int
+  gender              String    @default("ANY")
+  overrideMonth       Int? // e.g. February in some states
+  overrideAmountPaise Int?
+  effectiveFrom       String
+  source              String    @default("")
+  verifiedById        String?
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String?
+  updatedById         String?
+
+  @@index([stateCode, effectiveFrom])
+}
+
+model IncomeTaxSlab {
+  id           String    @id @default(cuid())
+  fy           String
+  regime       String // NEW | OLD
+  fromPaise    Int
+  toPaise      Int?
+  rateBp       Int
+  source       String    @default("")
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@index([fy, regime])
+}
+
+/// Standard deduction, rebate limit/amount, cess, surcharge bands etc. (value in paise or bp per key).
+model TaxParameter {
+  id           String    @id @default(cuid())
+  fy           String
+  regime       String    @default("ANY")
+  key          String
+  valueInt     Int
+  unit         String    @default("PAISE") // PAISE | BP
+  source       String    @default("")
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  @@unique([fy, regime, key])
+}
+
+model StipendMinimum {
+  id             String    @id @default(cuid())
+  institute      String // ICAI | ICSI
+  locationClass  String
+  yearOfTraining Int
+  amountPaise    Int
+  effectiveFrom  String
+  source         String    @default("")
+  verifiedById   String?
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdById    String?
+  updatedById    String?
+}
+
+model CpeRequirement {
+  id                String    @id @default(cuid())
+  institute         String
+  memberClass       String
+  blockStartYear    Int
+  blockYears        Int
+  structuredMinutes Int
+  totalMinutes      Int
+  perYearMinutes    Int
+  effectiveFrom     String
+  source            String    @default("")
+  verifiedById      String?
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  updatedById       String?
+}
+
+model ConveyanceRate {
+  id            String   @id @default(cuid())
+  mode          String // TWO_WHEELER | FOUR_WHEELER | PER_VISIT
+  ratePaise     Int
+  effectiveFrom String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+}
+
+// ---- Recruitment, onboarding, appraisal, CPE, skills
+
+model Opening {
+  id          String   @id @default(cuid())
+  title       String
+  kind        String   @default("STAFF") // STAFF | ARTICLE
+  status      String   @default("OPEN")
+  ownerId     String?
+  openedAt    String
+  closedAt    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id               String   @id @default(cuid())
+  openingId        String
+  name             String
+  email            String?
+  phone            String?
+  source           String   @default("")
+  stage            String   @default("APPLIED") // APPLIED | SCREENING | TEST | INTERVIEW | OFFER | JOINED | REJECTED
+  rejectedReason   String?
+  resumeDocId      String?
+  offerLetterDocId String?
+  joinedUserId     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  opening    Opening     @relation(fields: [openingId], references: [id])
+  interviews Interview[]
+}
+
+model Interview {
+  id             String   @id @default(cuid())
+  candidateId    String
+  interviewerId  String
+  scheduledAt    String
+  scoreJson      String   @default("{}")
+  recommendation String?
+  notes          String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+}
+
+model EmployeeOnboardingItem {
+  id          String    @id @default(cuid())
+  userId      String
+  code        String
+  label       String
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([userId, code])
+}
+
+model AppraisalCycle {
+  id          String   @id @default(cuid())
+  name        String
+  kind        String   @default("ANNUAL") // ANNUAL | HALF_YEARLY
+  startDate   String
+  endDate     String
+  status      String   @default("GOAL_SETTING") // GOAL_SETTING | SELF_REVIEW | MANAGER_REVIEW | MODERATION | CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  reviews AppraisalReview[]
+}
+
+model AppraisalReview {
+  id                        String    @id @default(cuid())
+  cycleId                   String
+  userId                    String
+  managerId                 String?
+  partnerId                 String?
+  selfReview                String    @default("")
+  selfSubmittedAt           DateTime?
+  managerReview             String    @default("")
+  managerRating             Int?
+  managerSubmittedAt        DateTime?
+  moderatedRating           Int?
+  finalRating               Int?
+  incrementRecommendationBp Int?
+  evidenceSnapshotJson      String    @default("{}")
+  status                    String    @default("OPEN")
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  createdById               String?
+  updatedById               String?
+
+  cycle AppraisalCycle @relation(fields: [cycleId], references: [id])
+  goals Goal[]
+
+  @@unique([cycleId, userId])
+}
+
+model Goal {
+  id             String   @id @default(cuid())
+  reviewId       String
+  title          String
+  description    String   @default("")
+  weightPct      Int      @default(0)
+  status         String   @default("OPEN")
+  selfComment    String   @default("")
+  managerComment String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  review AppraisalReview @relation(fields: [reviewId], references: [id])
+}
+
+model CPELog {
+  id               String   @id @default(cuid())
+  userId           String
+  date             String
+  minutes          Int
+  structured       Boolean  @default(true)
+  provider         String   @default("")
+  topic            String
+  certificateDocId String?
+  workEntryId      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String?
+  updatedById      String?
+
+  @@index([userId, date])
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  serviceLine String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model EmployeeSkill {
+  id          String   @id @default(cuid())
+  userId      String
+  skillId     String
+  level       Int      @default(1) // 1..4
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([userId, skillId])
+}
+
+model TrainingSession {
+  id          String   @id @default(cuid())
+  title       String
+  date        String
+  minutes     Int
+  trainer     String   @default("")
+  cpeEligible Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+}
+
+model TrainingAttendance {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  attended    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([sessionId, userId])
+}
+
+model ExpenseClaim {
+  id                String    @id @default(cuid())
+  userId            String
+  date              String
+  kind              String // CONVEYANCE | TRAVEL | OTHER
+  amountPaise       Int
+  distanceKm        Int?
+  clientId          String?
+  workEntryId       String?
+  clientRecoverable Boolean   @default(false)
+  description       String    @default("")
+  receiptDocId      String?
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED | PAID
+  approverId        String?
+  decidedAt         DateTime?
+  paidVia           String? // PAYROLL | SEPARATE
+  paidAt            DateTime?
+  payrollRunId      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  tag          String   @unique
+  kind         String // LAPTOP | PHONE | DONGLE | OTHER
+  description  String   @default("")
+  serial       String   @default("")
+  purchaseDate String?
+  condition    String   @default("GOOD")
+  status       String   @default("IN_STOCK") // IN_STOCK | ASSIGNED | RETIRED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String?
+  updatedById  String?
+
+  assignments AssetAssignment[]
+}
+
+model AssetAssignment {
+  id                String   @id @default(cuid())
+  assetId           String
+  userId            String
+  issuedAt          String
+  returnedAt        String?
+  conditionOnReturn String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@index([userId])
+}
+
+model ExitCase {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  resignationDate       String
+  lastWorkingDate       String?
+  noticeDays            Int      @default(0)
+  status                String   @default("NOTICE") // NOTICE | HANDOVER | FNF | CLOSED
+  ffComputedEnc         String?
+  relievingLetterDocId  String?
+  experienceLetterDocId String?
+  instituteClosureNote  String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdById           String?
+  updatedById           String?
+
+  items ExitChecklistItem[]
+}
+
+model ExitChecklistItem {
+  id          String    @id @default(cuid())
+  exitCaseId  String
+  code        String
+  label       String
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+  updatedById String?
+
+  exitCase ExitCase @relation(fields: [exitCaseId], references: [id])
+
+  @@unique([exitCaseId, code])
+}
+
+model PolicyDocument {
+  id            String   @id @default(cuid())
+  title         String
+  kind          String // LEAVE | CONDUCT | CONFIDENTIALITY | WFH | OTHER
+  version       Int      @default(1)
+  documentId    String?
+  body          String   @default("")
+  effectiveFrom String
+  requiresAck   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  acknowledgments PolicyAcknowledgment[]
+}
+
+model PolicyAcknowledgment {
+  id             String   @id @default(cuid())
+  policyId       String
+  userId         String
+  acknowledgedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String?
+  updatedById    String?
+
+  policy PolicyDocument @relation(fields: [policyId], references: [id])
+
+  @@unique([policyId, userId])
+}
+
+model ArticleshipRecord {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  institute         String   @default("ICAI") // ICAI | ICSI
+  registrationNo    String
+  principalId       String
+  startDate         String
+  expectedEndDate   String
+  revisedEndDate    String?
+  leaveEntitledDays Int      @default(0)
+  stipendYear       Int      @default(1)
+  status            String   @default("ACTIVE") // ACTIVE | COMPLETED | TERMINATED | TRANSFERRED
+  completionDate    String?
+  terminationDate   String?
+  notes             String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  entries ArticleshipNote[]
+}
+
+model ArticleshipNote {
+  id          String   @id @default(cuid())
+  recordId    String
+  authorId    String
+  date        String
+  kind        String // PRINCIPAL_NOTE | FEEDBACK | CLASS | EXAM
+  text        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  record ArticleshipRecord @relation(fields: [recordId], references: [id])
+}
+
+model HRLetter {
+  id                String    @id @default(cuid())
+  userId            String
+  kind              String // OFFER | APPOINTMENT | CONFIRMATION | INCREMENT | EXPERIENCE | RELIEVING
+  templateVersionId String?
+  documentId        String?
+  issuedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String?
+  updatedById       String?
+
+  @@index([userId])
+}
