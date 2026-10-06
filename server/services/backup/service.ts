@@ -61,7 +61,7 @@ export async function backupFileForDownload(actor: Actor, backupId: string) {
 export async function uploadBackup(actor: Actor, originalName: string, data: Buffer) {
   authorize(actor, "backup.download");
   fs.mkdirSync(backupDir(), { recursive: true });
-  const name = `uploaded-${Date.now()}-${safeName(originalName.endsWith(".zip") ? originalName : `${originalName}.zip`)}`;
+  const name = `uploaded-${Date.now()}-${safeName(/\.(zip|qbk)$/.test(originalName) ? originalName : `${originalName}.zip`)}`;
   fs.writeFileSync(path.join(backupDir(), name), data);
   try {
     verifyBackup(name);

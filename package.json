@@ -26,7 +26,10 @@
     "demo:totp": "tsx scripts/demo-totp.ts",
     "db:stats": "tsx scripts/db-stats.ts",
     "dev:lan": "next dev -H 0.0.0.0",
-    "start:lan": "next start -H 0.0.0.0"
+    "start:lan": "next start -H 0.0.0.0",
+    "lan:cert": "tsx scripts/lan-https.ts --cert-only",
+    "dev:lan:https": "tsx scripts/lan-https.ts --cert-only && next dev -H 0.0.0.0 --experimental-https --experimental-https-key certs/qepex-lan.key --experimental-https-cert certs/qepex-lan.crt",
+    "start:lan:https": "NODE_ENV=production tsx scripts/lan-https.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -52,6 +55,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.89.0",
+    "selfsigned": "^5.5.0",
     "tailwind-merge": "^3.7.0",
     "tsx": "^4.23.15",
     "zod": "^4.6.5"

@@ -21,7 +21,7 @@ export function BackupNow() {
 export function UploadBackup() {
   return (
     <FormDialog trigger="Upload a backup" title="Upload a backup file" description="Bring in a backup taken on another computer. It is checked before it can be restored." action={uploadBackupAction} submitLabel="Upload">
-      {() => <Field label="Backup (.zip)"><Input type="file" name="file" accept=".zip" required className="h-auto py-1.5" /></Field>}
+      {() => <Field label="Backup file (.qbk or .zip)"><Input type="file" name="file" accept=".qbk,.zip" required className="h-auto py-1.5" /></Field>}
     </FormDialog>
   );
 }

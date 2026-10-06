@@ -8,3 +8,4 @@ process.env.PII_KEY = Buffer.alloc(32, 9).toString("base64");
 process.env.AUTH_SECRET = "test-secret-test-secret-test-secret";
 process.env.BCRYPT_COST = "4";
 process.env.DEMO_MODE = "true";
+process.env.BACKUP_KEY = Buffer.alloc(32, 5).toString("base64");

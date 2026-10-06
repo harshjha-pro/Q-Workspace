@@ -5,7 +5,7 @@ import { resetDb } from "../helpers/db";
 import { makeUser, actorOf, makeClient } from "../helpers/factory";
 import { db } from "@/server/lib/db";
 import { backupNow, requestRestore, approveAndRestore, listBackups, backupFileForDownload, automaticBackup } from "@/server/services/backup/service";
-import { backupDir } from "@/server/services/backup/archive";
+import { backupDir, verifyBackup } from "@/server/services/backup/archive";
 import { storeFile } from "@/server/lib/storage";
 
 beforeAll(async () => {
@@ -57,6 +57,24 @@ describe("backup and restore (P1-14, P2-36)", () => {
     const b = await backupNow(actorOf(pa));
     fs.writeFileSync(path.join(backupDir(), b.fileName), "not a zip");
     await expect(requestRestore(actorOf(pa), b.id, "x")).rejects.toThrow();
+  });
+
+  it("backups are encrypted with BACKUP_KEY and refuse a different key (Q-27)", async () => {
+    const pa = await makeUser("PRACTICE_ADMIN");
+    const b = await backupNow(actorOf(pa));
+    expect(b.fileName.endsWith(".qbk")).toBe(true);
+    const bytes = fs.readFileSync(path.join(backupDir(), b.fileName));
+    expect(bytes.subarray(0, 8).toString()).toBe("QEPEXBK1");
+    expect(bytes.includes(Buffer.from("SQLite format 3"))).toBe(false);
+    expect(bytes.includes(Buffer.from("manifest.json"))).toBe(false);
+    expect(verifyBackup(b.fileName).app).toBe("qepex-work-tracker");
+    const key = process.env.BACKUP_KEY;
+    process.env.BACKUP_KEY = Buffer.alloc(32, 1).toString("base64");
+    try {
+      expect(() => verifyBackup(b.fileName)).toThrow(/different BACKUP_KEY/);
+    } finally {
+      process.env.BACKUP_KEY = key;
+    }
   });
 
   it("automatic backups are recorded", async () => {

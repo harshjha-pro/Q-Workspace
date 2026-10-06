@@ -11,7 +11,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const f = await backupFileForDownload(s.actor, id);
     return new Response(new Uint8Array(fs.readFileSync(f.abs)), {
-      headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="${f.fileName}"`, "cache-control": "no-store" },
+      headers: { "content-type": f.fileName.endsWith(".zip") ? "application/zip" : "application/octet-stream", "content-disposition": `attachment; filename="${f.fileName}"`, "cache-control": "no-store" },
     });
   } catch (e) {
     return new Response(isDomainError(e) ? e.message : "Error", { status: isDomainError(e) && e.code === "FORBIDDEN" ? 403 : 404 });

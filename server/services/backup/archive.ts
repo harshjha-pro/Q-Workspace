@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
 import AdmZip from "adm-zip";
 import { createClient } from "@libsql/client";
 
@@ -34,6 +34,44 @@ async function schemaVersionOfDb(file: string): Promise<string> {
     c.close();
   }
 }
+
+// Encrypted container (decisions D-39, Q-27): "QEPEXBK1" | iv(12) | tag(16) | AES-256-GCM(zip bytes).
+// The key is BACKUP_KEY in .env; without it a backup file is unreadable, so .env must be kept safely too.
+const MAGIC = Buffer.from("QEPEXBK1");
+
+function backupKey(): Buffer | null {
+  const raw = process.env.BACKUP_KEY;
+  if (!raw) return null;
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) throw new Error("BACKUP_KEY must be 32 bytes (base64) — run npm run setup");
+  return key;
+}
+
+export function sealBackup(zipBytes: Buffer): Buffer {
+  const key = backupKey();
+  if (!key) return zipBytes;
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([c.update(zipBytes), c.final()]);
+  return Buffer.concat([MAGIC, iv, c.getAuthTag(), data]);
+}
+
+export function openBackupBytes(bytes: Buffer): Buffer {
+  if (!bytes.subarray(0, MAGIC.length).equals(MAGIC)) return bytes; // plain zip from before encryption
+  const key = backupKey();
+  if (!key) throw new Error("This backup is encrypted and BACKUP_KEY is not set in .env.");
+  const iv = bytes.subarray(8, 20);
+  const tag = bytes.subarray(20, 36);
+  try {
+    const d = createDecipheriv("aes-256-gcm", key, iv);
+    d.setAuthTag(tag);
+    return Buffer.concat([d.update(bytes.subarray(36)), d.final()]);
+  } catch {
+    throw new Error("This backup was encrypted with a different BACKUP_KEY or is damaged.");
+  }
+}
+
+const openZip = (fileName: string) => new AdmZip(openBackupBytes(fs.readFileSync(path.join(backupDir(), safeName(fileName)))));
 
 function addDirToZip(zip: AdmZip, dir: string, zipRoot: string): number {
   if (!fs.existsSync(dir)) return 0;
@@ -73,14 +111,15 @@ export async function createBackupFile(kind: BackupKind): Promise<string> {
     storageFiles,
   };
   zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2)));
-  const name = `qepex-${stamp}-${kind.toLowerCase()}.zip`;
-  zip.writeZip(path.join(backupDir(), name));
+  const encrypted = backupKey() !== null;
+  const name = `qepex-${stamp}-${kind.toLowerCase()}.${encrypted ? "qbk" : "zip"}`;
+  fs.writeFileSync(path.join(backupDir(), name), sealBackup(zip.toBuffer()));
   fs.rmSync(snapshot, { force: true });
   return name;
 }
 
 export function readManifest(fileName: string): Manifest {
-  const zip = new AdmZip(path.join(backupDir(), safeName(fileName)));
+  const zip = openZip(fileName);
   const entry = zip.getEntry("manifest.json");
   if (!entry) throw new Error("Not a QEPEX backup (manifest missing).");
   const m = JSON.parse(entry.getData().toString("utf8")) as Manifest;
@@ -90,7 +129,7 @@ export function readManifest(fileName: string): Manifest {
 
 /** Check integrity: the DB inside the zip must match the manifest hash. */
 export function verifyBackup(fileName: string): Manifest {
-  const zip = new AdmZip(path.join(backupDir(), safeName(fileName)));
+  const zip = openZip(fileName);
   const m = readManifest(fileName);
   const dbEntry = zip.getEntry("qepex.db");
   if (!dbEntry) throw new Error("Backup has no database.");
@@ -106,7 +145,7 @@ export function verifyBackup(fileName: string): Manifest {
  * The backup DB is first brought to the current schema with `migrate` so the columns match.
  */
 export async function restoreBackupIntoLive(fileName: string, migrate: (dbFilePath: string) => void) {
-  const zip = new AdmZip(path.join(backupDir(), safeName(fileName)));
+  const zip = openZip(fileName);
   const work = path.join(backupDir(), `.restore-${Date.now()}`);
   fs.mkdirSync(work, { recursive: true });
   const tmpDb = path.join(work, "restore.db");
@@ -149,7 +188,7 @@ export async function restoreBackupIntoLive(fileName: string, migrate: (dbFilePa
 
 export function safeName(fileName: string): string {
   const base = path.basename(fileName);
-  if (!/^[A-Za-z0-9._-]+\.zip$/.test(base)) throw new Error("Invalid backup file name.");
+  if (!/^[A-Za-z0-9._-]+\.(zip|qbk)$/.test(base)) throw new Error("Invalid backup file name.");
   return base;
 }
 

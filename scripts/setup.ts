@@ -19,7 +19,7 @@ function ensureEnv() {
     console.log("• Created .env from .env.example");
   }
   let text = fs.readFileSync(".env", "utf8");
-  for (const key of ["VAULT_KEY", "PII_KEY", "AUTH_SECRET"]) {
+  for (const key of ["VAULT_KEY", "PII_KEY", "BACKUP_KEY", "AUTH_SECRET"]) {
     const re = new RegExp(`^${key}="?([^"\\n]*)"?$`, "m");
     const m = re.exec(text);
     if (m && m[1]) continue;
