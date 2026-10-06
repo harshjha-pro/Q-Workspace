@@ -47,7 +47,9 @@ function canSeePii(actor: Actor, userId: string) {
 }
 
 export async function getEmployeeProfile(actor: Actor, userId: string) {
-  await assertUserAccess(actor, "hr.records.view", userId);
+  // Everyone may see their own record, whatever their role's HR scope (spec 3.3 "own").
+  const self = actor.kind === "USER" && actor.userId === userId;
+  if (!self) await assertUserAccess(actor, "hr.records.view", userId);
   const p = await db().employeeProfile.findUnique({
     where: { userId },
     include: { user: { select: { displayName: true, role: true, designation: true, reportingManager: { select: { displayName: true } } } }, documents: true },

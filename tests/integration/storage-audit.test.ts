@@ -66,6 +66,15 @@ describe("audit trail (P1-05) and sensitive views (P1-09)", () => {
     await expect(upsertEmployeeProfile(actorOf(m), s.id, {})).rejects.toThrow(/access/);
   });
 
+  it("everyone can read their own record, even roles without HR scope", async () => {
+    const hr = await makeUser("HR_ADMIN");
+    const pa = await makeUser("PRACTICE_ADMIN");
+    await upsertEmployeeProfile(actorOf(hr), pa.id, { pan: "ABCPD1234E" });
+    expect((await getEmployeeProfile(actorOf(pa), pa.id))?.pan).toBe("ABCPD1234E");
+    const other = await makeUser("STAFF");
+    await expect(getEmployeeProfile(actorOf(pa), other.id)).rejects.toThrow(/access/);
+  });
+
   it("logSensitiveView records the viewer", async () => {
     const p = await makeUser("PARTNER");
     await logSensitiveView(actorOf(p), "CREDENTIAL", "Credential", "c1", "password");

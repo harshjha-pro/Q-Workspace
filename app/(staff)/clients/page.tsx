@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireStaff } from "@/server/context";
 import { listClients, listGroups } from "@/server/services/clients/service";
 import { can } from "@/server/permissions/guards";
+import { requireCap } from "@/lib/page";
 import { PageHeader } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { ClientsTable, type ClientRow } from "./clients-table";
@@ -10,6 +11,7 @@ export const metadata = { title: "Clients" };
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ status?: string; group?: string }> }) {
   const actor = await requireStaff();
+  requireCap(actor, "client.view");
   const sp = await searchParams;
   const [clients, groups] = await Promise.all([listClients(actor, { status: sp.status, groupId: sp.group }), listGroups(actor)]);
   const rows: ClientRow[] = clients.map((c) => ({

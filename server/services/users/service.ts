@@ -237,6 +237,11 @@ export async function custodyReport(actor: Actor, userId: string): Promise<Custo
       select: { id: true, name: true, code: true },
     }),
   ]);
+  // HR Admin runs exits but has no client data (spec 3.6): client-linked items are counted, not named.
+  if (!can(actor, "client.view")) {
+    const hidden = (n: number, what: string) => (n ? [{ id: "-", title: `${n} ${what} (ask the Practice Admin)`, name: `${n} ${what} (ask the Practice Admin)`, code: "", documentDesc: `${n} ${what} (ask the Practice Admin)`, clientId: "", effectiveDueDate: null }] : []);
+    return { dscs, documents: hidden(documents.length, "client documents"), assets, openTasks: hidden(openTasks.length, "open tasks"), activeEngagements: hidden(activeEngagements.length, "engagements") };
+  }
   return { dscs, documents, assets, openTasks, activeEngagements };
 }
 
