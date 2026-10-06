@@ -40,7 +40,7 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-27 | **Encrypted backups.** Backups hold the full database. Vault, salary and PII fields stay encrypted inside them, but client names, PANs and work data are readable by anyone who gets the .zip. | Encrypt each backup zip with a `BACKUP_PASSPHRASE` from `.env` (AES-256-GCM), required to restore. | Phase 2 |
 | Q-28 | Can a Manager create new clients for their team, or only Partners and the Practice Admin? (The spec matrix lets Managers manage their own clients; today a Manager-created client is placed under that Manager.) | Keep as built | — |
 
-## Needed during Phase 2
+## Needed during Phase 2 (accepted 6 Oct 2026 — built as proposed)
 
 | # | Question | Proposal |
 |---|---|---|
@@ -49,6 +49,15 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-12 | Weekly lock: week = Monday–Saturday, lock Sunday 16:00 IST, working Saturdays all year? | Yes, as settings |
 | Q-13 | Notice response default when the notice gives no date: received + N days — what N? Alert schedule 7/3/1 confirmed | N = 15, setting |
 | Q-14 | Review level per engagement type (spec gives examples): GST/TDS → Senior or Manager; ITR non-audit → Manager; ITR audit, audit reports, certificates → Partner; ROC → Manager prepares, Partner approves before DSC signing. EQR threshold: by fee, by entity type (listed/public interest), or both? | As listed; EQR threshold = fee ≥ setting OR entity flagged "public interest" |
+
+## New from Phase 2 (my proposal applies unless you say otherwise)
+
+| # | Question | Proposal | Blocks |
+|---|---|---|---|
+| Q-29 | **Verifying statutory values.** Every seeded due-date rule and late-fee rate is marked *Unverified* until a Partner checks it against the official notification in Admin → Due-date master. Who will do this, and must it be done before daily use starts? | A Partner verifies all rules before go-live; until then the app works but shows the Unverified badge | Daily use |
+| Q-30 | **UDIN reminder.** A signed report shows "Awaiting UDIN" and reminds the signing Partner after **7 days** (setting `udin.awaitingDays`). Is 7 days right for the firm? | Keep 7, editable | — |
+| Q-31 | **Office state(s) for holidays.** Due-date holiday shifting and the calendar use national and firm holidays. Which state(s) are the offices in, so state holidays can be added for leave and the calendar? | Add the office state's holidays as firm holidays each year | — |
+| Q-32 | **Start of daily use.** Phase 2 is usable for daily work entry, the compliance calendar, review and registers. Start using it now (with real data imported), or wait for a single go-live after Phase 5? (Spec §16.1 decision 1.) | Your call; if now, set `DEMO_MODE=false` on a fresh install and import clients/people | — |
 
 ## Needed during Phase 3
 
