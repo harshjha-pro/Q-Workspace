@@ -1,6 +1,7 @@
 import { db } from "../lib/db";
 import { automaticBackup } from "../services/backup/service";
 import { syncAllClients } from "../services/compliance/sync";
+import { runReminders } from "../services/reminders/service";
 
 export type JobDef = {
   code: string;
@@ -24,6 +25,16 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "PRACTICE_ADMIN"],
     run: async () => syncAllClients(),
+  },
+  {
+    code: "REMINDERS",
+    name: "Reminders and escalations",
+    description: "Due-date reminders (7/3/1 days), overdue escalation to manager and partner, pending-from-client follow-ups, review waits, notices and hearings, DSC expiry, UDINs, password changes, missing work entries and the weekly lock warning.",
+    cron: "30 7 * * *",
+    scheduleLabel: "Daily 07:30 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runReminders(),
   },
   {
     code: "AUTO_BACKUP",
