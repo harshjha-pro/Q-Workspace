@@ -112,7 +112,17 @@ const BADGES = [
   ["FAST_LEARNER", "Fast Learner"], ["TEAM_PLAYER", "Team Player"], ["PROBLEM_SOLVER", "Problem Solver"],
 ] as const;
 
+/** Rules Spec 4.2 event types (dates live in EventDate per client). */
+const EVENT_TYPES = [
+  ["AGM", "Annual general meeting"], ["AUDITOR_APPOINTMENT", "Auditor appointment"], ["INCORPORATION", "Incorporation"],
+  ["NOTICE_RECEIVED", "Notice received"], ["DIRECTOR_APPOINTMENT", "Director appointment"], ["DIRECTOR_RESIGNATION", "Director resignation"],
+  ["GST_CANCELLATION", "GST registration cancelled"],
+] as const;
+
 export async function seedReference(db: PrismaClient) {
+  for (const [code, name] of EVENT_TYPES) {
+    await db.eventType.upsert({ where: { code }, create: { code, name }, update: { name } });
+  }
   for (const [i, [code, name, description]] of ROLES.entries()) {
     await db.role.upsert({ where: { code }, create: { code, name, description, sortOrder: i }, update: { name, description, sortOrder: i } });
   }

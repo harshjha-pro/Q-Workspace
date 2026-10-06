@@ -14,7 +14,8 @@ export function createPrisma(url: string) {
 /** The shared client. A function (not a constant) so backup-restore can swap the file and reconnect. */
 export function db(): PrismaClient {
   if (!g.__qepexPrisma) {
-    g.__qepexPrisma = createPrisma(env().DATABASE_URL);
+    // Read DATABASE_URL at connect time (tests point each file at its own copy).
+    g.__qepexPrisma = createPrisma(process.env.DATABASE_URL ?? env().DATABASE_URL);
     // WAL lets the many readers on the LAN work while one write is in progress.
     g.__qepexPragmas = g.__qepexPrisma
       .$queryRawUnsafe("PRAGMA journal_mode=WAL")

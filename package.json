@@ -22,7 +22,9 @@
     "db:migrate:dev": "prisma migrate dev",
     "seed": "tsx prisma/seed/index.ts",
     "demo:reset": "tsx scripts/reset-demo.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "demo:totp": "tsx scripts/demo-totp.ts",
+    "db:stats": "tsx scripts/db-stats.ts"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
