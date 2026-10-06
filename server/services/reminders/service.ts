@@ -35,7 +35,16 @@ export async function runReminders(today = todayIst()) {
     managerId: t.engagement?.managerId ?? t.client.managerId,
     partnerId: t.engagement?.partnerId ?? t.client.partnerId,
   }));
-  for (const e of remindersDue(input, today, DEFAULT_REMINDERS)) {
+  const cfg = {
+    upcomingDays: await getSetting<number[]>("reminders.upcomingDays", DEFAULT_REMINDERS.upcomingDays),
+    managerEscalationDays: await getSettingNumber("reminders.managerEscalationDays", DEFAULT_REMINDERS.managerEscalationDays),
+    partnerEscalationDays: await getSettingNumber("reminders.partnerEscalationDays", DEFAULT_REMINDERS.partnerEscalationDays),
+    pendingFollowUpEveryDays: await getSettingNumber("reminders.pendingFollowUpEveryDays", DEFAULT_REMINDERS.pendingFollowUpEveryDays),
+    pendingEscalationDays: await getSettingNumber("reminders.pendingEscalationDays", DEFAULT_REMINDERS.pendingEscalationDays),
+    pendingEscalationDueWithinDays: await getSettingNumber("reminders.pendingEscalationDueWithinDays", DEFAULT_REMINDERS.pendingEscalationDueWithinDays),
+    reviewSlaDays: await getSettingNumber("reminders.reviewSlaDays", DEFAULT_REMINDERS.reviewSlaDays),
+  };
+  for (const e of remindersDue(input, today, cfg)) {
     add(e.kind, await notifyUsers(e.userIds, { kind: e.kind, title: e.title, link: `/tasks/${e.taskId}`, entityType: "Task", entityId: e.taskId, priority: e.priority, dedupeKey: e.dedupeKey }));
   }
 

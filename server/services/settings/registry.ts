@@ -25,6 +25,13 @@ export const SETTING_DEFAULTS = {
   "dsc.expiryAlertDays": { value: [30, 7], description: "DSC expiry alerts (days before expiry)" },
   "credentials.changeAfterDays": { value: 90, description: "Flag 'change periodically' credentials older than this" },
   "work.missingEntryLookbackDays": { value: 14, description: "Days checked for missing work entries" },
+  "reminders.upcomingDays": { value: [7, 3, 1], description: "Due-date reminders: days before the due date (Rules Spec 9)" },
+  "reminders.managerEscalationDays": { value: 1, description: "Overdue by this many days → escalate to the Manager" },
+  "reminders.partnerEscalationDays": { value: 3, description: "Overdue by this many days → escalate to the Partner" },
+  "reminders.pendingFollowUpEveryDays": { value: 3, description: "Pending from client: remind the assignee to follow up every N days" },
+  "reminders.pendingEscalationDays": { value: 10, description: "Pending from client this long with the due date near → escalate to the Manager" },
+  "reminders.pendingEscalationDueWithinDays": { value: 5, description: "…when the due date is within this many days" },
+  "reminders.reviewSlaDays": { value: 2, description: "Review waiting this long → remind the checker (twice as long → Partner)" },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
