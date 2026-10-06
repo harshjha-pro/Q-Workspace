@@ -383,4 +383,8 @@ export async function seedDemo(db: PrismaClient) {
     if (has("N")) await mk({ name: pick(["Notice u/s 143(2) AY 2024-25", "GST notice ASMT-10 FY 2023-24", "Notice u/s 148 AY 2022-23"]), serviceLine: "DIRECT_TAX", type: "NOTICE", recurrence: "ONE_TIME", feeBasis: "TIME", fee: 0, budgetHours: 25, checkerRole: "MANAGER" });
     if (has("Y") || (isCo && rand() < 0.35)) await mk({ name: pick(["Project report for bank loan", "Business valuation", "FEMA compliance review", "Startup India registration"]), serviceLine: "ADVISORY", type: "OTHER", recurrence: "ONE_TIME", fee: 75000, budgetHours: 40, checkerRole: "MANAGER" });
   }
+
+  // Phase 2 activity: compliance tasks, six months of entries, registers, leave.
+  const { seedActivity } = await import("./activity");
+  await seedActivity();
 }
