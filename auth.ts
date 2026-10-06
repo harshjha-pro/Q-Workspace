@@ -23,6 +23,14 @@ function clientIp(req: Request | undefined): string | undefined {
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  // Wrong passwords and the TOTP step are expected events (already recorded in LoginAttempt);
+  // keep them out of the server log so real errors stand out.
+  logger: {
+    error(error) {
+      if (error.name === "CredentialsSignin" || (error as { type?: string }).type === "CredentialsSignin") return;
+      console.error(error);
+    },
+  },
   session: { strategy: "jwt", maxAge: 12 * 3600 },
   pages: { signIn: "/login" },
   providers: [

@@ -11,8 +11,9 @@ next-env.d.ts
 # secrets and local data — never commit
 .env
 .env.local
-prisma/data/
-storage/
-backups/
-logs/
-tests/.tmp/
+# anchored to the repo root so app routes such as app/(staff)/admin/backups are NOT ignored
+/prisma/data/
+/storage/
+/backups/
+/logs/
+/tests/.tmp/
