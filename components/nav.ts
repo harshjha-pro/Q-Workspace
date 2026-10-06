@@ -28,7 +28,7 @@ const NAV: NavDef[] = [
   { href: "/people", label: "People", section: "People", check: canListPeople },
   { href: "/me", label: "My profile", section: "People" },
   { href: "/admin/compliance", label: "Due-date master", section: "Admin", cap: "dueDateMaster.manage" },
-  { href: "/admin/templates", label: "Stage templates", section: "Admin", cap: "templates.approve" },
+  { href: "/admin/templates", label: "Stage templates", section: "Admin", check: (a) => can(a, "templates.manage") && a.kind === "USER" && a.role !== "HR_ADMIN" },
   { href: "/admin/teams", label: "Client teams", section: "Admin", cap: "users.manage" },
   { href: "/admin/import", label: "Import", section: "Admin", cap: "import.run" },
   { href: "/admin/backups", label: "Backup & restore", section: "Admin", cap: "backup.restore.request" },

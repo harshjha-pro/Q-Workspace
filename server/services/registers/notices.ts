@@ -100,7 +100,7 @@ export async function listNotices(actor: Actor, f: { status?: string; clientId?:
     where: {
       AND: [
         ids === null ? {} : { OR: [inClients(ids), ...mine] },
-        f.status ? { status: f.status } : { status: { not: "CLOSED" } },
+        f.status === "ALL" ? {} : f.status ? { status: f.status } : { status: { not: "CLOSED" } },
         f.clientId ? { clientId: f.clientId } : {},
         f.authority ? { authority: f.authority } : {},
       ],
@@ -128,6 +128,15 @@ export async function updateNotice(actor: Actor, id: string, input: Partial<z.in
       data: { ...rest, ...(demandRupees !== undefined ? { demandPaise: Math.round(demandRupees * 100) } : {}), closedAt: d.status === "CLOSED" ? new Date() : d.status ? null : undefined, updatedById: idOf(actor) },
     });
     if (d.responseDueDate && before.taskId) await tx.task.update({ where: { id: before.taskId }, data: { effectiveDueDate: d.responseDueDate } });
+    // The response task follows the notice's people, so the right person gets its reminders.
+    if (before.taskId) {
+      const people: [string | null | undefined, string | null, string[]][] = [[d.assigneeId, before.assigneeId, ["ASSIGNEE", "MAKER"]], [d.reviewerId, before.reviewerId, ["CHECKER"]]];
+      for (const [next, prev, roles] of people) {
+        if (next === undefined || next === prev) continue;
+        await tx.taskAssignment.updateMany({ where: { taskId: before.taskId, role: { in: roles }, toDate: null }, data: { toDate: todayIst() } });
+        if (next) for (const role of roles) await tx.taskAssignment.create({ data: { taskId: before.taskId, userId: next, role, fromDate: todayIst(), createdById: idOf(actor) } });
+      }
+    }
     await writeAudit(tx, actor, { entityType: "Notice", entityId: id, action: "UPDATE", before, after });
     return after;
   });

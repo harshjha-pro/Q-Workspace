@@ -9,7 +9,7 @@ import { writeAudit } from "../../audit";
 import { todayIst, isIsoDate } from "../../lib/dates";
 import { zIsoDate } from "../../domain/enums";
 import {
-  computeDueDate, pickRule, periodFromKey, previewExtension as previewEngine, planExtension, valueAt,
+  computeDueDate, pickRule, periodFromKey, previewExtension as previewEngine, matchExtension, planExtension, valueAt,
   type DueRuleParams, type ExtensionDef, type TaskForExtension,
 } from "../../compliance-engine";
 import { syncClientCompliance, syncAllClients, applyUpdates, toExisting } from "./sync";
@@ -268,9 +268,12 @@ export async function createExtension(actor: Actor, input: ExtensionInput) {
 export async function previewExtension(actor: Actor, extensionId: string) {
   authorize(actor, "extension.publish");
   const def = await extensionDef(extensionId);
-  const p = previewEngine(def, await candidateTasks(def));
+  const candidates = await candidateTasks(def);
+  const p = previewEngine(def, candidates);
   await db().extension.update({ where: { id: extensionId }, data: { previewCount: p.tasks } });
-  return p;
+  const sampleIds = matchExtension(def, candidates).slice(0, 15).map((t) => t.id);
+  const sample = await db().task.findMany({ where: { id: { in: sampleIds } }, select: { id: true, title: true, effectiveDueDate: true, status: true, client: { select: { name: true } } } });
+  return { ...p, sample };
 }
 
 /** Publish: apply Rules Spec 5.3 to every matched task, notify assignees, supersede the earlier extension. */

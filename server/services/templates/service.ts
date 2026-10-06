@@ -1,21 +1,33 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
 import { parse } from "../../lib/validate";
-import { DomainError, notFound, ruleViolation } from "../../lib/errors";
+import { DomainError, forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize } from "../../permissions/guards";
 import type { Actor } from "../../permissions/actor";
 import { writeAudit } from "../../audit";
 import { todayIst } from "../../lib/dates";
 
 const idOf = (a: Actor) => (a.kind === "USER" ? a.userId : null);
+
+/** templates.manage also covers HR letters; stage templates are practice work, so HR Admin is kept out. */
+function manageStages(actor: Actor) {
+  authorize(actor, "templates.manage");
+  if (actor.kind === "USER" && actor.role === "HR_ADMIN") throw forbidden("Stage templates are managed by Partners and the Practice Admin.");
+}
 const OPEN = ["UPCOMING", "IN_PROGRESS", "PENDING_FROM_CLIENT", "UNDER_REVIEW"];
 
 export async function listTemplates(actor: Actor) {
-  authorize(actor, "templates.manage");
-  return db().stageTemplate.findMany({
+  manageStages(actor);
+  const open = await db().task.groupBy({ by: ["stageTemplateVersionId", "stageIndex"], where: { status: { in: OPEN }, stageTemplateVersionId: { not: null } }, _count: true });
+  const templates = await db().stageTemplate.findMany({
     include: { versions: { orderBy: { version: "desc" }, include: { stages: { orderBy: { index: "asc" } }, _count: { select: { tasks: { where: { status: { in: OPEN } } } } } } } },
     orderBy: { name: "asc" },
   });
+  // Which old stages hold open tasks, so publishing asks for a mapping only where it matters.
+  return templates.map((t) => ({
+    ...t,
+    openByStage: open.filter((o) => t.versions.some((v) => v.id === o.stageTemplateVersionId)).map((o) => ({ stageIndex: o.stageIndex, count: o._count })),
+  }));
 }
 
 const stageInput = z.object({
@@ -30,7 +42,7 @@ const draftInput = z.object({ stages: z.array(stageInput).min(2, "At least two s
 
 /** Templates are versioned: edits create a draft; open tasks keep their version until mapped (P2-24). */
 export async function createDraft(actor: Actor, templateId: string, input: z.input<typeof draftInput>) {
-  authorize(actor, "templates.manage");
+  manageStages(actor);
   const d = parse(draftInput, input);
   if (d.stages.filter((s) => s.isFiling).length > 1) throw new DomainError("VALIDATION", "Only one stage can be the filing stage.");
   const t = await db().stageTemplate.findUnique({ where: { id: templateId }, include: { versions: true } });
@@ -47,7 +59,7 @@ export async function createDraft(actor: Actor, templateId: string, input: z.inp
 }
 
 export async function discardDraft(actor: Actor, versionId: string) {
-  authorize(actor, "templates.manage");
+  manageStages(actor);
   const v = await db().stageTemplateVersion.findUnique({ where: { id: versionId } });
   if (!v || v.status !== "DRAFT") throw notFound("Draft");
   await transaction(async (tx) => {
@@ -66,7 +78,8 @@ export async function publishVersion(actor: Actor, versionId: string, opts: { mo
   authorize(actor, "templates.approve");
   const v = await db().stageTemplateVersion.findUnique({ where: { id: versionId }, include: { stages: true } });
   if (!v || v.status !== "DRAFT") throw notFound("Draft");
-  const older = await db().stageTemplateVersion.findMany({ where: { templateId: v.templateId, id: { not: versionId }, status: "ACTIVE" }, include: { stages: true } });
+  // Open tasks may still sit on retired versions (kept there at an earlier publish); they can move too.
+  const older = await db().stageTemplateVersion.findMany({ where: { templateId: v.templateId, id: { not: versionId }, status: { in: ["ACTIVE", "RETIRED"] } }, include: { stages: true } });
   const maxNew = v.stages.length - 1;
   if (opts.moveOpenTasks) {
     const used = new Set((await db().task.findMany({ where: { stageTemplateVersionId: { in: older.map((o) => o.id) }, status: { in: OPEN } }, select: { stageIndex: true } })).map((t) => t.stageIndex));
@@ -78,7 +91,7 @@ export async function publishVersion(actor: Actor, versionId: string, opts: { mo
   }
   return transaction(async (tx) => {
     await tx.stageTemplateVersion.update({ where: { id: versionId }, data: { status: "ACTIVE", approvedById: idOf(actor), effectiveFrom: todayIst() } });
-    await tx.stageTemplateVersion.updateMany({ where: { id: { in: older.map((o) => o.id) } }, data: { status: "RETIRED" } });
+    await tx.stageTemplateVersion.updateMany({ where: { id: { in: older.map((o) => o.id) }, status: "ACTIVE" }, data: { status: "RETIRED" } });
     let moved = 0;
     if (opts.moveOpenTasks) {
       const tasks = await tx.task.findMany({ where: { stageTemplateVersionId: { in: older.map((o) => o.id) }, status: { in: OPEN } }, select: { id: true, stageIndex: true } });

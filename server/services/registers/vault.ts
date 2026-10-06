@@ -82,7 +82,7 @@ export async function listCredentials(actor: Actor, clientId: string) {
   const days = await getSettingNumber("credentials.changeAfterDays", 90);
   for (const c of all) {
     if (!(await mayView(actor, c))) continue;
-    out.push({ id: c.id, portal: c.portal, label: c.label, lastChangedOn: c.lastChangedOn, changeDue: c.changePeriodically && (!c.lastChangedOn || diffDays(c.lastChangedOn, todayIst()) > days) });
+    out.push({ id: c.id, portal: c.portal, label: c.label, lastChangedOn: c.lastChangedOn, hasExtra: !!c.extraEnc, changeDue: c.changePeriodically && (!c.lastChangedOn || diffDays(c.lastChangedOn, todayIst()) > days) });
   }
   return out;
 }
@@ -117,6 +117,18 @@ export async function grantAccess(actor: Actor, clientId: string, userId: string
     await writeAudit(tx, actor, { entityType: "CredentialGrant", entityId: g.id, action: "GRANT", after: { userId, clientId, credentialId } });
     return g;
   });
+}
+
+/** People who may receive a grant for this client: Staff/Articles currently assigned to it (Q-06). */
+export async function grantCandidates(actor: Actor, clientId: string) {
+  await assertClientAccess(actor, "vault.grant", clientId);
+  const users = await db().user.findMany({ where: { active: true, role: { in: ["STAFF", "ARTICLE"] } }, select: { id: true, displayName: true, role: true, isSenior: true } });
+  const out = [];
+  for (const u of users) {
+    const n = await db().client.count({ where: { AND: [{ id: clientId }, clientWhere({ kind: "USER", userId: u.id, role: u.role as never, isSenior: u.isSenior, displayName: u.displayName }, "assigned")] } });
+    if (n) out.push({ id: u.id, displayName: u.displayName, role: u.role });
+  }
+  return out;
 }
 
 export async function revokeGrant(actor: Actor, grantId: string, reason = "Revoked") {

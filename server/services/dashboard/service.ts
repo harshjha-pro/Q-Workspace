@@ -3,6 +3,7 @@ import { authorize, can, scopeOf } from "../../permissions/guards";
 import { assertUserAccess, clientWhere, taskWhere } from "../../permissions/scopes";
 import type { Actor, StaffActor } from "../../permissions/actor";
 import { requireStaff } from "../../permissions/guards";
+import { notFound } from "../../lib/errors";
 import { addDays, todayIst, weekStart } from "../../lib/dates";
 import { listTasks, groupByDue } from "../tasks/service";
 import { waitingForMyReview } from "../review/service";
@@ -115,7 +116,8 @@ export async function thisWeek(actor: Actor, opts: { userId?: string; next?: boo
 /** Group view (P2-18): a client group's clients with open, overdue and filed counts. */
 export async function groupView(actor: Actor, groupId: string) {
   const scope = authorize(actor, "client.view");
-  const group = await db().clientGroup.findUniqueOrThrow({ where: { id: groupId } });
+  const group = await db().clientGroup.findUnique({ where: { id: groupId } });
+  if (!group) throw notFound("Group");
   const clients = await db().client.findMany({ where: { AND: [{ groupId }, clientWhere(actor, scope)] }, select: { id: true, code: true, name: true, constitution: true }, orderBy: { name: "asc" } });
   const today = todayIst();
   const taskScope = authorize(actor, "task.view");

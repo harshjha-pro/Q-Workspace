@@ -44,11 +44,17 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-mono">{c.code}</span>
             <span>{CONSTITUTION_LABELS[c.constitution as Constitution]}</span>
-            {c.group ? <Link href={`/clients?group=${c.group.id}`} className="underline">{c.group.name}</Link> : null}
+            {c.group ? <Link href={`/groups/${c.group.id}`} className="underline">{c.group.name}</Link> : null}
             <Badge tone={clientStatusTone(c.status)}>{c.status.toLowerCase()}</Badge>
           </span>
         }
-        actions={canManage ? <Link href={`/clients/${c.id}/edit`} className={buttonVariants({ variant: "secondary" })}>Edit details</Link> : null}
+        actions={
+          <span className="flex flex-wrap gap-2">
+            {can(actor, "task.view") ? <Link href={`/tasks?clientId=${c.id}&all=1`} className={buttonVariants({ variant: "secondary" })}>Tasks</Link> : null}
+            {can(actor, "vault.view") ? <Link href={`/clients/${c.id}/vault`} className={buttonVariants({ variant: "secondary" })}>Credentials</Link> : null}
+            {canManage ? <Link href={`/clients/${c.id}/edit`} className={buttonVariants({ variant: "secondary" })}>Edit details</Link> : null}
+          </span>
+        }
       />
 
       {canManage ? (

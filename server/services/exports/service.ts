@@ -18,6 +18,7 @@ export type ExportKind = (typeof EXPORT_KINDS)[number];
 export type ExportFilter = { from?: string; to?: string; clientId?: string; userId?: string };
 type Table = { name: string; columns: Column[]; rows: Record<string, unknown>[] };
 
+const clientNameMap = async (ids: string[]) => new Map((await db().client.findMany({ where: { id: { in: [...new Set(ids)] } }, select: { id: true, name: true } })).map((c) => [c.id, c.name]));
 const hours = (m: number) => Math.round((m / 60) * 100) / 100;
 
 /**
@@ -77,11 +78,12 @@ async function table(actor: Actor, kind: ExportKind, f: ExportFilter): Promise<T
       };
     }
     case "notices": {
-      const rows = await listNotices(actor, { status: undefined, clientId: f.clientId });
+      const rows = (await listNotices(actor, { status: "ALL", clientId: f.clientId })).filter((n) => (!f.from || n.receivedDate >= f.from) && (!f.to || n.receivedDate <= f.to));
+      const names = await clientNameMap(rows.map((n) => n.clientId));
       return {
         name: "Notices",
-        columns: [{ key: "clientId", header: "Client id" }, { key: "authority", header: "Authority" }, { key: "section", header: "Section" }, { key: "ay", header: "AY / period" }, { key: "ref", header: "Reference / DIN" }, { key: "received", header: "Received" }, { key: "due", header: "Response due" }, { key: "status", header: "Status" }],
-        rows: rows.map((n) => ({ clientId: n.clientId, authority: n.authority, section: n.section, ay: n.ayOrPeriod, ref: n.referenceNo, received: n.receivedDate, due: n.responseDueDate ?? "", status: n.status })),
+        columns: [{ key: "client", header: "Client", width: 30 }, { key: "authority", header: "Authority" }, { key: "section", header: "Section" }, { key: "ay", header: "AY / period" }, { key: "ref", header: "Reference / DIN" }, { key: "received", header: "Received" }, { key: "due", header: "Response due" }, { key: "status", header: "Status" }],
+        rows: rows.map((n) => ({ client: names.get(n.clientId) ?? "", authority: n.authority, section: n.section, ay: n.ayOrPeriod, ref: n.referenceNo, received: n.receivedDate, due: n.responseDueDate ?? "", status: n.status })),
       };
     }
     case "dsc": {
@@ -93,7 +95,7 @@ async function table(actor: Actor, kind: ExportKind, f: ExportFilter): Promise<T
       };
     }
     case "udin": {
-      const rows = await listUdins(actor);
+      const rows = (await listUdins(actor)).filter((u) => (!f.clientId || u.clientId === f.clientId) && (!f.from || u.signingDate >= f.from) && (!f.to || u.signingDate <= f.to));
       return {
         name: "UDIN register",
         columns: [{ key: "client", header: "Client", width: 30 }, { key: "doc", header: "Document", width: 26 }, { key: "signed", header: "Signed" }, { key: "partner", header: "Partner" }, { key: "udin", header: "UDIN", width: 22 }, { key: "generated", header: "Generated on" }, { key: "status", header: "Status" }],
@@ -101,11 +103,12 @@ async function table(actor: Actor, kind: ExportKind, f: ExportFilter): Promise<T
       };
     }
     case "inward": {
-      const rows = await listInwardOutward(actor, { clientId: f.clientId });
+      const rows = (await listInwardOutward(actor, { clientId: f.clientId })).filter((r) => (!f.from || r.date >= f.from) && (!f.to || r.date <= f.to));
+      const names = await clientNameMap(rows.map((r) => r.clientId));
       return {
         name: "Inward-outward",
-        columns: [{ key: "date", header: "Date" }, { key: "direction", header: "In/Out" }, { key: "clientId", header: "Client id" }, { key: "doc", header: "Document", width: 34 }, { key: "location", header: "Location" }, { key: "returned", header: "Returned" }],
-        rows: rows.map((r) => ({ date: r.date, direction: r.direction, clientId: r.clientId, doc: r.documentDesc, location: r.currentLocation, returned: r.returnedAt ? "Yes" : "No" })),
+        columns: [{ key: "date", header: "Date" }, { key: "direction", header: "In/Out" }, { key: "client", header: "Client", width: 30 }, { key: "doc", header: "Document", width: 34 }, { key: "location", header: "Location" }, { key: "returned", header: "Returned" }],
+        rows: rows.map((r) => ({ date: r.date, direction: r.direction, client: names.get(r.clientId) ?? "", doc: r.documentDesc, location: r.currentLocation, returned: r.returnedAt ? "Yes" : "No" })),
       };
     }
   }

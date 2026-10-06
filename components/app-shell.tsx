@@ -5,14 +5,16 @@ import { useState } from "react";
 import { Menu, X, LogOut } from "lucide-react";
 import type { NavItem } from "./nav";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "./notifications/bell";
 
 export function AppShell({
-  nav, user, demo, logout, children,
+  nav, user, demo, logout, unread = 0, children,
 }: {
   nav: NavItem[];
   user: { name: string; roleLabel: string };
   demo: boolean;
   logout: () => Promise<void>;
+  unread?: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +59,7 @@ export function AppShell({
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-white/95 px-4 py-2 backdrop-blur">
           <button className="md:hidden" aria-label="Open menu" onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></button>
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <NotificationBell unread={unread} />
             <Link href="/me" className="text-right leading-tight">
               <span className="block font-medium">{user.name}</span>
               <span className="block text-xs text-muted">{user.roleLabel}</span>

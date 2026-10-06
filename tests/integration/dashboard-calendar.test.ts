@@ -73,7 +73,7 @@ describe("calendar and .ics (P2-26, P2-43)", () => {
     expect(ics.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
     expect(ics).toContain("DTSTART;VALUE=DATE:20261020");
     expect(ics).toContain("DTEND;VALUE=DATE:20261021");
-    expect(ics).toContain("GSTR-3B\; Sep\\, 2026");
+    expect(ics).toContain("GSTR-3B\\; Sep\\, 2026");
     expect(ics.split("\r\n").every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
     expect(await myIcs(actorOf(w.s1))).toContain("BEGIN:VEVENT");
   });

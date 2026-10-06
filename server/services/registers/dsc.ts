@@ -111,6 +111,10 @@ export async function recordMovement(actor: Actor, dscId: string, input: z.input
 }
 
 export async function movements(actor: Actor, dscId: string) {
-  authorize(actor, "dsc.view");
+  const ids = await visibleClientIds(actor, "dsc.view");
+  if (ids) {
+    const linked = await db().dSCClient.count({ where: { dscId, clientId: { in: ids } } });
+    if (!linked) throw forbidden();
+  }
   return db().dSCMovement.findMany({ where: { dscId }, orderBy: { movedAt: "desc" }, take: 100 });
 }

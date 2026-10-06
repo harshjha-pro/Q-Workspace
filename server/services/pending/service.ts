@@ -139,7 +139,7 @@ export async function logReminder(actor: Actor, taskId: string, input: z.input<t
   const pending = await db().pendingRecord.findFirst({ where: { taskId, clearedAt: null } });
   return transaction(async (tx) => {
     const r = await tx.reminderLog.create({
-      data: { clientId: t.clientId, taskId, pendingRecordId: pending?.id ?? null, kind: "CLIENT_DOCS", channel: d.channel, messageText: d.messageText || d.note, sentById: idOf(actor), createdById: idOf(actor) },
+      data: { clientId: t.clientId, taskId, pendingRecordId: pending?.id ?? null, kind: "CLIENT_DOCS", channel: d.channel, messageText: [d.messageText, d.note && `Note: ${d.note}`].filter(Boolean).join("\n\n"), sentById: idOf(actor), createdById: idOf(actor) },
     });
     await writeAudit(tx, actor, { entityType: "ReminderLog", entityId: r.id, action: "CREATE", after: { channel: d.channel } });
     return r;

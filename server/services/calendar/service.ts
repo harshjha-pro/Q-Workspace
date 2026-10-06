@@ -58,7 +58,7 @@ export async function calendarItems(actor: Actor, f: CalendarFilter): Promise<Ca
 // ---------------------------------------------------------------------------
 // .ics (RFC 5545) — replaces calendar sync (brief §4): download and import into any calendar app.
 // ---------------------------------------------------------------------------
-const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 const compact = (d: string) => d.replace(/-/g, "");
 
 /** Lines over 75 octets are folded with CRLF + space. */

@@ -6,8 +6,8 @@ calendar, review and sign-off, registers, billing, CRM, HRMS and payroll, a clie
 It runs on **one computer with only Node.js**. There is no cloud account, external database, API key or
 paid service, and nothing leaves the machine.
 
-> **Build status:** Phase 1 (Foundation) is complete. The data model is frozen. Phases 2–5 add the
-> modules listed in [`docs/build-plan.md`](docs/build-plan.md).
+> **Build status:** Phase 1 (Foundation) and Phase 2 (Core practice) are complete. The data model is
+> frozen. Phases 3–5 add the modules listed in [`docs/build-plan.md`](docs/build-plan.md).
 
 ## Quick start
 
@@ -42,10 +42,14 @@ Every demo user's password is **`Qepex@2026`**.
 `npm run demo:totp` to print the current 6-digit code. Real users scan their own QR code under
 **My profile → Password & two-factor login**.
 
-The demo firm has 21 people, 3 client teams, 40 clients and 159 engagements. The clients cover every
+The demo firm has 21 people, 3 client teams, 40 clients and about 170 engagements. The clients cover every
 constitution, 8 family/promoter groups, multiple GSTINs, directors shared across companies, AGM dates and
-Professional Tax registrations. All PAN, GSTIN, DIN, Aadhaar and bank numbers are **fake** but correctly
-formatted.
+Professional Tax registrations. On top of that the seed generates the compliance calendar for every client
+(about 1,500 tasks, most past ones filed, some late, some overdue), about six months of daily work entries,
+work pending from clients and under review, notices with a hearing, DSCs in every expiry band, UDINs,
+portal credentials with grants, the inward/outward register, leave (including one request that clashes with
+due dates) and today's reminders. Dates are relative to the day you run setup, so the demo always looks
+current. All PAN, GSTIN, DIN, Aadhaar, UDIN and bank numbers are **fake** but correctly formatted.
 
 **Reset demo data:** go to Settings → Demo data (Partner only), or run `npm run demo:reset`. Both refuse
 unless `DEMO_MODE=true`.
@@ -56,14 +60,30 @@ unless `DEMO_MODE=true`.
 2. `npm run setup` prints a one-time password for the first Partner (`partner`). Sign in, set a password,
    and set up two-factor login.
 3. Add people under **People**, or in bulk under **Import**. Then add clients the same way.
-4. **Back up `.env` separately and safely.** It holds `VAULT_KEY` and `PII_KEY`. Without them, encrypted
-   fields (credentials, salary, bank, Aadhaar, PAN of staff) cannot be read, even from a backup.
+4. **Back up `.env` separately and safely.** It holds `VAULT_KEY`, `PII_KEY` and `BACKUP_KEY`. Without
+   them, encrypted fields (credentials, salary, bank, Aadhaar, PAN of staff) cannot be read, and backup
+   files (`.qbk`, encrypted) cannot be restored.
+5. Before relying on due dates, a Partner opens **Admin → Due-date master** and verifies each rule and late
+   fee against the official notification (unverified rows are flagged).
 
-### Phones on the office Wi-Fi
+### Phones on the office Wi-Fi (HTTPS)
 
-`npm run dev` and `npm start` listen only on this computer. `npm run dev:lan` / `npm run start:lan`
-let phones on the same Wi-Fi connect. Traffic is plain HTTP for now; HTTPS for LAN use is open question
-Q-26.
+`npm run dev` and `npm start` listen only on this computer. To let phones on the office Wi-Fi in, use HTTPS:
+
+```bash
+npm run build
+npm run start:lan:https    # https://<this-computer's-IP>:3443  (prints the addresses)
+```
+
+The first run creates a certificate for this computer in `certs/` (never committed). Each phone or PC must
+trust it once: copy `certs/qepex-lan.crt` to the device and install it (Android: Settings → Security →
+Install a certificate → CA certificate; iPhone: open the file, install the profile, then Settings → General →
+About → Certificate Trust Settings → turn it on; Windows: double-click → Install → Trusted Root Certification
+Authorities). After that the browser shows a padlock and **Add work** can be installed to the home screen
+and used offline; entries made offline sync when the phone is back on the Wi-Fi.
+
+`npm run dev:lan:https` does the same for development. Plain-HTTP `dev:lan` / `start:lan` still exist, but
+browsers do not allow offline mode over plain HTTP on another device.
 
 ## Commands
 
@@ -71,7 +91,8 @@ Q-26.
 |---|---|
 | `npm run setup` | Keys, folders, safe migration, reference + demo data |
 | `npm run dev` / `dev:lan` | Development server (local / office network) |
-| `npm run build` then `npm start` / `start:lan` | Production server |
+| `npm run build` then `npm start` / `start:lan:https` | Production server (this computer / office network over HTTPS) |
+| `npm run lan:cert` | Create or refresh the office-network certificate only |
 | `npm test` | Unit, integration, permission and migration tests (Vitest) |
 | `npm run test:coverage` | Same with coverage (compliance engine must be 100% from Phase 2) |
 | `npm run e2e` | Browser tests (Playwright, desktop + phone) — starts its own dev server |
@@ -108,6 +129,30 @@ needs only Node.js.
 - **Scheduler**: runs inside the app, with Run now buttons and a System Log page.
 - **Data model**: 181 tables, frozen (see [`docs/data-model.md`](docs/data-model.md)).
 
+## What Phase 2 delivers
+
+- **Compliance calendar engine**: 31 compliance types (plus GSTR-10, Form 11 and STK-2 closure filings) with
+  effective-dated, admin-editable rules, holidays, extensions with preview, AGM-based and provisional dates,
+  late-fee and interest exposure. Every Rules Spec scenario and edge case is a test; 100% branch coverage.
+- **Tasks**: generated per client, GSTIN, director or PT state; list grouped Overdue / This week / Next week /
+  Later; This Week page; group view; manager bulk reassign / change checker / not applicable; one-off tasks.
+- **Daily work entry** (phone-first): recent client pairs, Today / Yesterday / pick / multiple dates / whole
+  week, 15-minute steps, soft warning above 12 hours, budget signals, outcome numbers (ARN, SRN…), location,
+  copy entry/day/week, timer, week grid, missing-day banners, weekly lock with Partner extension and
+  correction requests. Works offline and syncs later.
+- **Pending from client**: checklists, mark-all-requested, client-waiting days kept apart from internal delay,
+  "Copy pending list" text for WhatsApp/email and "Mark as sent" reminder log.
+- **Review & sign-off**: maker ≠ checker, Articles never check, review points, filing blocked while points
+  are open, Partner sign-off and EQR, UDIN awaiting list.
+- **Registers**: notices and hearings (7/3/1-day alerts), DSC register with custody movements and expiry
+  bands, UDIN register, credentials vault (grants, every reveal logged), inward/outward.
+- **Notifications**: in-app centre with preferences and quiet hours, browser pop-ups while the app is open,
+  daily reminders and escalations (due, overdue → Manager → Partner, pending follow-up, review waits, DSC,
+  UDIN, password changes, missing entries, weekly lock).
+- **Calendar** (mine / compliance) with `.ics` download; **leave** with a due-date clash check and reassign;
+  scoped **CSV/Excel exports**; stage-template versioning with stage mapping; the home dashboard per role.
+- **Encrypted backups** and **HTTPS on the office network**.
+
 ## Project layout
 
 ```
@@ -126,7 +171,7 @@ prisma/migrations/   Versioned migrations — never reset
 prisma/seed/         Reference data + demo firm
 tests/               unit, integration, permissions, migration, e2e
 docs/                architecture, data model, permissions, decisions, open questions, build plan, reports
-storage/ backups/ logs/   Local data (git-ignored)
+storage/ backups/ logs/ certs/   Local data (git-ignored)
 ```
 
 ## Documentation
@@ -139,3 +184,4 @@ storage/ backups/ logs/   Local data (git-ignored)
 - [`docs/spec-differences.md`](docs/spec-differences.md): where the brief and the specs differ
 - [`docs/build-plan.md`](docs/build-plan.md): phases mapped to requirement IDs
 - [`docs/phase-1-report.md`](docs/phase-1-report.md): Phase 1 report
+- [`docs/phase-2-report.md`](docs/phase-2-report.md): Phase 2 report

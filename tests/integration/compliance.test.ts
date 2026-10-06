@@ -84,7 +84,8 @@ describe("compliance service (generation from master data)", () => {
     await db().task.update({ where: { id: t.id }, data: { status: "FILED_LATE", filedDate: "2026-06-22", ackNumber: "AA2706220001", effectiveDueDate: "2026-06-20" } });
     const ext = await createExtension(actorOf(pa), { typeCodes: ["GST-3B-M"], periodsMode: "SPECIFIC", periodKeys: ["2026-05"], scope: [{ field: "state", values: ["MH"] }], newEffectiveDueDate: "2026-06-24", reason: "Portal outage", notificationRef: "N-08/2026" });
     const p = await previewExtension(actorOf(pa), ext.id);
-    expect(p).toEqual({ tasks: 1, clients: 1, reclassify: 1 });
+    expect(p).toMatchObject({ tasks: 1, clients: 1, reclassify: 1 });
+    expect(p.sample).toHaveLength(1);
     await expect(publishExtension(actorOf(pa), ext.id, 5)).rejects.toThrow(/changed/);
     await publishExtension(actorOf(pa), ext.id, 1);
     const after = await db().task.findUniqueOrThrow({ where: { id: t.id } });

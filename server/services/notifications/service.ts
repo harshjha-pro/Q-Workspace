@@ -1,5 +1,5 @@
 import { db } from "../../lib/db";
-import { forbidden } from "../../lib/errors";
+import { DomainError, forbidden } from "../../lib/errors";
 import type { Actor } from "../../permissions/actor";
 
 export type NotifyInput = {
@@ -63,6 +63,7 @@ export async function getPreferences(actor: Actor) {
 /** Quiet hours and muted kinds silence browser pop-ups only; escalations can never be muted (spec 9.2). */
 export async function savePreferences(actor: Actor, p: { quietFrom?: string | null; quietTo?: string | null; browserEnabled: boolean; mutedKinds: string[] }) {
   const userId = self(actor);
+  for (const t of [p.quietFrom, p.quietTo]) if (t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new DomainError("VALIDATION", "Quiet hours use HH:MM (24-hour).");
   const muted = p.mutedKinds.filter((k) => !k.startsWith("ESCALATE") && !k.endsWith("ESCALATION")).join(",");
   const data = { quietFrom: p.quietFrom || null, quietTo: p.quietTo || null, browserEnabled: p.browserEnabled, mutedKindsCsv: muted };
   return db().notificationPreference.upsert({ where: { userId }, create: { userId, ...data }, update: data });
