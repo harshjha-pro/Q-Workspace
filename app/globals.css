@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/*
+ * Calm, professional palette. Status colours are defined once here and used everywhere
+ * (brief §10: same status colours in every list, calendar and board).
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-ink: #1f2937;
+  --color-muted: #6b7280;
+  --color-line: #e5e7eb;
+  --color-brand: #1f3a5f;
+  --color-brand-600: #24456f;
+  --color-brand-50: #eef3f9;
+  --color-accent: #0f766e;
+
+  --color-st-upcoming: #64748b;
+  --color-st-progress: #2563eb;
+  --color-st-pending: #b45309;
+  --color-st-review: #7c3aed;
+  --color-st-filed: #15803d;
+  --color-st-late: #b91c1c;
+  --color-st-na: #9ca3af;
+  --color-st-overdue: #dc2626;
+  --color-st-risk: #d97706;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
