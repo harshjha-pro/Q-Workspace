@@ -85,7 +85,7 @@ const FAMILIES = [
   { code: "F2", name: "Income Tax", stageTemplateCode: "INCOME_TAX_RETURN", reviewLevel: "MANAGER", requiresSignoff: false, requiresUdin: false },
   { code: "F3", name: "TDS/TCS", stageTemplateCode: "TDS_RETURN", reviewLevel: "SENIOR", requiresSignoff: false, requiresUdin: false },
   { code: "F4", name: "Audit & Transfer Pricing", stageTemplateCode: "AUDIT", reviewLevel: "PARTNER", requiresSignoff: true, requiresUdin: true },
-  { code: "F5", name: "ROC / LLP", stageTemplateCode: "ROC_ANNUAL", reviewLevel: "PARTNER", requiresSignoff: true, requiresUdin: false },
+  { code: "F5", name: "ROC / LLP", stageTemplateCode: "ROC_ANNUAL", reviewLevel: "PARTNER", requiresSignoff: false, requiresUdin: false },
   { code: "F6", name: "Statutory Payroll", stageTemplateCode: "PAYROLL_STATUTORY", reviewLevel: "SENIOR", requiresSignoff: false, requiresUdin: false },
 ];
 

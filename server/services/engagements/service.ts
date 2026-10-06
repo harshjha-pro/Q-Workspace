@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { db, transaction } from "../../lib/db";
+import { db, transaction, type Tx } from "../../lib/db";
 import { parse, parsePartial } from "../../lib/validate";
 import { forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, can } from "../../permissions/guards";
@@ -106,8 +106,26 @@ export async function createEngagement(actor: Actor, input: EngagementInput) {
       },
     });
     await writeAudit(tx, actor, { entityType: "Engagement", entityId: e.id, action: "CREATE", after: e });
+    if (e.recurrence === "RECURRING") await adoptAutoTasks(tx, e);
     return e;
   });
+}
+
+/**
+ * Compliance tasks generated before the client's real recurring engagement existed sit on an
+ * auto-created "(recurring)" engagement. When the real one is created, its open tasks move to it.
+ */
+async function adoptAutoTasks(tx: Tx, e: { id: string; clientId: string; engagementType: string; name: string; stageTemplateVersionId: string | null }) {
+  const auto = await tx.engagement.findMany({ where: { clientId: e.clientId, engagementType: e.engagementType, name: { endsWith: "(recurring)" }, id: { not: e.id } } });
+  if (auto.length === 0) return;
+  const hints: Record<string, RegExp> = { TAR: /tax audit/i, "TP-3CEB": /3ceb|transfer/i, "STAT-AUDIT": /statutory/i };
+  const tasks = await tx.task.findMany({ where: { engagementId: { in: auto.map((a) => a.id) }, status: { in: ["UPCOMING", "IN_PROGRESS", "PENDING_FROM_CLIENT", "UNDER_REVIEW"] } } });
+  for (const t of tasks) {
+    const hint = t.complianceTypeCode ? hints[t.complianceTypeCode] : undefined;
+    const otherHint = Object.values(hints).some((h) => h.test(e.name));
+    if (hint ? !hint.test(e.name) : otherHint) continue;
+    await tx.task.update({ where: { id: t.id }, data: { engagementId: e.id } });
+  }
 }
 
 const engagementUpdate = engagementInput.omit({ clientId: true }).extend({ status: z.enum(ENGAGEMENT_STATUSES) });
@@ -149,6 +167,15 @@ export async function assignToEngagement(actor: Actor, engagementId: string, inp
     const a = await tx.engagementAssignment.create({
       data: { engagementId, userId: data.userId, role: data.role, fromDate: todayIst(), createdById: idOf(actor) },
     });
+    // Open tasks of the engagement that have nobody in this role get this person (maker ≠ checker kept).
+    const taskRoles = data.role === "CHECKER" ? ["CHECKER"] : data.role === "EQR" ? ["EQR"] : ["ASSIGNEE", "MAKER"];
+    const open = await tx.task.findMany({ where: { engagementId, status: { in: ["UPCOMING", "IN_PROGRESS", "PENDING_FROM_CLIENT", "UNDER_REVIEW"] } }, include: { assignments: { where: { toDate: null } } } });
+    for (const t of open) {
+      if (t.assignments.some((x) => taskRoles.includes(x.role))) continue;
+      const clash = data.role === "CHECKER" ? t.assignments.some((x) => x.userId === data.userId && x.role === "MAKER") : data.role !== "EQR" && t.assignments.some((x) => x.userId === data.userId && x.role === "CHECKER");
+      if (clash) continue;
+      for (const role of taskRoles) await tx.taskAssignment.create({ data: { taskId: t.id, userId: data.userId, role, fromDate: todayIst(), createdById: idOf(actor) } });
+    }
     await writeAudit(tx, actor, { entityType: "EngagementAssignment", entityId: a.id, action: "CREATE", after: { engagementId, ...data } });
     return a;
   });
