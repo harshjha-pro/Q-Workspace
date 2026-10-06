@@ -96,3 +96,18 @@ export async function saveProfileAction(userId: string, _: ActionResult, f: Form
     return toActionError(e);
   }
 }
+
+export async function uploadEmployeeDocAction(userId: string, _: ActionResult, f: FormData): Promise<ActionResult> {
+  const actor = await requireStaff();
+  try {
+    const file = f.get("file");
+    if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose a file." };
+    const { addEmployeeDocument } = await import("@/server/services/employees/service");
+    await addEmployeeDocument(actor, userId, { name: file.name, data: Buffer.from(await file.arrayBuffer()) }, s(f, "kind") || "OTHER");
+    revalidatePath(`/people/${userId}`);
+    revalidatePath("/me");
+    return { ok: true, message: "Uploaded." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}

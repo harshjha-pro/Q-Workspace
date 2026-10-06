@@ -92,3 +92,20 @@ describe("employee profile partial update", () => {
     expect([p?.pan, p?.address, p?.uan]).toEqual(["ABCPD1234E", "Pune", "100123456789"]);
   });
 });
+
+describe("employee documents (P1-21)", () => {
+  it("HR and the employee can download; a colleague cannot; HR views are logged", async () => {
+    const { addEmployeeDocument } = await import("@/server/services/employees/service");
+    const { documentForDownload } = await import("@/server/services/documents/service");
+    const hr = await makeUser("HR_ADMIN");
+    const emp = await makeUser("STAFF");
+    const colleague = await makeUser("STAFF");
+    await upsertEmployeeProfile(actorOf(hr), emp.id, {});
+    const doc = await addEmployeeDocument(actorOf(emp), emp.id, { name: "pan.pdf", data: Buffer.from("%PDF-1.4 pan") }, "KYC");
+    expect((await documentForDownload(actorOf(emp), doc.id)).fileName).toBe("pan.pdf");
+    await documentForDownload(actorOf(hr), doc.id);
+    expect(await db().sensitiveViewLog.count({ where: { entityId: doc.id, actorUserId: hr.id } })).toBe(1);
+    await expect(documentForDownload(actorOf(colleague), doc.id)).rejects.toThrow(/access/);
+    await expect(addEmployeeDocument(actorOf(colleague), emp.id, { name: "x.pdf", data: Buffer.from("%PDF") }, "KYC")).rejects.toThrow(/access/);
+  });
+});

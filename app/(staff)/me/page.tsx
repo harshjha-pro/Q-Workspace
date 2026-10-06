@@ -6,6 +6,8 @@ import { PageHeader, Card, CardContent, CardHeader, CardTitle, EmptyState } from
 import { buttonVariants } from "@/components/ui/button";
 import { ROLE_LABELS, LOCATION_LABELS } from "@/server/domain/enums";
 import { ProfileView } from "../people/profile-view";
+import { EmployeeDocuments } from "../people/documents";
+import { listEmployeeDocuments } from "@/server/services/documents/service";
 
 export const metadata = { title: "My profile" };
 
@@ -28,6 +30,7 @@ export default async function MePage() {
         </CardContent>
       </Card>
       {profile ? <ProfileView p={profile} /> : <EmptyState title="No employee record yet">HR will add your record.</EmptyState>}
+      {profile ? <EmployeeDocuments userId={actor.userId} docs={await listEmployeeDocuments(actor, actor.userId)} canUpload /> : null}
       <p className="text-xs text-muted">Leave, payslips, CPE and appraisal arrive in later phases.</p>
     </div>
   );

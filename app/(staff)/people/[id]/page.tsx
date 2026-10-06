@@ -12,6 +12,8 @@ import { ROLE_LABELS, LOCATION_LABELS, type Role } from "@/server/domain/enums";
 import { formatDate, formatDateTime } from "@/server/lib/dates";
 import { ProfileView } from "../profile-view";
 import { PersonAdminActions } from "./admin-actions";
+import { EmployeeDocuments } from "../documents";
+import { listEmployeeDocuments } from "@/server/services/documents/service";
 
 export const metadata = { title: "Person" };
 
@@ -21,6 +23,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const u = await load(() => getUser(actor, id));
   const profile = await getEmployeeProfile(actor, id).catch(() => null);
   const isAdmin = can(actor, "users.manage");
+  const docs = await listEmployeeDocuments(actor, id);
+  const canSeeDocs = actor.userId === id || can(actor, "hr.records.manage") || actor.role === "PARTNER";
   const custody = isAdmin ? await custodyReport(actor, id) : null;
   const options = isAdmin
     ? { designations: await db().designation.findMany({ orderBy: { level: "desc" } }), managers: (await listUserOptions(actor, ["PARTNER", "MANAGER"])).filter((m) => m.id !== id).map((m) => ({ id: m.id, name: m.displayName })) }
@@ -57,6 +61,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       ) : can(actor, "hr.records.manage") ? (
         <EmptyState title="No employee record yet"><Link className="underline" href={`/people/${u.id}/profile`}>Create it</Link></EmptyState>
       ) : null}
+      {profile && canSeeDocs ? <EmployeeDocuments userId={u.id} docs={docs} canUpload={can(actor, "hr.records.manage") || actor.userId === u.id} /> : null}
       {custody ? (
         <Card>
           <CardHeader><CardTitle>Custody and hand-over</CardTitle><span className="text-xs text-muted">Items to return or reassign at offboarding (spec 3.9).</span></CardHeader>
