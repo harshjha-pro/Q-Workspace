@@ -5,6 +5,7 @@
  */
 import type { PrismaClient } from "../../generated/prisma/client";
 import { SYSTEM_USER_ID } from "../../server/permissions/actor";
+import { COMPLIANCE_MASTER, LATE_FEE_MASTER, GST_STATE_GROUPS, CHECKLISTS, NATIONAL_HOLIDAYS } from "./compliance-master";
 
 const ROLES = [
   ["PARTNER", "Partner", "Full firm-wide visibility; final sign-off; approvals"],
@@ -170,5 +171,47 @@ export async function seedReference(db: PrismaClient) {
   }
   for (const [code, name] of BADGES) {
     await db.badge.upsert({ where: { code }, create: { code, name }, update: { name } });
+  }
+
+  await seedComplianceMaster(db);
+}
+
+/**
+ * Due-Date Master (Phase 2). Types are upserted; rule v1, late fees, groups and checklists are only
+ * created when missing, so edits made in the app are never overwritten by a later setup run.
+ */
+export async function seedComplianceMaster(db: PrismaClient) {
+  for (const r of COMPLIANCE_MASTER) {
+    const data = {
+      name: r.name, shortName: r.shortName, frequency: r.frequency, periodBasis: r.periodBasis, partyBasis: r.partyBasis, familyCode: r.familyCode,
+      serviceLine: r.serviceLine, ackType: r.ackType, appliesWhen: r.appliesWhen, isClosure: r.isClosure ?? false, sortOrder: r.sortOrder,
+      eventTypeCode: r.rule.kind === "EVENT_OFFSET" ? r.rule.eventType : null,
+    };
+    await db.complianceType.upsert({ where: { code: r.code }, create: { code: r.code, weekendHolidayPolicy: r.weekendHolidayPolicy, ...data }, update: data });
+    if (!(await db.dueDateRule.findFirst({ where: { complianceTypeCode: r.code } }))) {
+      await db.dueDateRule.create({
+        data: { complianceTypeCode: r.code, version: 1, kind: r.rule.kind, paramsJson: JSON.stringify(r.rule), effectiveFrom: "2017-04-01", source: "Rules Spec V1 §10 — illustrative, verify before go-live" },
+      });
+    }
+  }
+  for (const f of LATE_FEE_MASTER) {
+    if (!(await db.lateFeeRate.findFirst({ where: { complianceTypeCode: f.code } }))) {
+      await db.lateFeeRate.create({ data: { complianceTypeCode: f.code, perDayPaise: f.perDayPaise, maxPaise: f.maxPaise, interestBpPerMonth: f.interestBpPerMonth, note: f.note, effectiveFrom: "2017-07-01", source: "Illustrative — verify (open-questions Q-29)" } });
+    }
+  }
+  for (const [stateCode, groupCode] of Object.entries(GST_STATE_GROUPS)) {
+    if (!(await db.gstStateGroup.findFirst({ where: { stateCode } }))) {
+      await db.gstStateGroup.create({ data: { stateCode, groupCode, effectiveFrom: "2020-01-01", source: "Illustrative — verify (Rules Spec C7)" } });
+    }
+  }
+  for (const [family, items] of Object.entries(CHECKLISTS)) {
+    const code = `FAMILY_${family}`;
+    if (!(await db.checklistTemplate.findUnique({ where: { code } }))) {
+      await db.checklistTemplate.create({ data: { code, name: `Default checklist ${family}`, items: { create: items.map((label, i) => ({ label, sortOrder: i, keywords: label.toLowerCase() })) } } });
+    }
+    await db.stageTemplateFamily.updateMany({ where: { code: family, checklistTemplateCode: null }, data: { checklistTemplateCode: code } });
+  }
+  for (const [date, name] of NATIONAL_HOLIDAYS) {
+    await db.holiday.upsert({ where: { date_stateCode: { date, stateCode: "-" } }, create: { date, name, kind: "NATIONAL" }, update: {} });
   }
 }

@@ -202,6 +202,13 @@ export async function setClientFlags(actor: Actor, clientId: string, input: z.in
   }
   const changed = (Object.entries(data.flags) as [ClientFlag, boolean][]).filter(([f, v]) => before[f] !== v);
   if (changed.length === 0) return before;
+  // A flag's history must stay in date order, or "when did this apply" becomes ambiguous (Rules Spec 7).
+  for (const [flag] of changed) {
+    const last = await db().clientFlagHistory.findFirst({ where: { clientId, flag }, orderBy: { effectiveDate: "desc" } });
+    if (last && data.effectiveDate < last.effectiveDate) {
+      throw new DomainError("VALIDATION", `The effective date is before the last change to this flag (${last.effectiveDate}).`, { effectiveDate: `On or after ${last.effectiveDate}` });
+    }
+  }
   const after = await transaction(async (tx) => {
     for (const [flag, value] of changed) {
       await tx.clientFlagHistory.create({

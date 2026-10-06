@@ -1,5 +1,6 @@
 import { db } from "../lib/db";
 import { automaticBackup } from "../services/backup/service";
+import { syncAllClients } from "../services/compliance/sync";
 
 export type JobDef = {
   code: string;
@@ -12,8 +13,18 @@ export type JobDef = {
   run: () => Promise<Record<string, unknown> | void>;
 };
 
-/** Phase 1 jobs. Compliance generation, reminders, payroll prep etc. are added in their phases. */
+/** Jobs by phase: backup + sessions (1), compliance generation + reminders (2); payroll prep etc. later. */
 export const JOBS: JobDef[] = [
+  {
+    code: "COMPLIANCE_GENERATION",
+    name: "Compliance calendar generation",
+    description: "Creates the next periods for every client (idempotent), closes tasks that no longer apply and refreshes provisional dates.",
+    cron: "0 1 * * *",
+    scheduleLabel: "Daily 01:00 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => syncAllClients(),
+  },
   {
     code: "AUTO_BACKUP",
     name: "Nightly backup",

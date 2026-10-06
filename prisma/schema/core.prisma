@@ -575,6 +575,13 @@ model Task {
   budgetMinutes          Int       @default(0)
   isOneOff               Boolean   @default(false)
   closedAt               DateTime?
+  // Phase 2 (additive): period dates for queries, due-date explanation, tax due for interest exposure
+  periodStart            String    @default("")
+  periodEnd              String    @default("")
+  dueBasis               String    @default("")
+  holidayShifted         Boolean   @default(false)
+  taxDuePaise            Int?
+  underReviewSince       DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   createdById            String?
@@ -594,6 +601,7 @@ model Task {
 
   @@unique([clientId, complianceTypeCode, partyKey, periodKey])
   @@index([engagementId])
+  @@index([clientId, status])
   @@index([status])
   @@index([effectiveDueDate])
 }
