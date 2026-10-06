@@ -1,3 +1,4 @@
+import { toCsv } from "../../lib/csv";
 import { db } from "../../lib/db";
 import { authorize } from "../../permissions/guards";
 import { userWhere } from "../../permissions/scopes";
@@ -25,7 +26,6 @@ export async function searchAudit(actor: Actor, f: AuditFilter) {
 }
 
 export function auditCsv(rows: Awaited<ReturnType<typeof searchAudit>>) {
-  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const head = ["When (UTC)", "Who", "Action", "Entity", "Entity id", "Reason", "Before", "After"];
-  return [head.join(","), ...rows.map((r) => [r.at.toISOString(), r.actorName, r.action, r.entityType, r.entityId, r.reason, r.beforeJson, r.afterJson].map(esc).join(","))].join("\n");
+  return toCsv(head, rows.map((r) => [r.at.toISOString(), r.actorName, r.action, r.entityType, r.entityId, r.reason, r.beforeJson, r.afterJson]));
 }
