@@ -1,3 +1,4 @@
+"use client";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -36,11 +37,17 @@ export function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-xs text-red-600">{message}</p>;
 }
 
-export function Field({ label, error, hint, children, className }: { label: string; error?: string; hint?: string; children: React.ReactNode; className?: string }) {
+/**
+ * Field = label + control + hint/error. The label is tied to the control with htmlFor/id
+ * (generated), so every field has a clean accessible name.
+ */
+export function Field({ label, error, hint, children, className }: { label: string; error?: string; hint?: string; children: React.ReactElement<{ id?: string; "aria-invalid"?: boolean }>; className?: string }) {
+  const generated = React.useId();
+  const id = children.props.id ?? generated;
   return (
     <div className={className}>
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {React.cloneElement(children, { id, "aria-invalid": children.props["aria-invalid"] ?? (error ? true : undefined) })}
       {hint && !error ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
       <FieldError message={error} />
     </div>
