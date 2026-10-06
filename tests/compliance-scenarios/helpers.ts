@@ -33,4 +33,4 @@ export function asExisting(creates: TaskCreate[], status: ExistingTask["status"]
   }));
 }
 
-export const only = (ts: { typeCode: string }[], code: string) => ts.filter((t) => t.typeCode === code);
+export const only = <T extends { typeCode: string }>(ts: T[], code: string): T[] => ts.filter((t) => t.typeCode === code);
