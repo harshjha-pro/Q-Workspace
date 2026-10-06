@@ -56,6 +56,13 @@ async function main() {
     console.log(`• Backed up existing database to ${file}`);
   }
 
+  // Nothing leaves this machine: switch off Next.js anonymous telemetry (decisions D-34).
+  try {
+    execSync("npx next telemetry disable", { stdio: "ignore" });
+  } catch {
+    /* not fatal */
+  }
+
   console.log("• Applying migrations (prisma migrate deploy)…");
   execSync("npx prisma migrate deploy", { stdio: "inherit", env: process.env });
 

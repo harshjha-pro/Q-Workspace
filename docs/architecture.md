@@ -1,6 +1,6 @@
-# QEPEX India Work Tracker — Architecture (Phase 0, for approval)
+# QEPEX India Work Tracker — Architecture
 
-Status: **proposed**, not approved. No application code exists yet.
+Status: approved 6 Oct 2026; Phase 1 built. Amendments are marked *(Phase 1)*.
 
 ## 1. Runtime picture
 
@@ -44,9 +44,9 @@ flowchart LR
 ## 2. Request lifecycle (every mutating or sensitive call)
 
 1. **Route** (server action or route handler) receives input.
-2. `getActor()` resolves the session → `Actor { userId, role, isSenior, employeeId, portalClientIds[], sessionEpoch }`.
-   The DB is checked on **every** request (`user.active`, `user.sessionEpoch`) so offboarding
-   and forced logout take effect immediately even though Auth.js credentials use JWT sessions.
+2. `requireStaff()` / `getSession()` (`server/context.ts`) resolve the Auth.js JWT to a `UserSession` row and
+   re-check it on **every** request (revoked? expired? idle > 30 min? user still active?) → `Actor { userId, role,
+   isSenior, displayName }`. Offboarding, role change and password reset revoke sessions immediately. *(Phase 1)*
 3. **Zod** parses the input (schemas live beside each service, shared with React Hook Form).
 4. **Service** method runs. First line is always `authorize(actor, 'capability', resource?)`.
    List queries use `scopeWhere(actor, 'entity')`, which returns a Prisma `where` fragment
@@ -138,13 +138,13 @@ monthly MIS build (5th), weekly summary (Mon 07:00), nightly local backup, reten
 |---|---|
 | Passwords | bcrypt (cost 12); lockout after N failures; admin reset forces change at next login |
 | 2FA | `otplib` TOTP; QR rendered locally (`qrcode` package, data URL); mandatory for Partner, Manager, Practice Admin, HR Admin; optional for Staff/Article; portal per Q-07 |
-| Sessions | Auth.js v5 credentials + JWT (httpOnly, SameSite=Lax); idle timeout (default 30 min, setting) + absolute timeout; `sessionEpoch` bump = global logout for that user |
+| Sessions | Auth.js v5 credentials + JWT (httpOnly, SameSite=Lax) carrying a `UserSession` id; idle timeout (default 30 min) and absolute timeout (12 h) are settings; lockout after 5 failures for 15 min *(Phase 1)* |
 | Encryption at rest | AES-256-GCM, two keys in `.env`: `VAULT_KEY` (credentials) and `PII_KEY` (salary, bank account, Aadhaar, PAN of employees). Ciphertext format `v1:iv:tag:data` so keys can rotate. `npm run setup` generates keys if absent and never overwrites them |
 | CSRF | server actions' built-in origin check; route handlers check `Origin` |
 | Files | stored outside `/public`; served only through a route handler that authorizes and logs; extension allow-list + magic-byte sniff + size limit; random stored names |
 | Audit | append-only `AuditLog` (no update/delete path in code); `SensitiveViewLog` |
 | Logging | structured JSON logs (`pino`) to `/logs`, rotated; admin System Log page reads them; no secrets or decrypted values are ever logged |
-| Backup | `VACUUM INTO` snapshot + `/storage` → zip in `/backups`; download by Partner; restore = request → Partner approval → maintenance mode → automatic pre-restore backup → swap → reconnect |
+| Backup | `VACUUM INTO` snapshot + `/storage` → zip in `/backups`; download by Partner; restore = request → Partner approval → automatic pre-restore backup → migrate the backup copy → copy rows into the live DB via `ATTACH` → swap storage (D-22, *Phase 1*) |
 
 ## 7. Offline (work entry only)
 
@@ -183,6 +183,7 @@ As given in the brief (§6), plus:
 
 next, react, typescript, tailwindcss, shadcn/ui (Radix), @tanstack/react-table, react-hook-form, zod,
 @prisma/client + prisma, next-auth (Auth.js v5), bcryptjs, otplib, qrcode, node-cron, @react-pdf/renderer,
-exceljs, docx (Word output for the template library, spec §13.3), recharts, idb, pino, archiver + yauzl
-(backup zip), date-fns + date-fns-tz, vitest + @vitest/coverage-v8, @playwright/test.
+exceljs, docx (Word output for the template library, spec §13.3), recharts, idb, pino, adm-zip
+(backup zip), vitest + @vitest/coverage-v8, @playwright/test. Phase 1 pins: next 16.3, prisma 7.10 +
+@prisma/adapter-libsql, next-auth 5 beta, otplib 13, zod 4, @tanstack/react-table 8, tailwindcss 4.
 Each is MIT/Apache/ISC; versions pinned at Phase 1 start and listed in `docs/decisions.md`.

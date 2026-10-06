@@ -1,7 +1,8 @@
 # QEPEX India Work Tracker — Data Model (Phase 0, for approval)
 
-Status: **proposed**. The full Prisma schema for every entity below is written and
-migrated in Phase 1 and then **frozen** (spec §14.1). Later phases add rows and
+Status: **FROZEN at the end of Phase 1** (migration `20261006144742_init_frozen_phase1`, 181 tables in
+`prisma/schema/*.prisma`). The schema is the source of truth; this page is the readable overview
+(spec §14.1). Later phases add rows and
 seed data, not structural changes; any structural change after freeze needs an
 explicit change request and an additive migration.
 
@@ -441,8 +442,18 @@ Additional: `DocumentTag`, `DocumentSearchToken` (portable full-text index, D-11
 `BackupRecord` (file, size, sha256, kind AUTO|MANUAL|PRE_RESTORE, restoreRequestedBy, approvedBy),
 `JobRun`, `LoginAttempt`, `SystemLogIndex` (optional pointer into rotated log files).
 
-## 8. Entity count
+## 8. Entity count and Phase 1 additions
 
-About 165 tables. All created in Phase 1 (empty where the module comes later) so the
-schema can be frozen, as the spec requires. The full `schema.prisma` is a Phase 1 deliverable;
-this document is the reviewable design.
+181 tables, all created in Phase 1 (empty where the module comes later), split by domain:
+`core.prisma` (37), `compliance.prisma` (35, incl. review, pending, registers), `billing-crm.prisma` (21),
+`hr.prisma` (43), `portal-other.prisma` (45).
+
+Added while writing the schema (beyond the design above): `UserSession` (server-side sessions, D-09),
+`LoginAttempt`, `StageMapping` (template version moves, P2-24), `ClientPtRegistration` (Q-02),
+`EmployeeOnboardingItem`, `TrainingSession`/`TrainingAttendance`, `ExitChecklistItem`, `InvestmentProof`,
+`MessageThreadParticipant` (removed at offboarding), `MeetingAttendee`, `KnowledgeArticleLink`, `QCInspectionSample`,
+`OnboardingItem`, `PendingRecordItem`, `ExtensionType`, `ExtensionScope`, `ReceiptAllocation`, `CampaignRecipient`.
+
+**Change control after the freeze:** additive migrations only (new nullable columns, new tables, new indexes).
+`tests/migration` fails the build if a later migration drops a table/column or deletes rows without an explicit
+`-- allow-destructive: <reason>` marker, or if `schema.prisma` drifts from the migrations.

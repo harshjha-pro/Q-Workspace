@@ -173,6 +173,11 @@ Enforced in services (and covered by `tests/permissions/invariants.test.ts`):
 10. Mandatory 2FA roles cannot reach any page except TOTP enrolment until enrolled.
 11. **Extensions and due-date master changes** require a preview confirmation step (Rules Spec §5.2).
 12. Weekly-locked entries are editable only through an approved CorrectionRequest.
+13. Only a Partner grants, changes, resets or deactivates the Partner, Practice Admin and HR Admin roles (D-29).
+14. Everyone reads their own employee record and documents (D-30).
+15. Engagement fees / chargeability change only with `billing.approve` (Partner) after creation (D-32).
+16. The last active Partner cannot be deactivated; nobody can deactivate themself.
+17. Fee fields are zeroed in engagement responses for roles without `billing.view` (Staff, Article).
 
 ## 4. Guard API (Phase 1)
 
@@ -182,8 +187,8 @@ const where = scopeWhere(actor, 'task');            // Prisma where-fragment for
 const dto   = shape(actor, 'invoice', invoiceRow);  // strips fields the role may not see
 ```
 
-## 5. Test plan
+## 5. Test plan (built in Phase 1)
 
-`tests/permissions/matrix.test.ts` is table-driven: for each `Capability × Role` it seeds a
+`tests/unit/permissions-matrix.test.ts` checks every role × capability against the matrix; `tests/permissions/scopes.test.ts` is table-driven: for each `Capability × Role` it seeds a
 fixture (own record, team record, other-team record, unassigned record, other portal client)
 and asserts allow/deny for each. 85 capabilities × 7 roles × up to 5 fixture positions.

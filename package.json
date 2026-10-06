@@ -8,9 +8,9 @@
   },
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "dev": "next dev",
+    "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -24,10 +24,11 @@
     "demo:reset": "tsx scripts/reset-demo.ts",
     "postinstall": "prisma generate",
     "demo:totp": "tsx scripts/demo-totp.ts",
-    "db:stats": "tsx scripts/db-stats.ts"
+    "db:stats": "tsx scripts/db-stats.ts",
+    "dev:lan": "next dev -H 0.0.0.0",
+    "start:lan": "next start -H 0.0.0.0"
   },
   "dependencies": {
-    "@date-fns/tz": "^1.5.0",
     "@hookform/resolvers": "^5.9.1",
     "@libsql/client": "^0.18.0",
     "@prisma/adapter-libsql": "^7.10.0",
@@ -37,7 +38,6 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
     "dotenv": "^18.0.5",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.52.0",
@@ -73,5 +73,10 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "mysql2": "^3.24.5",
+    "deepmerge-ts": "^8.0.2"
   }
 }

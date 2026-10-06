@@ -4,7 +4,7 @@ Phases follow the brief §13. Requirement IDs are from Product Spec §15 (118 it
 Every commit message starts with the IDs it covers, e.g. `P2-11 P2-22: effective vs original due date`.
 "→" marks a requirement built in its code-only replacement form (brief §4).
 
-## Phase 1 — Foundation (data model frozen at the end)
+## Phase 1 — Foundation (data model frozen at the end) — ✅ built 6 Oct 2026 (see `phase-1-report.md`)
 
 | # | Slice | IDs |
 |---|---|---|

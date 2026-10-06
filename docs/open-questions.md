@@ -22,6 +22,14 @@ proposal, I will build that unless you say otherwise.
 | Q-05 | **Flag switched off mid-year**: is the cut-over test the period start date (my reading of scenario 7 + the tax-audit edge case), so an In-Progress task for a period starting after the off date still goes to Not Applicable? | Yes, period start date decides; work entries on it are kept | Phase 2 |
 | Q-07 | **Portal 2FA**: the spec makes OTP mandatory for portal users; the brief makes TOTP optional. Mandatory TOTP for portal users? | Optional per brief, with a firm setting to make it mandatory | Phase 4 |
 
+## New from Phase 1 (answer before Phase 2 where marked)
+
+| # | Question | Proposal | Blocks |
+|---|---|---|---|
+| Q-26 | **HTTPS on the office network.** On one computer the app uses `localhost`, which is safe. Phones on the office Wi-Fi (`npm run dev:lan` / `start:lan`) talk plain HTTP, so passwords and data cross the Wi-Fi unencrypted. Also, phones only allow the offline work-entry app (PWA) over HTTPS. | Phase 2 adds `npm run start:lan` over HTTPS with a certificate generated on the machine by `npm run setup` (pure-JS `selfsigned` package; each phone accepts it once). The alternative is to use the app on the main computer only. | Phase 2 (offline entry on phones) |
+| Q-27 | **Encrypted backups.** Backups hold the full database. Vault, salary and PII fields stay encrypted inside them, but client names, PANs and work data are readable by anyone who gets the .zip. | Encrypt each backup zip with a `BACKUP_PASSPHRASE` from `.env` (AES-256-GCM), required to restore. | Phase 2 |
+| Q-28 | Can a Manager create new clients for their team, or only Partners and the Practice Admin? (The spec matrix lets Managers manage their own clients; today a Manager-created client is placed under that Manager.) | Keep as built | — |
+
 ## Needed during Phase 2
 
 | # | Question | Proposal |
