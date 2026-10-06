@@ -22,7 +22,17 @@ proposal, I will build that unless you say otherwise.
 | Q-05 | **Flag switched off mid-year**: is the cut-over test the period start date (my reading of scenario 7 + the tax-audit edge case), so an In-Progress task for a period starting after the off date still goes to Not Applicable? | Yes, period start date decides; work entries on it are kept | Phase 2 |
 | Q-07 | **Portal 2FA**: the spec makes OTP mandatory for portal users; the brief makes TOTP optional. Mandatory TOTP for portal users? | Optional per brief, with a firm setting to make it mandatory | Phase 4 |
 
-## New from Phase 1 (answer before Phase 2 where marked)
+## Accepted on 6 Oct 2026 ("accepted — recommendations")
+
+The proposals below were accepted as answers and are what Phase 2 builds:
+Q-02b (PT due dates entered manually until state rules are supplied; MSME Form 1 30 Apr / 31 Oct, Unverified),
+Q-05 (period start date decides when a flag is switched off), Q-07 (portal TOTP optional with a firm setting),
+Q-10 (AGM ceiling 6 months after FY end; first AGM 9 months after first FY end), Q-11 (closure filings as
+manual-due-date tasks), Q-12 (Mon–Sat week, lock Sunday 16:00 IST), Q-13 (notice response default = received + 15 days),
+Q-14 (review levels as proposed; EQR when audit fee ≥ setting or entity is public interest), Q-26 (HTTPS for LAN
+with a locally generated certificate), Q-27 (backups encrypted with a key in .env), Q-28 (keep as built).
+
+## New from Phase 1 (answered — see above)
 
 | # | Question | Proposal | Blocks |
 |---|---|---|---|
