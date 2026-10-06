@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { login, openNav, DEMO_PASSWORD } from "./helpers";
 
-test("staff signs in with password only and sees their engagements", async ({ page }) => {
+test("staff signs in with password only and sees their day", async ({ page }) => {
   await login(page, "priya.nair");
-  await expect(page.getByText("My engagements")).toBeVisible();
-  await expect(page.getByText("Staff / Senior (Senior)").first()).toBeVisible();
+  await expect(page.getByText(/hrs? .*logged|Nothing logged/).first()).toBeVisible();
+  await expect(page.getByText("Senior", { exact: true }).first()).toBeVisible();
 });
 
 test("partner needs the authenticator code (mandatory 2FA)", async ({ page }) => {

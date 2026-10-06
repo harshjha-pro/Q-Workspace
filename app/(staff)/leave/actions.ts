@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/server/context";
 import * as svc from "@/server/services/leave/service";
-import { bulkReassign } from "@/server/services/tasks/service";
+import { bulkReassign, bulkChangeChecker } from "@/server/services/tasks/service";
 import { toActionError, type ActionResult } from "@/lib/action";
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -45,11 +45,14 @@ export async function decideLeaveAction(id: string, approve: boolean, note: stri
 }
 
 /** Reassign one task that falls due during the leave (spec 11.3 shortcut on the approval screen). */
-export async function reassignTaskAction(taskId: string, userId: string): Promise<ActionResult> {
+export async function reassignTaskAction(taskId: string, userId: string, role: string): Promise<ActionResult> {
   const actor = await requireStaff();
   try {
     if (!userId) return { ok: false, error: "Choose a person." };
-    await bulkReassign(actor, [taskId], userId);
+    // Replace the role that clashes with the leave: the checker stays maker-independent (maker ≠ checker).
+    const roles = role.split(",").map((r) => r.trim());
+    if (roles.some((r) => r === "ASSIGNEE" || r === "MAKER")) await bulkReassign(actor, [taskId], userId);
+    if (roles.includes("CHECKER")) await bulkChangeChecker(actor, [taskId], userId);
     revalidatePath("/leave");
     return { ok: true, message: "Reassigned." };
   } catch (e) {

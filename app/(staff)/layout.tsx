@@ -14,7 +14,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
     await signOut({ redirectTo: "/login" });
   }
   return (
-    <AppShell nav={navFor(actor)} user={{ name: actor.displayName, roleLabel: `${ROLE_LABELS[actor.role]}${actor.isSenior ? " (Senior)" : ""}` }} demo={isDemoMode()} logout={logout} unread={unread}>
+    <AppShell nav={navFor(actor)} user={{ name: actor.displayName, roleLabel: actor.role === "STAFF" ? (actor.isSenior ? "Senior" : "Staff") : ROLE_LABELS[actor.role] }} demo={isDemoMode()} logout={logout} unread={unread}>
       {children}
     </AppShell>
   );

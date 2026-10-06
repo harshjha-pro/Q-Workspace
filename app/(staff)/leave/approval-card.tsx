@@ -27,7 +27,7 @@ function ReassignRow({ c, people }: { c: Conflict; people: { id: string; name: s
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
           <Button size="sm" variant="secondary" disabled={!to || pending} onClick={() => start(async () => {
-            const r = await reassignTaskAction(c.id, to);
+            const r = await reassignTaskAction(c.id, to, c.role);
             setMsg(r.ok ? { ok: true, text: r.message ?? "Reassigned." } : { ok: false, text: r.error });
             if (r.ok) router.refresh();
           })}>{pending ? "Working…" : "Reassign"}</Button>

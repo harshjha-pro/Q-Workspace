@@ -121,7 +121,9 @@ export async function pendingMessage(actor: Actor, taskId: string) {
     `For ${t.title} (${client.name}) we are waiting for the following:`,
     ...(items.length ? items.map((i, n) => `${n + 1}. ${i.label}${i.note ? ` — ${i.note}` : ""}`) : ["(no items marked as requested)"]),
     "",
-    by ? `Kindly share these by ${by}${t.effectiveDueDate ? ` so we can file before the due date of ${formatDate(t.effectiveDueDate)}` : ""}.` : "Kindly share these at the earliest.",
+    t.effectiveDueDate && t.effectiveDueDate < todayIst()
+      ? `The due date of ${formatDate(t.effectiveDueDate)} has passed, so kindly share these at the earliest.`
+      : by ? `Kindly share these by ${by}${t.effectiveDueDate ? ` so we can file before the due date of ${formatDate(t.effectiveDueDate)}` : ""}.` : "Kindly share these at the earliest.",
     "",
     `Regards,`,
     `${me?.displayName ?? "QEPEX India"}`,

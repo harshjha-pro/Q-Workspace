@@ -41,6 +41,8 @@ export async function createNotice(actor: Actor, input: NoticeInput) {
   if (d.receivedDate > todayIst()) throw new DomainError("VALIDATION", "Received date cannot be in the future.", { receivedDate: "Check the date" });
   const due = d.responseDueDate ?? addDays(d.receivedDate, await getSettingNumber("notice.defaultResponseDays", 15));
   const engagement = d.engagementId ? await db().engagement.findFirst({ where: { id: d.engagementId, clientId: d.clientId } }) : null;
+  // Without an engagement the response task still follows the Notice stage template (spec 4.4).
+  const versionId = engagement?.stageTemplateVersionId ?? (await db().stageTemplateVersion.findFirst({ where: { template: { code: "NOTICE" }, status: "ACTIVE" }, orderBy: { version: "desc" } }))?.id ?? null;
   const notice = await transaction(async (tx) => {
     const n = await tx.notice.create({
       data: {
@@ -54,7 +56,7 @@ export async function createNotice(actor: Actor, input: NoticeInput) {
       const t = await tx.task.create({
         data: {
           clientId: d.clientId, engagementId: engagement?.id ?? null, title: `Notice response: ${label(n)}`, periodKey: `NOTICE-${n.id}`,
-          originalDueDate: due, effectiveDueDate: due, isOneOff: true, stageTemplateVersionId: engagement?.stageTemplateVersionId ?? null, createdById: idOf(actor),
+          originalDueDate: due, effectiveDueDate: due, isOneOff: true, stageTemplateVersionId: versionId, createdById: idOf(actor),
         },
       });
       await tx.taskStatusHistory.create({ data: { taskId: t.id, toStatus: "UPCOMING", reason: "Notice received", createdById: idOf(actor) } });

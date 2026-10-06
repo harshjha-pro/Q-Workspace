@@ -78,7 +78,8 @@ export async function seedActivity() {
   await approve("rahul.verma", addDays(today, -95), addDays(today, -91), "PERSONAL", "imran.shaikh");
   await approve("divya.krishnan", addDays(today, 3), addDays(today, 3), "PERSONAL", "sneha.kulkarni");
   // Pending requests for the approval screens; Priya's overlaps tasks she is maker on (conflict check demo).
-  for (const [u, from, to, approver, note] of [["priya.nair", addDays(today, 6), addDays(today, 9), "rohan.iyer", "Family function in Kochi"], ["aditya.kumar", addDays(today, 15), addDays(today, 16), "rohan.iyer", "CA Intermediate exam"]] as const) {
+  const priyaDue = (await db().task.findFirst({ where: { effectiveDueDate: { gte: addDays(today, 4) }, status: { notIn: CLOSED }, assignments: { some: { userId: P("priya.nair").id, toDate: null } } }, orderBy: { effectiveDueDate: "asc" } }))?.effectiveDueDate ?? addDays(today, 7);
+  for (const [u, from, to, approver, note] of [["priya.nair", addDays(priyaDue, -1), addDays(priyaDue, 1), "rohan.iyer", "Family function in Kochi"], ["aditya.kumar", addDays(today, 15), addDays(today, 16), "rohan.iyer", "CA Intermediate exam"]] as const) {
     const days = await workingDays(from, to);
     await db().leaveRequest.create({ data: { userId: P(u).id, leaveType: u === "aditya.kumar" ? "EXAM_STUDY" : "PERSONAL", reason: u === "aditya.kumar" ? "EXAM_STUDY" : "PERSONAL", note, fromDate: from, toDate: to, halfDays: days.length * 2, approverId: P(approver).id, createdById: P(u).id } });
   }
@@ -176,6 +177,13 @@ export async function seedActivity() {
   for (const t of toProgress) {
     await db().task.update({ where: { id: t.id }, data: { status: "IN_PROGRESS", stageIndex: Math.min(2, Math.max(0, (t.stageTemplateVersion?.stages.length ?? 1) - 3)) } });
     await db().taskStatusHistory.create({ data: { taskId: t.id, fromStatus: "UPCOMING", toStatus: "IN_PROGRESS", reason: "Work logged", createdById: "system" } });
+  }
+
+  // Open tasks nobody picked up go to the client's Manager, except a few left for "Allocations pending".
+  const unassigned = await db().task.findMany({ where: { status: { notIn: CLOSED }, assignments: { none: { toDate: null } } }, include: { client: { select: { managerId: true, partnerId: true } } }, orderBy: { effectiveDueDate: "asc" } });
+  for (const t of unassigned.slice(4)) {
+    const owner = t.client.managerId ?? t.client.partnerId ?? P("rohan.iyer").id;
+    await db().taskAssignment.create({ data: { taskId: t.id, userId: owner, role: "ASSIGNEE", fromDate: start, createdById: "system" } });
   }
 
   // 5. Pending from client: waiting on documents, with a reminder sent.
