@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
-import { parse } from "../../lib/validate";
-import { notFound, ruleViolation } from "../../lib/errors";
+import { parse, parsePartial } from "../../lib/validate";
+import { forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, can } from "../../permissions/guards";
 import { assertClientAccess, assertEngagementAccess, engagementWhere } from "../../permissions/scopes";
 import type { Actor } from "../../permissions/actor";
@@ -110,13 +110,16 @@ export async function createEngagement(actor: Actor, input: EngagementInput) {
   });
 }
 
-const engagementUpdate = engagementInput.omit({ clientId: true }).partial().extend({ status: z.enum(ENGAGEMENT_STATUSES).optional() });
+const engagementUpdate = engagementInput.omit({ clientId: true }).extend({ status: z.enum(ENGAGEMENT_STATUSES) });
 
-export async function updateEngagement(actor: Actor, engagementId: string, input: z.input<typeof engagementUpdate>) {
+export async function updateEngagement(actor: Actor, engagementId: string, input: Partial<z.input<typeof engagementUpdate>>) {
   await assertEngagementAccess(actor, "engagement.manage", engagementId);
-  const data = parse(engagementUpdate, input);
+  const data = parsePartial(engagementUpdate, input);
   return transaction(async (tx) => {
     const before = await tx.engagement.findUniqueOrThrow({ where: { id: engagementId } });
+    // Fees and chargeability are Partner decisions (spec 3.1, 7.1); Managers only see them.
+    const feeChanged = (["feeBasis", "feePaise", "ratePaisePerHour", "chargeable"] as const).some((k) => data[k] !== undefined && data[k] !== before[k]);
+    if (feeChanged && !can(actor, "billing.approve")) throw forbidden("Only a Partner can change fees or chargeability.");
     checkFeeBasis({ feeBasis: data.feeBasis ?? before.feeBasis, ratePaisePerHour: data.ratePaisePerHour ?? before.ratePaisePerHour });
     if (before.status === "ARCHIVED") throw ruleViolation("Archived engagements are read-only.");
     const after = await tx.engagement.update({

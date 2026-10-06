@@ -119,3 +119,11 @@ describe("Professional Tax registrations (Q-02)", () => {
     expect(await db().state.count({ where: { ptLevied: true } })).toBe(19);
   });
 });
+
+describe("partial updates never reset untouched fields", () => {
+  it("renaming a client keeps books-by, KYC and channel", async () => {
+    const c = await createClient(actorOf(w.pa), { name: "Keep Fields Co", constitution: "PARTNERSHIP", booksBy: "FIRM", kycStatus: "COMPLETE", preferredChannel: "WHATSAPP", fyEnd: "12-31" });
+    const after = await updateClient(actorOf(w.pa), c.id, { name: "Keep Fields & Co" });
+    expect([after.booksBy, after.kycStatus, after.preferredChannel, after.fyEnd]).toEqual(["FIRM", "COMPLETE", "WHATSAPP", "12-31"]);
+  });
+});

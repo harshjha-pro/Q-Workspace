@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
-import { parse } from "../../lib/validate";
+import { parse, parsePartial } from "../../lib/validate";
 import { forbidden, notFound } from "../../lib/errors";
 import { authorize, scopeOf } from "../../permissions/guards";
 import { assertUserAccess } from "../../permissions/scopes";
@@ -71,28 +71,33 @@ export async function getEmployeeProfile(actor: Actor, userId: string) {
   };
 }
 
+/**
+ * Create or update a profile. On update only the fields sent are changed, so an import row or
+ * form that leaves PAN blank never wipes the stored PAN.
+ */
 export async function upsertEmployeeProfile(actor: Actor, userId: string, input: ProfileInput) {
   authorize(actor, "hr.records.manage");
-  const data = parse(profileInput, input);
   const user = await db().user.findUnique({ where: { id: userId } });
   if (!user || user.isSystem) throw notFound("User");
+  const existing = await db().employeeProfile.findUnique({ where: { userId } });
+  const data = (existing ? parsePartial(profileInput, input) : parse(profileInput, input)) as Partial<z.output<typeof profileInput>>;
   const { bankName, bankAccount, bankIfsc, pan, aadhaar, ...plain } = data;
-  const enc = {
-    bankNameEnc: encryptOpt(bankName, "PII"),
-    bankAccountEnc: encryptOpt(bankAccount, "PII"),
-    bankIfscEnc: encryptOpt(bankIfsc, "PII"),
-    panEnc: encryptOpt(pan, "PII"),
-    aadhaarEnc: encryptOpt(aadhaar, "PII"),
-    aadhaarLast4: aadhaar ? aadhaar.slice(-4) : null,
-  };
+  const enc: Record<string, string | null> = {};
+  if (bankName !== undefined) enc.bankNameEnc = encryptOpt(bankName, "PII");
+  if (bankAccount !== undefined) enc.bankAccountEnc = encryptOpt(bankAccount, "PII");
+  if (bankIfsc !== undefined) enc.bankIfscEnc = encryptOpt(bankIfsc, "PII");
+  if (pan !== undefined) enc.panEnc = encryptOpt(pan, "PII");
+  if (aadhaar !== undefined) {
+    enc.aadhaarEnc = encryptOpt(aadhaar, "PII");
+    enc.aadhaarLast4 = aadhaar ? aadhaar.slice(-4) : null;
+  }
   return transaction(async (tx) => {
-    const before = await tx.employeeProfile.findUnique({ where: { userId } });
-    const row = before
+    const row = existing
       ? await tx.employeeProfile.update({ where: { userId }, data: { ...plain, ...enc, updatedById: idOf(actor) } })
       : await tx.employeeProfile.create({
-          data: { ...plain, ...enc, userId, employeeCode: await nextCode(tx, "employee"), createdById: idOf(actor) },
+          data: { ...(plain as object), ...enc, userId, employeeCode: await nextCode(tx, "employee"), createdById: idOf(actor) },
         });
-    await writeAudit(tx, actor, { entityType: "EmployeeProfile", entityId: row.id, action: before ? "UPDATE" : "CREATE", before, after: row });
+    await writeAudit(tx, actor, { entityType: "EmployeeProfile", entityId: row.id, action: existing ? "UPDATE" : "CREATE", before: existing, after: row });
     return row;
   });
 }

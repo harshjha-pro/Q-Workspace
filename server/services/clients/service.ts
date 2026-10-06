@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db, transaction, type Tx } from "../../lib/db";
-import { parse } from "../../lib/validate";
+import { parse, parsePartial } from "../../lib/validate";
 import { DomainError, conflict, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, isReadOnlyScope } from "../../permissions/guards";
 import { assertClientAccess, clientWhere } from "../../permissions/scopes";
@@ -153,7 +153,7 @@ export async function createClient(actor: Actor, input: ClientInput & { flags?: 
 
 export async function updateClient(actor: Actor, clientId: string, input: Partial<ClientInput>) {
   await assertManage(actor, clientId);
-  const data = parse(clientInput.partial(), input);
+  const data = parsePartial(clientInput, input);
   const before = await db().client.findUniqueOrThrow({ where: { id: clientId } });
   validateIdentifiers({ constitution: data.constitution ?? before.constitution, cinLlpin: data.cinLlpin ?? before.cinLlpin });
   const constitutionChanged = data.constitution && data.constitution !== before.constitution;

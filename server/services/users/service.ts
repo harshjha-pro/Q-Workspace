@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
-import { parse } from "../../lib/validate";
+import { parse, parsePartial } from "../../lib/validate";
 import { DomainError, forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, can } from "../../permissions/guards";
 import { assertUserAccess, userWhere } from "../../permissions/scopes";
@@ -113,7 +113,7 @@ export async function createUser(actor: Actor, input: UserInput) {
 
 export async function updateUser(actor: Actor, userId: string, input: Partial<UserInput>) {
   authorize(actor, "users.manage");
-  const data = parse(userInput.partial().omit({ username: true }), input);
+  const data = parsePartial(userInput.omit({ username: true }), input);
   return transaction(async (tx) => {
     const before = await tx.user.findUnique({ where: { id: userId } });
     if (!before || before.isSystem) throw notFound("User");

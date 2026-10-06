@@ -53,6 +53,12 @@ describe("engagements (P1-20)", () => {
     expect(e.canSeeFees).toBe(true);
   });
 
+  it("only a Partner can change fees after creation", async () => {
+    await expect(updateEngagement(actorOf(w.m1), w.e1.id, { feePaise: 1 })).rejects.toThrow(/Only a Partner/);
+    await updateEngagement(actorOf(w.m1), w.e1.id, { budgetMinutes: 900 });
+    await updateEngagement(actorOf(w.partner), w.e1.id, { feePaise: 30_000_00 });
+  });
+
   it("archived engagements are read-only", async () => {
     await updateEngagement(actorOf(w.partner), w.e2.id, { status: "ARCHIVED" });
     await expect(updateEngagement(actorOf(w.partner), w.e2.id, { name: "Changed name" })).rejects.toThrow(/read-only/);

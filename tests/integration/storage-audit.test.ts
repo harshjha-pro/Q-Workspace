@@ -72,3 +72,14 @@ describe("audit trail (P1-05) and sensitive views (P1-09)", () => {
     expect(await db().sensitiveViewLog.count({ where: { entityId: "c1" } })).toBe(1);
   });
 });
+
+describe("employee profile partial update", () => {
+  it("a later update without PAN keeps the stored PAN", async () => {
+    const hr = await makeUser("HR_ADMIN");
+    const s = await makeUser("STAFF");
+    await upsertEmployeeProfile(actorOf(hr), s.id, { pan: "ABCPD1234E", address: "Pune" });
+    await upsertEmployeeProfile(actorOf(hr), s.id, { uan: "100123456789" });
+    const p = await getEmployeeProfile(actorOf(hr), s.id);
+    expect([p?.pan, p?.address, p?.uan]).toEqual(["ABCPD1234E", "Pune", "100123456789"]);
+  });
+});

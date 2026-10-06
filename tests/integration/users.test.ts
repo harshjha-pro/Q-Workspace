@@ -99,3 +99,12 @@ describe("offboarding (P1-15)", () => {
     await expect(addTeamMember(actorOf(w.pa), team.id, w.hr.id)).rejects.toThrow(/HR Admin/);
   });
 });
+
+describe("partial user update", () => {
+  it("changing the name keeps location policy and senior flag", async () => {
+    const pa = await makeUser("PRACTICE_ADMIN");
+    const { user } = await createUser(actorOf(pa), { username: "keep.me", displayName: "Keep Me", role: "STAFF", isSenior: true, defaultLocation: "WFH", locationChangeable: false });
+    const after = await updateUser(actorOf(pa), user.id, { displayName: "Keep Me Too" });
+    expect([after.isSenior, after.defaultLocation, after.locationChangeable]).toEqual([true, "WFH", false]);
+  });
+});
