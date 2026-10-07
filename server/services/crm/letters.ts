@@ -120,7 +120,14 @@ export async function generateLetter(actor: Actor, proposalId: string) {
   const open = await db().engagementLetter.findFirst({ where: { proposalId, status: { not: "WITHDRAWN" } } });
   if (open) throw conflict("This proposal already has an engagement letter.");
   const extra = await letterExtras(p);
-  const r = await renderTemplateFor(`ENGAGEMENT_LETTER_${p.serviceLine}`, DEFAULT_LETTER, { clientId: p.clientId, extra });
+  // Firm templates use {{client.*}} / {{engagement.*}}; for a lead those records don't exist yet, so the
+  // lead and the accepted proposal supply them.
+  const lead = p.leadId ? await db().lead.findUnique({ where: { id: p.leadId } }) : null;
+  const fallback = {
+    client: { name: extra.clientName, address: extra.clientAddress.trim(), contactName: extra.contactName.trim(), pan: lead?.pan ?? "", contactEmail: lead?.email ?? "" },
+    engagement: { name: p.title, fee: extra.fee, feeBasis: extra.feeBasis },
+  };
+  const r = await renderTemplateFor(`ENGAGEMENT_LETTER_${p.serviceLine}`, DEFAULT_LETTER, { clientId: p.clientId, extra, fallback });
   return transaction(async (tx) => {
     const l = await tx.engagementLetter.create({
       data: { proposalId, clientId: p.clientId ?? `${LEAD_PLACEHOLDER}${p.leadId}`, templateVersionId: r.templateVersionId, body: r.text, createdById: idOf(actor), updatedById: idOf(actor) },

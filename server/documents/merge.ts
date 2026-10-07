@@ -29,7 +29,18 @@ export function fieldsIn(body: string): string[] {
 const inr = (paise: number) => `Rs. ${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 /** Build merge data from whichever records the document is about. Callers check permissions first. */
-export async function mergeDataFor(ctx: { clientId?: string | null; engagementId?: string | null; userId?: string | null; extra?: Record<string, string> }): Promise<MergeData> {
+export async function mergeDataFor(ctx: { clientId?: string | null; engagementId?: string | null; userId?: string | null; extra?: Record<string, string>; fallback?: MergeData }): Promise<MergeData> {
+  const data = await baseMergeData(ctx);
+  // Fallback values fill fields the records leave empty — e.g. a letter for a lead, before its client and
+  // engagement exist, takes the client name and fee from the lead and the proposal.
+  for (const [group, fields] of Object.entries(ctx.fallback ?? {})) {
+    data[group] ??= {};
+    for (const [k, v] of Object.entries(fields)) if (!data[group]![k] && v) data[group]![k] = v;
+  }
+  return data;
+}
+
+async function baseMergeData(ctx: { clientId?: string | null; engagementId?: string | null; userId?: string | null; extra?: Record<string, string> }): Promise<MergeData> {
   const today = todayIst();
   const firm = await db().firmProfile.findFirst();
   const data: MergeData = {

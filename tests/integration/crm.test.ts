@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { resetDb } from "../helpers/db";
 import { buildWorld, actorOf, makeClient, makeUser } from "../helpers/factory";
 import { db } from "@/server/lib/db";
+import { mergeDataFor, renderMerge } from "@/server/documents/merge";
 import { addDays, todayIst } from "@/server/lib/dates";
 import { seedCrmReference } from "@/prisma/seed/phase3/crm";
 import { createLead, updateLead, setLeadStage, addLeadActivity, listLeads, getLead, leadHours, findDuplicates, runLeadFollowUps } from "@/server/services/crm/leads";
@@ -183,6 +184,10 @@ describe("engagement letter acceptance → client + engagement (P3-10) and onboa
     expect(letter.body).toContain("Proposal Industries Private Limited");
     expect(letter.body).toContain("Rs. 1,20,000");
     expect(await db().client.count({ where: { pan: "AAACP5555K" } })).toBe(0);
+    // A firm template written with {{client.*}} / {{engagement.*}} is filled from the lead and proposal too.
+    const data = await mergeDataFor({ clientId: null, fallback: { client: { name: "Proposal Industries Private Limited" }, engagement: { fee: "Rs. 1,20,000" } } });
+    const merged = renderMerge("Dear {{client.name}}, fee {{engagement.fee}}", data);
+    expect(merged).toEqual({ text: "Dear Proposal Industries Private Limited, fee Rs. 1,20,000", missing: [] });
     const docx = await letterFile(actorOf(w.m1), letterId, "docx");
     expect(docx.body.subarray(0, 2).toString()).toBe("PK");
   });
