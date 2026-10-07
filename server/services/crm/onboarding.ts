@@ -20,7 +20,7 @@ export const ONBOARDING_ITEMS: { code: string; label: string; auditOnly?: boolea
   { code: "FLAGS_CONFIRMED", label: "Applicability flags confirmed, so the compliance calendar starts correctly" },
   { code: "CONFLICT_CHECK", label: "Conflict and independence check — Partner's decision recorded" },
   { code: "PREV_AUDITOR_NOC", label: "Previous auditor: communication / NOC recorded with attachment", auditOnly: true },
-  { code: "PORTAL_INVITE", label: "Client portal invitation (portal arrives in Phase 4 — mark when done)" },
+  { code: "PORTAL_INVITE", label: "Client portal invitation (Admin → Portal users)" },
   { code: "CREDENTIALS", label: "Portal credentials collected into the vault (never by email)" },
 ];
 const KYC = ["KYC_PAN", "KYC_ADDRESS", "KYC_CONSTITUTION", "KYC_SIGNATORY"];

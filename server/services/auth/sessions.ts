@@ -1,5 +1,5 @@
 import { db } from "../../lib/db";
-import { getSettingNumber } from "../settings/service";
+import { getSetting, getSettingNumber } from "../settings/service";
 import type { Actor } from "../../permissions/actor";
 import type { Role } from "../../domain/enums";
 import { MANDATORY_2FA_ROLES } from "../../domain/enums";
@@ -58,6 +58,7 @@ export async function resolveSession(sessionId: string, now = new Date()): Promi
   }
   if (s.portalUser) {
     if (!s.portalUser.active) return null;
+    const mandatory = (await getSetting<boolean>("portal.totpMandatory", false)) === true;
     return {
       actor: {
         kind: "PORTAL",
@@ -68,7 +69,7 @@ export async function resolveSession(sessionId: string, now = new Date()): Promi
         sessionId: s.id,
         ip: s.ip ?? undefined,
       },
-      needsTotpEnrolment: false,
+      needsTotpEnrolment: mandatory && !s.portalUser.totpEnabled,
       mustChangePassword: false,
     };
   }

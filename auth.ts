@@ -1,6 +1,6 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { staffLogin } from "@/server/services/auth/login";
+import { portalLogin, staffLogin } from "@/server/services/auth/login";
 import { revokeSession } from "@/server/services/auth/sessions";
 
 /** Carries our login status code ("NEED_TOTP", "LOCKED", "INVALID") back to the login form. */
@@ -48,6 +48,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
         if (result.status !== "OK") throw new LoginError(result.status);
         return { id: result.userId, sid: result.sessionId } as { id: string; sid: string };
+      },
+    }),
+    // Client portal (P4-02): its own provider and login page; the session row says which realm it is.
+    Credentials({
+      id: "portal",
+      credentials: { email: {}, password: {}, totp: {} },
+      async authorize(credentials, request) {
+        const email = String(credentials?.email ?? "");
+        const password = String(credentials?.password ?? "");
+        const totp = credentials?.totp ? String(credentials.totp) : undefined;
+        if (!email || !password) throw new LoginError("INVALID");
+        const result = await portalLogin(
+          { email, password, totp },
+          { ip: clientIp(request), userAgent: request?.headers.get("user-agent") ?? undefined },
+        );
+        if (result.status !== "OK") throw new LoginError(result.status);
+        return { id: result.portalUserId, sid: result.sessionId } as { id: string; sid: string };
       },
     }),
   ],

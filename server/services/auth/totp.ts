@@ -8,8 +8,8 @@ export function totpUri(secret: string, label: string, issuer = "QEPEX Work Trac
   return generateURI({ issuer, label, secret });
 }
 
-export async function totpQrDataUrl(secret: string, label: string) {
-  return QRCode.toDataURL(totpUri(secret, label), { margin: 1, width: 220 });
+export async function totpQrDataUrl(secret: string, label: string, issuer?: string) {
+  return QRCode.toDataURL(totpUri(secret, label, issuer), { margin: 1, width: 220 });
 }
 
 /** Accepts the current code and one 30-second step either side (clock drift on phones). */
