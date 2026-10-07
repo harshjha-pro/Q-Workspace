@@ -1,8 +1,7 @@
 import type { ClientSnapshot, ComplianceTypeDef, DueRuleDef, HolidayCalendar, Obligation, Period, PeriodBasis, TaskCreate } from "./types";
-import { nextPeriod, periodContaining, periodsOverlapping } from "./periods";
+import { closurePeriod as closureOf, nextPeriod, periodContaining, periodsOverlapping } from "./periods";
 import { applyHolidayPolicy, computeDueDate, pickRule, type DueContext } from "./rules";
 import { valueAt } from "./applicability";
-import { formatDate as formatDateShort } from "../lib/dates";
 
 export type GenerationInput = {
   client: ClientSnapshot;
@@ -35,10 +34,6 @@ export function horizonEnd(basis: PeriodBasis, today: string, horizon = DEFAULT_
   return p;
 }
 
-/** The single period of a one-time (closure) filing. */
-function closurePeriod(o: Obligation): Period {
-  return { key: `CLOSE-${o.start}`, label: `final (from ${formatDateShort(o.start)})`, start: o.start, end: o.start, index: "EVT" };
-}
 
 /**
  * Plan the tasks to create (Rules Spec 11.1). Idempotent: natural keys that already exist are skipped,
@@ -55,7 +50,7 @@ export function planGeneration(input: GenerationInput): TaskCreate[] {
     const rule = input.rules.get(o.typeCode) ?? [];
     let periods: Period[];
     if (type.frequency === "ONE_TIME") {
-      periods = [closurePeriod(o)];
+      periods = [closureOf(o.start)];
     } else {
       const basis = o.basisOverride ?? type.periodBasis;
       const last = horizonEnd(basis, input.today, horizon);

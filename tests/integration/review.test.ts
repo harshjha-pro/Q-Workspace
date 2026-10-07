@@ -105,6 +105,7 @@ describe("audit sign-off, EQR and UDIN", () => {
     await expect(signOff(actorOf(w.manager!), t.id, "PARTNER")).rejects.toThrow(/access/);
     await expect(signOff(actorOf(w.partner!), t.id, "PARTNER")).rejects.toThrow(/quality review/);
     await signOff(actorOf(w.partner2!), t.id, "EQR");
+    await expect(signOff(actorOf(w.partner2!), t.id, "PARTNER")).rejects.toThrow(/differ from the EQR/);
     await signOff(actorOf(w.partner!), t.id, "PARTNER");
     const after = await db().task.findUniqueOrThrow({ where: { id: t.id } });
     expect(after.signoffRecorded).toBe(true);

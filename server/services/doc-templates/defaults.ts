@@ -301,15 +301,17 @@ Director / Authorised signatory          Chief Financial Officer` },
 
   // ---- HR letters (codes HR_*)
   { code: "HR_OFFER", name: "Offer letter", category: "HR_LETTER", outputFormat: "PDF", body: `${DRAFT_MARKER}
-${hrTop}
+{{today.date}}
 
-Dear {{employee.name}},
+{{extra.candidateName}}
+
+Dear {{extra.candidateName}},
 
 # Offer of employment
 
-We are pleased to offer you the position of {{employee.designation}} with {{firm.name}}, based at our Jaipur office. We expect you to join on {{extra.joiningDate}}.
+We are pleased to offer you the position of {{extra.position}} with {{firm.name}}, based at our Jaipur office. We expect you to join on {{extra.joiningDate}}.
 
-Your total annual compensation will be {{extra.annualCompensation}}, with the break-up given in the annexure. Other terms, including working hours, leave and the probation period, follow the firm's HR policy, a copy of which will be shared on joining.
+Your total annual compensation will be {{extra.ctc}}, with the break-up given in the annexure. Other terms, including working hours, leave and the probation period, follow the firm's HR policy, a copy of which will be shared on joining.
 
 This offer depends on satisfactory verification of your documents and references. Please confirm your acceptance by signing a copy of this letter by {{extra.acceptBy}}.
 
@@ -361,7 +363,7 @@ Dear {{employee.name}},
 
 # Revision of compensation
 
-In recognition of your performance, we are pleased to revise your total annual compensation to {{extra.revisedCompensation}} with effect from {{extra.effectiveFrom}}. The revised break-up is given in the annexure. {{extra.designationChange}}
+In recognition of your performance, we are pleased to revise your total annual compensation to {{extra.newCtc}} with effect from {{extra.effectiveFrom}}. The revised break-up is given in the annexure.
 
 This letter is confidential. All other terms of your employment remain unchanged.
 
@@ -373,9 +375,9 @@ Partner` },
 
 # To whom it may concern
 
-This is to certify that {{employee.name}} worked with {{firm.name}} from {{employee.joiningDate}} to {{extra.lastWorkingDate}}. At the time of leaving, the designation held was {{employee.designation}}.
+This is to certify that {{employee.name}} worked with {{firm.name}} from {{employee.joiningDate}} to {{extra.lastWorkingDate}}. At the time of leaving, the position held was {{extra.position}}.
 
-During this period the work included {{extra.workSummary}}. We found the conduct and work satisfactory.
+We found the conduct and work satisfactory.
 
 We wish {{employee.name}} every success.
 

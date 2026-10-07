@@ -27,6 +27,8 @@ describe("periods", () => {
   it("round-trips keys", () => {
     for (const k of ["2026-08", "FY2026-27-Q2", "FY2026-27-H2", "FY2025-26", "AY2026-27"]) expect(periodFromKey(k).key).toBe(k);
     expect(() => periodFromKey("nonsense")).toThrow(/Unknown period key/);
+    // Closure filings (GSTR-10, STK-2, Form 24) round-trip, so an event-date recompute on a discontinued client works.
+    expect(periodFromKey("CLOSE-2026-10-01")).toMatchObject({ key: "CLOSE-2026-10-01", start: "2026-10-01", end: "2026-10-01", index: "EVT" });
   });
   it("lists overlapping periods and handles empty ranges", () => {
     expect(periodsOverlapping("FY_QUARTER", "2026-05-15", "2026-10-01").map((p) => p.index)).toEqual(["Q1", "Q2", "Q3"]);
@@ -288,7 +290,7 @@ describe("extensions and changes — remaining branches", () => {
     const c = client({ events: { "AGM|FY2025-26": "2026-09-15" }, flags: { pfApplicable: flag("2025-04-01") } });
     const tk = (over: Partial<ExistingTask>): ExistingTask => ({ id: "a", clientId: "c1", typeCode: "AOC-4", partyKey: "-", periodKey: "FY2025-26", periodStart: "2025-04-01", status: "UPCOMING", originalDueDate: "2026-10-15", effectiveDueDate: "2026-10-15", isProvisional: false, filedDate: null, ...over });
     const cfg = { agmCeilingMonths: 6, firstAgmCeilingMonths: 9 };
-    expect(planEventRecompute(c, [tk({ status: "NOT_APPLICABLE" }), tk({ typeCode: "UNKNOWN" }), tk({ typeCode: "DPT-3" }), tk({})], TYPES, RULES, cfg)).toEqual([]);
+    expect(planEventRecompute(c, [tk({ status: "NOT_APPLICABLE" }), tk({ typeCode: "UNKNOWN" }), tk({ typeCode: "DPT-3" }), tk({ typeCode: "DPT-3", periodKey: "CLOSE-2026-10-01" }), tk({})], TYPES, RULES, cfg)).toEqual([]);
     expect(planEventRecompute(client(), [tk({ typeCode: "ADT-1" })], TYPES, RULES, cfg)).toEqual([]);
     const [still] = planEventRecompute(c, [tk({ status: "FILED_LATE", filedDate: "2026-10-20", effectiveDueDate: "2026-10-01" })], TYPES, RULES, cfg);
     expect(still!.status).toBeUndefined();

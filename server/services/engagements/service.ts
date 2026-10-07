@@ -139,7 +139,8 @@ export async function updateEngagement(actor: Actor, engagementId: string, input
     const feeChanged = (["feeBasis", "feePaise", "ratePaisePerHour", "chargeable"] as const).some((k) => data[k] !== undefined && data[k] !== before[k]);
     if (feeChanged && !can(actor, "billing.approve")) throw forbidden("Only a Partner can change fees or chargeability.");
     checkFeeBasis({ feeBasis: data.feeBasis ?? before.feeBasis, ratePaisePerHour: data.ratePaisePerHour ?? before.ratePaisePerHour });
-    if (before.status === "ARCHIVED") throw ruleViolation("Archived engagements are read-only.");
+    // Closing sets COMPLETED + archivedAt (lifecycle service); both mean the file is closed.
+    if (before.status === "ARCHIVED" || before.archivedAt) throw ruleViolation("Archived engagements are read-only.");
     const after = await tx.engagement.update({
       where: { id: engagementId },
       data: { ...data, closedAt: data.status === "COMPLETED" && !before.closedAt ? new Date() : before.closedAt, updatedById: idOf(actor) },
@@ -155,6 +156,8 @@ const assignInput = z.object({ userId: z.string(), role: z.enum(["MEMBER", "MAKE
 export async function assignToEngagement(actor: Actor, engagementId: string, input: z.input<typeof assignInput>) {
   await assertEngagementAccess(actor, "engagement.manage", engagementId);
   const data = parse(assignInput, input);
+  const eng = await db().engagement.findUniqueOrThrow({ where: { id: engagementId }, select: { status: true, archivedAt: true } });
+  if (eng.status === "ARCHIVED" || eng.archivedAt) throw ruleViolation("Archived engagements are read-only.");
   const user = await db().user.findUnique({ where: { id: data.userId } });
   if (!user || !user.active) throw ruleViolation("Only active people can be assigned.");
   if (user.role === "HR_ADMIN" || user.role === "PRACTICE_ADMIN") throw ruleViolation("Admins are not assigned to client work.");

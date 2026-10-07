@@ -214,4 +214,17 @@ export async function seedComplianceMaster(db: PrismaClient) {
   for (const [date, name] of NATIONAL_HOLIDAYS) {
     await db.holiday.upsert({ where: { date_stateCode: { date, stateCode: "-" } }, create: { date, name, kind: "NATIONAL" }, update: {} });
   }
+
+  // Phase 3 reference data (idempotent; statutory rows Unverified). Order matters: firm-only compliance
+  // types (collab) build on the compliance master seeded above.
+  const p3 = {
+    billing: await import("./phase3/billing"), crm: await import("./phase3/crm"), payroll: await import("./phase3/payroll"),
+    hr: await import("./phase3/hr"), dms: await import("./phase3/dms"), collab: await import("./phase3/collab"),
+  };
+  await p3.billing.seedBillingReference(db);
+  await p3.crm.seedCrmReference(db);
+  await p3.payroll.seedPayrollReference(db);
+  await p3.hr.seedHrReference(db);
+  await p3.dms.seedDmsReference(db);
+  await p3.collab.seedCollabReference(db);
 }

@@ -164,11 +164,15 @@ export async function signOff(actor: Actor, taskId: string, level: "PARTNER" | "
   const type = t.complianceTypeCode ? await db().complianceType.findUnique({ where: { code: t.complianceTypeCode } }) : null;
   const family = type ? await db().stageTemplateFamily.findUnique({ where: { code: type.familyCode } }) : null;
   const threshold = await getSettingNumber("eqr.feeThresholdPaise", 50_000_00);
-  const eqrNeeded = Boolean(engagement?.eqrRequired || (family?.code === "F4" && (client.publicInterest || (engagement?.feePaise ?? 0) >= threshold)));
+  // One EQR rule for the whole app: the engagement-level test from QC (flag, public interest, audit fee
+  // threshold), plus the task-level test for audit-family tasks without an engagement.
+  const { eqrRequired } = await import("../qc/service");
+  const eqrNeeded = (engagement ? await eqrRequired(engagement.id) : false) || (family?.code === "F4" && (client.publicInterest || (engagement?.feePaise ?? 0) >= threshold));
   const existing = await db().signOff.findMany({ where: { taskId } });
   if (existing.some((s) => s.level === level)) throw ruleViolation("Already signed off at this level.");
   if (level === "EQR" && !eqrNeeded) throw ruleViolation("EQR is not required for this engagement.");
   if (level === "EQR" && existing.some((s) => s.level === "PARTNER" && s.signedById === actor.userId)) throw forbidden("The EQR Partner must differ from the signing Partner.");
+  if (level === "PARTNER" && existing.some((s) => s.level === "EQR" && s.signedById === actor.userId)) throw forbidden("The signing Partner must differ from the EQR Partner.");
   if (level === "PARTNER" && eqrNeeded && !existing.some((s) => s.level === "EQR")) throw ruleViolation("Engagement quality review must be completed before Partner sign-off.");
   return transaction(async (tx) => {
     let udinRecordId: string | null = null;

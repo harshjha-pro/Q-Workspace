@@ -1,5 +1,5 @@
 import type { Period, PeriodBasis } from "./types";
-import { addDays, isoFromParts, parseIso } from "../lib/dates";
+import { addDays, isoFromParts, parseIso, formatDate } from "../lib/dates";
 
 /**
  * Indian statutory periods. FY = 1 Apr – 31 Mar; quarters and halves are fiscal (Rules Spec 0.1).
@@ -81,8 +81,15 @@ export function periodsOverlapping(basis: PeriodBasis, from: string, to: string)
 }
 
 /** Rebuild a period from its key (used for existing tasks). */
+/** The single period of a one-time (closure) filing, e.g. GSTR-10 from the cancellation date. */
+export function closurePeriod(start: string): Period {
+  return { key: `CLOSE-${start}`, label: `final (from ${formatDate(start)})`, start, end: start, index: "EVT" };
+}
+
 export function periodFromKey(key: string): Period {
-  let m = /^(\d{4})-(\d{2})$/.exec(key);
+  let m = /^CLOSE-(\d{4}-\d{2}-\d{2})$/.exec(key);
+  if (m) return closurePeriod(m[1]!);
+  m = /^(\d{4})-(\d{2})$/.exec(key);
   if (m) return monthPeriod(+m[1]!, +m[2]!);
   m = /^FY(\d{4})-\d{2}-Q([1-4])$/.exec(key);
   if (m) return quarterPeriod(+m[1]!, +m[2]!);

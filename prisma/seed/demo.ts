@@ -387,4 +387,20 @@ export async function seedDemo(db: PrismaClient) {
   // Phase 2 activity: compliance tasks, six months of entries, registers, leave.
   const { seedActivity } = await import("./activity");
   await seedActivity();
+
+  // Phase 3 demo activity. Payroll needs the work entries (attendance) and sets demo cost rates, which
+  // billing's realization uses; collaboration closes engagements that the QC inspection samples; HR's
+  // appraisal evidence reads feedback (CRM) and applause (collaboration).
+  const { seedPayrollDemo } = await import("./phase3/payroll");
+  const { seedBillingDemo } = await import("./phase3/billing");
+  const { seedCrmDemo } = await import("./phase3/crm");
+  const { seedCollabDemo } = await import("./phase3/collab");
+  const { seedDmsDemo } = await import("./phase3/dms");
+  const { seedHrDemo } = await import("./phase3/hr");
+  await seedPayrollDemo();
+  await seedBillingDemo();
+  await seedCrmDemo();
+  await seedCollabDemo();
+  await seedDmsDemo();
+  await seedHrDemo();
 }

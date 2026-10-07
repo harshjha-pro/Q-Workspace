@@ -25,7 +25,7 @@ export const LETTER_LABELS: Record<LetterKind, string> = {
 /** Letters that carry pay figures: viewing them is a salary view (invariant 5). */
 const PAY_LETTERS: LetterKind[] = ["OFFER", "APPOINTMENT", "INCREMENT"];
 
-/** Extra merge fields each letter asks HR to type ({{extra.<key>}}). */
+/** Extra merge fields each letter asks HR to type ({{extra.<key>}}). Firm templates for HR_<KIND> must use these keys (the defaults in doc-templates do). */
 export const LETTER_EXTRA_FIELDS: Record<LetterKind, { key: string; label: string; type?: "date" }[]> = {
   OFFER: [{ key: "position", label: "Position" }, { key: "ctc", label: "Annual CTC / monthly stipend" }, { key: "joiningDate", label: "Joining date", type: "date" }, { key: "acceptBy", label: "Accept by", type: "date" }],
   APPOINTMENT: [{ key: "position", label: "Position" }, { key: "ctc", label: "Annual CTC / monthly stipend" }, { key: "probationMonths", label: "Probation (months)" }],
