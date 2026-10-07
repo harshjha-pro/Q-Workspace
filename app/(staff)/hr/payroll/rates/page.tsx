@@ -44,7 +44,7 @@ export default async function RatesPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title="Statutory payroll rates" subtitle="Every rate, slab and limit the payroll engine uses. Nothing is hard-coded." />
       <p className="text-sm"><Link href="/hr/payroll" className="text-brand hover:underline">← Payroll</Link></p>
-      <Alert tone="warn">The Income-tax Act, 2025 replaced the Income-tax Act, 1961 from 1 April 2026. The FY 2026-27 values were seeded from the Finance Act 2025 and section/form numbers have changed (Form 16 has a new number): a Partner must verify each row before relying on TDS.</Alert>
+      <Alert tone="warn">The FY 2026-27 values were seeded from the Finance Act 2025 and are Unverified. A Partner verifies each row against the current law (Income-tax Act, 2025 from 1 April 2026) before relying on TDS (Q-34).</Alert>
       {section("PF", "Provident Fund", ["From", "Employee", "Employer EPF / EPS", "PF ceiling", "EPS ceiling", "Admin / EDLI"], t.pf.map((r) => (
         <TR key={r.id}><TD>{formatDate(r.effectiveFrom)}</TD><TD>{pct(r.employeeBp)}</TD><TD>{pct(r.employerEpfBp)} / {pct(r.employerEpsBp)}</TD><TD>{inr(r.pfWageCeilingPaise)}</TD><TD>{inr(r.epsWageCeilingPaise)}</TD><TD>{pct(r.adminBp)} / {pct(r.edliBp)}</TD>{status("PF", r)}</TR>
       )))}

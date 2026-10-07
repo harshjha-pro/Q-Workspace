@@ -86,9 +86,16 @@ async function activeTemplateVersion(engagementType: string) {
   return template.versions[0] ?? null;
 }
 
-export async function createEngagement(actor: Actor, input: EngagementInput) {
+/**
+ * Q-33: a Practice Admin may create and staff the engagement that an accepted, Partner-approved engagement
+ * letter calls for (CRM acceptance), without general engagement-management rights.
+ */
+export type FromAcceptedLetter = { fromAcceptedLetter?: boolean };
+const viaLetter = (actor: Actor, opts: FromAcceptedLetter) => Boolean(opts.fromAcceptedLetter && actor.kind === "USER" && actor.role === "PRACTICE_ADMIN");
+
+export async function createEngagement(actor: Actor, input: EngagementInput, opts: FromAcceptedLetter = {}) {
   const data = parse(engagementInput, input);
-  await assertClientAccess(actor, "engagement.manage", data.clientId);
+  await assertClientAccess(actor, viaLetter(actor, opts) ? "client.manage" : "engagement.manage", data.clientId);
   checkFeeBasis(data);
   const version = await activeTemplateVersion(data.engagementType);
   const client = await db().client.findUniqueOrThrow({ where: { id: data.clientId } });
@@ -153,8 +160,11 @@ export async function updateEngagement(actor: Actor, engagementId: string, input
 const assignInput = z.object({ userId: z.string(), role: z.enum(["MEMBER", "MAKER", "CHECKER", "EQR"]).default("MEMBER") });
 
 /** Assign a person to an engagement. Articles never check; HR Admin never touches client work. */
-export async function assignToEngagement(actor: Actor, engagementId: string, input: z.input<typeof assignInput>) {
-  await assertEngagementAccess(actor, "engagement.manage", engagementId);
+export async function assignToEngagement(actor: Actor, engagementId: string, input: z.input<typeof assignInput>, opts: FromAcceptedLetter = {}) {
+  if (viaLetter(actor, opts)) {
+    const e = await db().engagement.findUniqueOrThrow({ where: { id: engagementId }, select: { clientId: true } });
+    await assertClientAccess(actor, "client.manage", e.clientId);
+  } else await assertEngagementAccess(actor, "engagement.manage", engagementId);
   const data = parse(assignInput, input);
   const eng = await db().engagement.findUniqueOrThrow({ where: { id: engagementId }, select: { status: true, archivedAt: true } });
   if (eng.status === "ARCHIVED" || eng.archivedAt) throw ruleViolation("Archived engagements are read-only.");

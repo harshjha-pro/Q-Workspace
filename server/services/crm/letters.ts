@@ -219,6 +219,8 @@ export type AcceptLetterInput = z.input<typeof acceptInput>;
  * with the chosen team → onboarding checklist + conflict check for a new client → lead Won.
  * Steps reuse the clients / engagements services (each audited); a retry after a failure resumes safely.
  */
+const isPracticeAdmin = (a: Actor) => a.kind === "USER" && a.role === "PRACTICE_ADMIN";
+
 export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string, file: { name: string; data: Buffer }, input: AcceptLetterInput = {}) {
   const l = await loadLetter(actor, letterId, "crm.manage");
   const d = parse(acceptInput, input);
@@ -239,12 +241,12 @@ export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string,
   if (newClient) {
     if (!lead) throw ruleViolation("No lead or client to accept for.");
     authorize(actor, "client.manage");
-    authorize(actor, "engagement.manage");
+    if (!isPracticeAdmin(actor)) authorize(actor, "engagement.manage"); // Q-33: the Practice Admin may accept
     if (lead.pan && (await db().client.findFirst({ where: { pan: lead.pan, status: { not: "DISCONTINUED_CLOSED" } } }))) {
       throw conflict("A client with this lead's PAN already exists. Link the lead to that client instead of creating a new one.");
     }
   } else {
-    await assertClientAccess(actor, "engagement.manage", clientId!);
+    await assertClientAccess(actor, isPracticeAdmin(actor) ? "client.manage" : "engagement.manage", clientId!);
   }
   const stored = await storeFile(["_crm", "engagement-letters"], file.name, file.data);
   const today = todayIst();
@@ -274,9 +276,9 @@ export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string,
       clientId: clientId!, name: d.engagementName ?? p.title, serviceLine: p.serviceLine as ServiceLine, engagementType, recurrence: d.recurrence ?? spec.recurrence,
       feeBasis: p.feeBasis as "FIXED" | "RETAINER" | "TIME", feePaise: p.feeBasis === "TIME" ? 0 : p.feePaise, ratePaisePerHour: p.feeBasis === "TIME" ? p.ratePaise : 0,
       budgetMinutes: Math.round(p.budgetMinutes / 15) * 15, startDate: d.startDate ?? today,
-    });
+    }, { fromAcceptedLetter: true });
   }
-  for (const uid of d.memberUserIds) await assignToEngagement(actor, engagement.id, { userId: uid, role: "MEMBER" });
+  for (const uid of d.memberUserIds) await assignToEngagement(actor, engagement.id, { userId: uid, role: "MEMBER" }, { fromAcceptedLetter: true });
 
   const result = await transaction(async (tx) => {
     const doc = await tx.document.create({

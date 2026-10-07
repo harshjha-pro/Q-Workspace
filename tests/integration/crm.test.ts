@@ -3,6 +3,7 @@ import { resetDb } from "../helpers/db";
 import { buildWorld, actorOf, makeClient, makeUser } from "../helpers/factory";
 import { db } from "@/server/lib/db";
 import { mergeDataFor, renderMerge } from "@/server/documents/merge";
+import { createEngagement } from "@/server/services/engagements/service";
 import { addDays, todayIst } from "@/server/lib/dates";
 import { seedCrmReference } from "@/prisma/seed/phase3/crm";
 import { createLead, updateLead, setLeadStage, addLeadActivity, listLeads, getLead, leadHours, findDuplicates, runLeadFollowUps } from "@/server/services/crm/leads";
@@ -193,7 +194,9 @@ describe("engagement letter acceptance → client + engagement (P3-10) and onboa
   });
 
   it("uploading the signed copy creates the client, the engagement (fee, budget, template, team), onboarding and wins the lead", async () => {
-    const r = await acceptLetterWithSignedCopy(actorOf(w.m1), letterId, { name: "signed.pdf", data: PDF }, { memberUserIds: [w.s1.id] });
+    // Q-33: the Practice Admin may accept the letter, though it cannot create engagements directly.
+    await expect(createEngagement(actorOf(w.pa), { clientId: w.c1.id, name: "Direct attempt", serviceLine: "GST", engagementType: "GST_RETURN" })).rejects.toThrow();
+    const r = await acceptLetterWithSignedCopy(actorOf(w.pa), letterId, { name: "signed.pdf", data: PDF }, { memberUserIds: [w.s1.id] });
     clientId = r.clientId;
     const client = await db().client.findUniqueOrThrow({ where: { id: clientId }, include: { contacts: true } });
     expect(client.pan).toBe("AAACP5555K");

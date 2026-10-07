@@ -33,10 +33,10 @@ export const SETTING_DEFAULTS = {
   "reminders.pendingEscalationDays": { value: 10, description: "Pending from client this long with the due date near → escalate to the Manager" },
   "reminders.pendingEscalationDueWithinDays": { value: 5, description: "…when the due date is within this many days" },
   "reminders.reviewSlaDays": { value: 2, description: "Review waiting this long → remind the checker (twice as long → Partner)" },
-  // Phase 3 — billing (Q-18). GST rate and SAC codes are statutory: confirm against the GST notifications.
-  "billing.gstRateBp": { value: 1800, description: "GST rate on professional fees, in basis points (1800 = 18%) — Unverified, confirm (Q-18)" },
-  "billing.sacByServiceLine": { value: { ACCOUNTING: "998222", AUDIT: "998221", DIRECT_TAX: "998231", GST: "998231", COMPANY_LAW: "998216", ADVISORY: "998311" }, description: "SAC code per service line — Unverified, confirm (Q-18)" },
-  "billing.defaultSac": { value: "998231", description: "SAC when the service line is not mapped — Unverified" },
+  // Phase 3 — billing (Q-18). GST rate and SAC codes confirmed by the firm (Q-35); revisit if GST law changes.
+  "billing.gstRateBp": { value: 1800, description: "GST rate on professional fees, in basis points (1800 = 18%; confirmed Q-35)" },
+  "billing.sacByServiceLine": { value: { ACCOUNTING: "998222", AUDIT: "998221", DIRECT_TAX: "998231", GST: "998231", COMPANY_LAW: "998216", ADVISORY: "998311" }, description: "SAC code per service line (confirmed Q-35)" },
+  "billing.defaultSac": { value: "998231", description: "SAC when the service line is not mapped (confirmed Q-35)" },
   "billing.invoicePrefix": { value: "QI", description: "Invoice series code; numbers are <code>/yy-yy/0001 (≤16 characters, Q-18)" },
   "billing.paymentTermsDays": { value: 15, description: "Invoice due date = invoice date + days" },
   "billing.unbilledAlertDays": { value: 30, description: "Flag unbilled chargeable work older than this" },
@@ -66,7 +66,7 @@ export const SETTING_DEFAULTS = {
   "payroll.defaultRegime": { value: "NEW", description: "Default income-tax regime on new salary structures" },
   "payroll.esiRoundUpToRupee": { value: true, description: "Round each ESI share up to the next rupee" },
   "payroll.stipendLocationClass": { value: "POP_20L_PLUS", description: "Firm's city class for the minimum article stipend (Jaipur: over 20 lakh population)" },
-  "payroll.form16Label": { value: "Form 16", description: "Label of the annual salary TDS certificate (renumbered under the Income-tax Act, 2025 — verify)" },
+  "payroll.form16Label": { value: "Form 16", description: "Label of the annual salary TDS certificate (Form 16, confirmed Q-34)" },
   // Phase 3 — documents, QC, collaboration
   "qc.inspectionSampleSize": { value: 5, description: "Engagements sampled at random for a periodic file inspection" },
   "comments.editWindowMinutes": { value: 15, description: "Minutes an author can edit their own comment" },

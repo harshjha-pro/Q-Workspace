@@ -5,7 +5,7 @@
  *  - PF, ESI, Professional Tax (Maharashtra, Karnataka; Rajasthan levies none, so it has no rows),
  *    income-tax slabs and tax parameters for FY 2026-27, ICAI minimum stipend, leave-policy placeholders (Q-20).
  *  The Income-tax Act, 2025 replaced the 1961 Act from 1 April 2026: the FY 2026-27 values below are the
- *  Finance Act 2025 figures and MUST be verified (and section/form labels renumbered) before use.
+ *  Finance Act 2025 figures and MUST be verified by a Partner before use (Q-34).
  *
  * Demo (uses the services; dates relative to today): encrypted salary structures for every salaried person
  * and stipends for the articles (Partners draw profit share, not salary, so they have none), one revision

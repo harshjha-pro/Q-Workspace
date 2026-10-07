@@ -131,8 +131,9 @@ New dependencies, both MIT: `pdfkit` (PDFs) and `docx` (Word).
 
 ## 7. Open questions
 
-New: **Q-33** (may the Practice Admin accept engagement letters?), **Q-34** (who verifies payroll values under the
-Income-tax Act, 2025, and what is Form 16 now called?), **Q-35** (SAC codes and GST rate), **Q-36** (firm GSTIN,
+Answered on 7 Oct 2026: **Q-33** yes, the Practice Admin may accept engagement letters (built, D-76); **Q-34** a
+Partner verifies payroll values and Form 16 keeps its name; **Q-35** GST 18% and the SAC codes confirmed. Still
+open: **Q-36** (firm GSTIN,
 PAN, bank and UPI for invoices), **Q-37** (surcharge band limit), **Q-38** (Tally/Zoho export layout?), **Q-39**
 (OK to add the JSON-kept fields as real columns in one additive migration at the start of Phase 4?). Still open
 from before, built with my proposals: Q-09, Q-18 to Q-23.

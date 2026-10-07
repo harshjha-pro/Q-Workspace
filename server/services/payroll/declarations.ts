@@ -168,8 +168,8 @@ export async function taxProjection(actor: Actor, userId?: string): Promise<{ fy
 }
 
 // ---------------------------------------------------------------------------
-// Form 16 (annual; Part B computed here, Part A typed by HR from TRACES). Label is a setting because the
-// Income-tax Act, 2025 renumbers the forms from 1 April 2026.
+// Form 16 (annual; Part B computed here, Part A typed by HR from TRACES). The firm confirmed the name
+// "Form 16" (Q-34); the label stays a setting in case it changes.
 // ---------------------------------------------------------------------------
 const partAInput = z.object({
   employerTan: z.string().trim().toUpperCase().regex(/^[A-Z]{4}[0-9]{5}[A-Z]$/, "TAN looks like ABCD12345E"),
