@@ -24,7 +24,7 @@ export default async function ArticleshipPage() {
     <div className="mx-auto max-w-5xl space-y-4">
       <PageHeader title="Articleship" subtitle={`Registration, leave against entitlement, exposure and completion. Completion within ${rules.completionAlertDays} days is flagged for replacement planning.`} />
       {approaching.length ? <Alert tone="warn">{approaching.length} article{approaching.length === 1 ? "" : "s"} complete within {rules.completionAlertDays} days: {approaching.map((r) => r.name).join(", ")}.</Alert> : null}
-      {rows.length === 0 ? <EmptyState title="No articleship records">HR registers each article's institute details here.</EmptyState> : (
+      {rows.length === 0 ? <EmptyState title="No articleship records">HR registers each article&apos;s institute details here.</EmptyState> : (
         <Card>
           <Table>
             <THead><tr><TH>Article</TH><TH>Principal</TH><TH>Leave</TH><TH>Completion</TH></tr></THead>

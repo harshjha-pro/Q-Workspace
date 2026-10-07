@@ -294,3 +294,16 @@ export async function myForm16(actor: Actor) {
 
 export const currentFyStart = () => fyStartYear(todayIst());
 export type { Declaration };
+
+/** People with paid salary in the FY and their certificate status (HR / Partner page). */
+export async function form16Candidates(actor: Actor, fyStart: number) {
+  if (!isSalaryAdmin(actor) || actor.kind === "PORTAL") throw forbidden();
+  const slips = await db().payslip.findMany({ where: { run: { kind: "SALARY", month: { in: fyMonths(fyStart) }, status: { in: ["PAID", "LOCKED"] } } }, select: { userId: true, run: { select: { month: true } } } });
+  const byUser = new Map<string, number>();
+  for (const s of slips) byUser.set(s.userId, (byUser.get(s.userId) ?? 0) + 1);
+  const [users, forms] = await Promise.all([
+    db().user.findMany({ where: { id: { in: [...byUser.keys()] } }, select: { id: true, displayName: true } }),
+    db().form16.findMany({ where: { fy: fyCode(fyStart) } }),
+  ]);
+  return users.map((u) => ({ userId: u.id, name: u.displayName, months: byUser.get(u.id) ?? 0, form16: forms.find((f) => f.userId === u.id) ?? null })).sort((a, b) => a.name.localeCompare(b.name));
+}

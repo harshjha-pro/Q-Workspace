@@ -162,3 +162,10 @@ export async function adjustBalance(actor: Actor, balanceId: string, deltaHalfDa
     await writeAudit(tx, actor, { entityType: "LeaveBalance", entityId: balanceId, action: "ADJUST", before: { adjustedHalfDays: b.adjustedHalfDays }, after: { adjustedHalfDays: b.adjustedHalfDays + deltaHalfDays }, reason });
   });
 }
+
+/** "Run accrual now" from the leave-policies page (HR, or a Partner). */
+export async function runLeaveAccrualNow(actor: Actor) {
+  requireStaff(actor);
+  if (actor.role !== "PARTNER") authorize(actor, "hr.records.manage");
+  return runLeaveAccrual(todayIst(), actor);
+}
