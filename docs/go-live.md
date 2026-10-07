@@ -94,6 +94,16 @@ After step 5, open **Home** as a Manager:
 - Professional Tax due dates are typed per task (Q-02b). Rajasthan does not levy PT, so only clients
   registered in other states have PT tasks.
 
+## 6a. Before the first invoice and the first payroll (Phase 3)
+
+- **Admin → Firm profile**: GSTIN, PAN, address, bank and UPI details (printed on invoices).
+- **Settings**: confirm `billing.gstRateBp` and `billing.sacByServiceLine` (Q-35).
+- **HR → Payroll → Rates**: the Partner verifies PF, ESI, income-tax slabs and parameters, and stipend
+  minimums for FY 2026-27 under the Income-tax Act, 2025 (Q-34). Set `payroll.form16Label` to the new form name.
+- **HR → Leave policies**: replace the placeholder quotas with the firm's policy (Q-20).
+- **HR → Cost rates**: ₹/hour per designation, so realization works (Q-22).
+- **People → each person → profile**: salary structures (HR proposes, a Partner approves), UAN / ESI numbers.
+
 ## 7. First week
 
 - Everyone logs daily work on **Add work**. Phones can install it to the home screen.

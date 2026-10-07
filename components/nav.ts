@@ -60,7 +60,7 @@ const NAV: NavDef[] = [
   { href: "/admin/compliance", label: "Due-date master", section: "Admin", cap: "dueDateMaster.manage" },
   { href: "/qc", label: "Quality control", section: "Admin", anyOf: ["qc.manage", "qc.declare"] },
   { href: "/admin/retention", label: "Retention & purge", section: "Admin", cap: "settings.manage" },
-  { href: "/archive", label: "Archive & retention", section: "Admin", anyOf: ["engagement.view"] },
+  { href: "/archive", label: "Archive", section: "Admin", anyOf: ["engagement.view"] },
   { href: "/admin/doc-templates", label: "Document templates", section: "Admin", cap: "templates.manage" },
   { href: "/admin/firm", label: "Firm profile", section: "Admin", cap: "settings.manage" },
   { href: "/admin/templates", label: "Stage templates", section: "Admin", check: (a) => can(a, "templates.manage") && a.kind === "USER" && a.role !== "HR_ADMIN" },

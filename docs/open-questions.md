@@ -59,7 +59,19 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-31 | Office state for holidays | **Rajasthan** | Firm profile state RJ; Rajasthan holidays count as office holidays (D-50). The holiday list itself is entered by the Practice Admin |
 | Q-32 | Start daily use now? | **Yes, now, with real data** | Go-live cut-off (D-49), opening flag dates (D-48), engagements import (D-51) and [`go-live.md`](go-live.md) |
 
-## Needed during Phase 3
+## New from Phase 3 (my proposal applies unless you say otherwise)
+
+| # | Question | Proposal | Blocks |
+|---|---|---|---|
+| Q-33 | The Practice Admin can manage leads and proposals but cannot accept an engagement letter, because accepting creates engagements (only Partners and Managers may). Should the Practice Admin be able to? | Keep Partner/Manager only | — |
+| Q-34 | **Payroll statutory values** for FY 2026-27 (PF, ESI, income-tax slabs, rebate, standard deduction, 80C/80D limits, ICAI stipend minimums, CPE hours) are seeded Unverified from the Finance Act 2025 and older ICAI figures. Who verifies them under the Income-tax Act, 2025, and what is the new name of Form 16? ICSI stipend minimums are not seeded. | HR Admin prepares, a Partner verifies on Payroll → Rates before the first real run | First real payroll |
+| Q-35 | **SAC codes and GST rate** on fees: seeded 998221 (audit), 998222 (accounting), 998231 (tax, GST), 998216 (company law — least certain), 998311 (advisory), 18%. | Partner confirms in Settings before the first invoice | First invoice |
+| Q-36 | The firm's GSTIN, PAN, bank and UPI details for invoices | Enter under Admin → Firm profile | First invoice |
+| Q-37 | Above ₹2 crore of salary income the old-regime surcharge bands cannot be stored (the rate table holds amounts up to about ₹2.1 crore). | Accept for now (no staff near it); widen the column with an additive migration if needed | — |
+| Q-38 | Accounting export: generic CSV/Excel columns now. Do you want a Tally- or Zoho-specific layout? (Spec §16.1 decision 4) | Generic until you name one | — |
+| Q-39 | Some fields are kept as JSON in text columns because the data model is frozen (invoice IRN/Ack, receipt TDS, letter lead link, service-template engagement type and budget, Form 16 Part A). | Add them as real columns in one additive migration at the start of Phase 4 | — |
+
+## Needed during Phase 3 (proposals applied, still open for confirmation)
 
 | # | Question | Proposal |
 |---|---|---|

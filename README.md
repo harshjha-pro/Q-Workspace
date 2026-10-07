@@ -6,8 +6,8 @@ calendar, review and sign-off, registers, billing, CRM, HRMS and payroll, a clie
 It runs on **one computer with only Node.js**. There is no cloud account, external database, API key or
 paid service, and nothing leaves the machine.
 
-> **Build status:** Phase 1 (Foundation) and Phase 2 (Core practice) are complete. The data model is
-> frozen. Phases 3–5 add the modules listed in [`docs/build-plan.md`](docs/build-plan.md).
+> **Build status:** Phases 1 (Foundation), 2 (Core practice) and 3 (Firm modules) are complete. The data
+> model is frozen. Phases 4–5 (client portal, analytics) are listed in [`docs/build-plan.md`](docs/build-plan.md).
 
 ## Quick start
 
@@ -48,7 +48,10 @@ Professional Tax registrations. On top of that the seed generates the compliance
 (about 1,500 tasks, most past ones filed, some late, some overdue), about six months of daily work entries,
 work pending from clients and under review, notices with a hearing, DSCs in every expiry band, UDINs,
 portal credentials with grants, the inward/outward register, leave (including one request that clashes with
-due dates) and today's reminders. Dates are relative to the day you run setup, so the demo always looks
+due dates) and today's reminders. Phase 3 adds about 45 invoices with receipts, write-offs and retainer drafts,
+leads and proposals through to a won engagement, six months of payroll and stipend runs, appraisals,
+articleship records, expenses, assets, an exit in progress, about 60 documents with QC checklists, knowledge
+articles, helpdesk tickets, meetings and applause. Dates are relative to the day you run setup, so the demo always looks
 current. All PAN, GSTIN, DIN, Aadhaar, UDIN and bank numbers are **fake** but correctly formatted.
 
 **Reset demo data:** go to Settings → Demo data (Partner only), or run `npm run demo:reset`. Both refuse
@@ -157,6 +160,30 @@ needs only Node.js.
   scoped **CSV/Excel exports**; stage-template versioning with stage mapping; the home dashboard per role.
 - **Encrypted backups** and **HTTPS on the office network**.
 
+## What Phase 3 delivers
+
+- **Billing**: firm profile, GST invoices (CGST/SGST or IGST, SAC, pure-agent reimbursements, manual IRN) with
+  PDF, gapless FY numbering, manual receipts with client TDS and part-payments, write-offs, ageing, unbilled-work
+  alerts, realization, monthly retainer drafts for Partner approval, payment-reminder text, disbursements,
+  accounting export (CSV/Excel).
+- **CRM**: leads with duplicate check, activities, proposals with versions and Partner approval, engagement
+  letters (PDF/Word) whose signed copy creates the client and engagement, onboarding checklist and conflict
+  check, communication log, cross-sell suggestions, renewals with fee suggestions, client feedback, client
+  communications with opt-out.
+- **HR & payroll**: attendance from work entries, leave policies and accrual, salary structures, monthly payroll
+  and article stipend runs (PF, ESI, PT, TDS under either regime), payslips, bank / PF ECR / ESI / PT / 24Q files,
+  investment declarations, Form 16, cost rates; recruitment, articleship, appraisals with an evidence panel, CPE
+  and skills, expenses, assets, exit and full-and-final, HR letters and policy acknowledgments.
+- **Documents & quality**: automatic folders, versions, check-out, permission-aware search, audit file index,
+  SQC 1 checklists, independence declarations, EQR, file inspections, peer-review pack, document template
+  library (Word/PDF with merge fields, Partner-approved).
+- **Collaboration**: completion reports, archive, retention with Partner-approved purge, comments with
+  @mentions, client meetings with action items, knowledge base, helpdesk, applause, the firm's own compliance.
+
+Statutory values (GST rate, SAC codes, PF/ESI/PT, income-tax slabs, stipend minimums, CPE hours) are seeded
+**Unverified**. The Income-tax Act, 2025 replaced the 1961 Act from 1 April 2026, so payroll tax values and form
+names must be verified before the first real run (docs/open-questions.md Q-34).
+
 ## Project layout
 
 ```
@@ -189,3 +216,5 @@ storage/ backups/ logs/ certs/   Local data (git-ignored)
 - [`docs/build-plan.md`](docs/build-plan.md): phases mapped to requirement IDs
 - [`docs/phase-1-report.md`](docs/phase-1-report.md): Phase 1 report
 - [`docs/phase-2-report.md`](docs/phase-2-report.md): Phase 2 report
+- [`docs/phase-3-report.md`](docs/phase-3-report.md): Phase 3 report
+- [`docs/go-live.md`](docs/go-live.md): going live with real data
