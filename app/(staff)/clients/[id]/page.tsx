@@ -52,6 +52,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <span className="flex flex-wrap gap-2">
             {can(actor, "task.view") ? <Link href={`/tasks?clientId=${c.id}&all=1`} className={buttonVariants({ variant: "secondary" })}>Tasks</Link> : null}
             {can(actor, "vault.view") ? <Link href={`/clients/${c.id}/vault`} className={buttonVariants({ variant: "secondary" })}>Credentials</Link> : null}
+            {can(actor, "dms.view") ? <Link href={`/documents?clientId=${c.id}`} className={buttonVariants({ variant: "secondary" })}>Documents</Link> : null}
+            {can(actor, "crm.view") ? <Link href={`/crm/clients/${c.id}/communications`} className={buttonVariants({ variant: "secondary" })}>Communications</Link> : null}
+            {can(actor, "crm.manage") ? <Link href={`/crm/onboarding/${c.id}`} className={buttonVariants({ variant: "secondary" })}>Onboarding</Link> : null}
             {canManage ? <Link href={`/clients/${c.id}/edit`} className={buttonVariants({ variant: "secondary" })}>Edit details</Link> : null}
           </span>
         }

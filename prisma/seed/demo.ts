@@ -183,7 +183,7 @@ export async function seedDemo(db: PrismaClient) {
         membershipBody: ["PARTNER", "MANAGER"].includes(p.role) ? "ICAI" : null,
         membershipNo: ["PARTNER", "MANAGER"].includes(p.role) ? digits(6) : null,
         joiningDate: p.role === "PARTNER" ? "2012-04-01" : p.role === "ARTICLE" ? pick(["2024-07-01", "2025-01-15", "2025-08-01"]) : pick(["2019-06-10", "2021-08-02", "2023-04-03"]),
-        workStateCode: "MH",
+        workStateCode: "RJ", // Jaipur office (Q-31)
         createdById: "system",
       },
     });
@@ -211,13 +211,14 @@ export async function seedDemo(db: PrismaClient) {
   await db.client.create({
     data: {
       code: "CL-0000", name: "QEPEX India (Firm)", searchName: "qepex india firm", constitution: "PARTNERSHIP", pan: "AAFFQ1234K",
-      stateCode: "MH", isFirm: true, partnerId: users.get("arvind.mehta")!.id, managerId: users.get("rohan.iyer")!.id,
+      stateCode: "RJ", isFirm: true, partnerId: users.get("arvind.mehta")!.id, managerId: users.get("rohan.iyer")!.id,
       tdsApplicable: true, tdsSalary: true, tdsNonSalary: true, pfApplicable: true, esiApplicable: true, advanceTaxApplicable: true,
       statusEffectiveFrom: "2012-04-01", createdById: "system",
-      gstins: { create: { gstin: fakeGstin("27", "AAFFQ1234K", 1), stateCode: "MH", frequency: "MONTHLY", annualReturnApplicable: true, frequencyEffectiveFrom: "2017-07-01" } },
-      ptRegistrations: { create: { stateCode: "MH", kind: "EMPLOYER", registrationNo: `27${digits(9)}P`, effectiveFrom: "2012-04-01" } },
+      gstins: { create: { gstin: fakeGstin("08", "AAFFQ1234K", 1), stateCode: "RJ", frequency: "MONTHLY", annualReturnApplicable: true, frequencyEffectiveFrom: "2017-07-01" } },
+      // Rajasthan levies no Professional Tax, so the firm has no PT registration.
     },
   });
+  digits(9); // keeps the seeded random sequence (and so the rest of the demo) unchanged
 
   // Groups
   const groups = new Map<string, string>();

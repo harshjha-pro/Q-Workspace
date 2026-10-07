@@ -6,7 +6,7 @@ import { db } from "@/server/lib/db";
 import { can, scopeOf } from "@/server/permissions/guards";
 import { userWhere } from "@/server/permissions/scopes";
 import { formatDate, todayIst } from "@/server/lib/dates";
-import { leaveBalances, leaveConflicts, listLeave } from "@/server/services/leave/service";
+import { leaveBalances, leaveConflicts, listLeave, leaveBalanceWarningFor } from "@/server/services/leave/service";
 import { PageHeader, Card, CardHeader, CardTitle, CardContent, EmptyState } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -123,10 +123,10 @@ async function Approvals({ actor }: { actor: StaffActor }) {
         orderBy: { displayName: "asc" },
       })
     : [];
-  const withConflicts = await Promise.all(rows.map(async (r) => ({ r, tasks: await load(() => leaveConflicts(actor, r.id)) })));
+  const withConflicts = await Promise.all(rows.map(async (r) => ({ r, tasks: await load(() => leaveConflicts(actor, r.id)), balance: await load(() => leaveBalanceWarningFor(actor, r.id)) })));
   return (
     <div className="space-y-3">
-      {withConflicts.map(({ r, tasks }) => {
+      {withConflicts.map(({ r, tasks, balance }) => {
         const conflicts: Conflict[] = tasks.map((t) => ({
           id: t.id, title: t.title, client: t.client.name, due: formatDate(t.effectiveDueDate),
           role: t.assignments.filter((a) => a.userId === r.userId).map((a) => a.role).join(", ") || "assigned",
@@ -139,6 +139,7 @@ async function Approvals({ actor }: { actor: StaffActor }) {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm"><span className="text-muted">Reason:</span> {LEAVE_REASON_LABELS[r.reason] ?? r.reason}{r.note ? ` — ${r.note}` : ""}</p>
+              {balance?.message ? <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{balance.message}</p> : null}
               <LeaveApproval id={r.id} conflicts={conflicts} people={pool.filter((p) => p.id !== r.userId).map((p) => ({ id: p.id, name: p.displayName }))} />
             </CardContent>
           </Card>
