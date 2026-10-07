@@ -71,7 +71,7 @@ QC_FINDINGS (Mon–Sat 08:00), RETENTION_PROPOSALS (Sundays; proposes only, neve
 
 | Suite | Result |
 |---|---|
-| Vitest: unit, integration, permissions, migration, compliance scenarios, payroll golden (35 files) | **347 passed** (348 including the letter test added at the end, §4 item 6) |
+| Vitest: unit, integration, permissions, migration, compliance scenarios, payroll golden (35 files) | **347 passed** (including the letter check added at the end, §4 item 6) |
 | Compliance engine coverage | **100%** statements, branches (469/469), functions, lines |
 | Payroll golden tests | 6 fixed-input cases with hand-worked arithmetic: new regime with loss of pay, old regime with 80C/80D/HRA, ESI earner, mid-year joiner, PF capped vs full, stipend below minimum |
 | Playwright e2e (new) | lead → proposal → Partner approval → letter → signed copy → client + engagement; payroll run Draft → Reviewed → Approved → Paid with payslip PDF; invoice → part receipt (NEFT) → final receipt with TDS → Fully received + PDF: **3 passed, twice in a row** from a fresh demo |
