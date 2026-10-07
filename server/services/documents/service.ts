@@ -5,6 +5,7 @@ import { assertClientAccess } from "../../permissions/scopes";
 import type { Actor } from "../../permissions/actor";
 import { readStoredFile } from "../../lib/storage";
 import { writeAudit, logSensitiveView } from "../../audit";
+import { allowedConfidentiality } from "../dms/access";
 
 /**
  * Authorised download of a stored file. Files are never served statically: every download
@@ -19,6 +20,8 @@ export async function documentForDownload(actor: Actor, documentId: string) {
     if (!self) await logSensitiveView(actor, "SALARY", "Document", doc.id, "employee document");
   } else if (doc.clientId) {
     await assertClientAccess(actor, "dms.view", doc.clientId);
+    // Phase 3 (P3-26): BILLING / SALARY / HR client documents are narrower than client access.
+    if (!allowedConfidentiality(actor).includes(doc.confidentiality)) throw forbidden("This document is confidential.");
     if (doc.confidentiality === "FINANCIALS" || doc.confidentiality === "NOTICE") {
       await logSensitiveView(actor, doc.confidentiality === "FINANCIALS" ? "FINANCIALS" : "NOTICE", "Document", doc.id);
     }

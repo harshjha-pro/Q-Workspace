@@ -11,6 +11,24 @@ import { writeAudit } from "../../audit";
 import { addDays, dayOfWeek, fyStartYear, fyLabel, todayIst, zIso } from "./util";
 import { notifyUsers } from "../notifications/service";
 import { getSetting } from "../settings/service";
+import { recordLeaveExcess, clearLeaveExcess } from "../attendance/service";
+
+const fyOf = (date: string) => `FY${fyStartYear(date)}-${String((fyStartYear(date) + 1) % 100).padStart(2, "0")}`;
+
+/**
+ * Policy balance check (P3-36): available half-days in the leave type's balance for the leave's FY, and how
+ * much of the request exceeds it. No balance row (no policy for the type) → nothing is treated as excess.
+ * Approval is never blocked; the excess becomes loss of pay.
+ */
+export async function leaveBalanceWarning(requestId: string) {
+  const r = await db().leaveRequest.findUnique({ where: { id: requestId } });
+  if (!r) throw notFound("Leave request");
+  const b = await db().leaveBalance.findUnique({ where: { userId_leaveType_fy: { userId: r.userId, leaveType: r.leaveType, fy: fyOf(r.fromDate) } } });
+  if (!b) return null;
+  const available = b.openingHalfDays + b.accruedHalfDays + b.adjustedHalfDays - b.takenHalfDays - b.encashedHalfDays;
+  const excessHalfDays = Math.max(0, r.halfDays - Math.max(0, available));
+  return { availableHalfDays: available, requestedHalfDays: r.halfDays, excessHalfDays, message: excessHalfDays ? `Only ${Math.max(0, available) / 2} day(s) left; ${excessHalfDays / 2} day(s) will be loss of pay.` : null };
+}
 
 export const LEAVE_TYPES = ["PERSONAL", "SICK", "EXAM_STUDY", "OTHER"] as const;
 const leaveInput = z.object({
@@ -48,6 +66,15 @@ export async function leaveDays(userId: string, from: string, to: string) {
     }
   }
   return map;
+}
+
+/** The balance warning for the approval screen: the applicant or someone who may approve their leave. */
+export async function leaveBalanceWarningFor(actor: Actor, requestId: string) {
+  requireStaff(actor);
+  const r = await db().leaveRequest.findUnique({ where: { id: requestId } });
+  if (!r) throw notFound("Leave request");
+  if (r.userId !== actor.userId) await assertUserAccess(actor, "leave.approve", r.userId);
+  return leaveBalanceWarning(requestId);
 }
 
 async function approverFor(userId: string) {
@@ -102,15 +129,20 @@ export async function decideLeave(actor: Actor, requestId: string, approve: bool
   await assertUserAccess(actor, "leave.approve", r.userId);
   if (r.status !== "PENDING") throw ruleViolation("This request was already decided.");
   if (!approve && !note.trim()) throw new DomainError("VALIDATION", "Give a reason for rejecting.", { note: "Required" });
+  const warning = approve ? await leaveBalanceWarning(requestId) : null;
+  const days = warning?.excessHalfDays ? await workingDays(r.fromDate, r.toDate) : [];
   await transaction(async (tx) => {
     await tx.leaveRequest.update({ where: { id: requestId }, data: { status: approve ? "APPROVED" : "REJECTED", approverId: actor.userId, decidedAt: new Date(), decisionNote: note, conflictsReviewedAt: new Date() } });
     if (approve) {
-      const fy = `FY${fyStartYear(r.fromDate)}-${String((fyStartYear(r.fromDate) + 1) % 100).padStart(2, "0")}`;
-      await tx.leaveBalance.updateMany({ where: { userId: r.userId, leaveType: r.leaveType, fy }, data: { takenHalfDays: { increment: r.halfDays } } });
+      await tx.leaveBalance.updateMany({ where: { userId: r.userId, leaveType: r.leaveType, fy: fyOf(r.fromDate) }, data: { takenHalfDays: { increment: r.halfDays } } });
+      if (warning?.excessHalfDays) {
+        await recordLeaveExcess(tx, actor, r.userId, days, warning.excessHalfDays, { start: r.halfDayStart ? r.fromDate : null, end: r.halfDayEnd ? r.toDate : null });
+      }
     }
-    await writeAudit(tx, actor, { entityType: "LeaveRequest", entityId: requestId, action: approve ? "APPROVE" : "REJECT", reason: note });
+    await writeAudit(tx, actor, { entityType: "LeaveRequest", entityId: requestId, action: approve ? "APPROVE" : "REJECT", reason: note, after: warning?.excessHalfDays ? { lossOfPayHalfDays: warning.excessHalfDays } : null });
   });
-  await notifyUsers([r.userId], { kind: "LEAVE_DECIDED", title: `Leave ${approve ? "approved" : "rejected"}: ${r.fromDate} to ${r.toDate}`, body: note, link: "/leave", entityType: "LeaveRequest", entityId: requestId });
+  await notifyUsers([r.userId], { kind: "LEAVE_DECIDED", title: `Leave ${approve ? "approved" : "rejected"}: ${r.fromDate} to ${r.toDate}`, body: [note, warning?.message ?? ""].filter(Boolean).join(" "), link: "/leave", entityType: "LeaveRequest", entityId: requestId });
+  return { lossOfPayHalfDays: warning?.excessHalfDays ?? 0 };
 }
 
 export async function cancelLeave(actor: Actor, requestId: string) {
@@ -122,8 +154,8 @@ export async function cancelLeave(actor: Actor, requestId: string) {
   await transaction(async (tx) => {
     await tx.leaveRequest.update({ where: { id: requestId }, data: { status: "CANCELLED" } });
     if (r.status === "APPROVED") {
-      const fy = `FY${fyStartYear(r.fromDate)}-${String((fyStartYear(r.fromDate) + 1) % 100).padStart(2, "0")}`;
-      await tx.leaveBalance.updateMany({ where: { userId: r.userId, leaveType: r.leaveType, fy }, data: { takenHalfDays: { decrement: r.halfDays } } });
+      await tx.leaveBalance.updateMany({ where: { userId: r.userId, leaveType: r.leaveType, fy: fyOf(r.fromDate) }, data: { takenHalfDays: { decrement: r.halfDays } } });
+      await clearLeaveExcess(tx, r.userId, r.fromDate, r.toDate);
     }
     await writeAudit(tx, actor, { entityType: "LeaveRequest", entityId: requestId, action: "CANCEL" });
   });
