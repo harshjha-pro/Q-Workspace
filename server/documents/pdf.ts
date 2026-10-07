@@ -123,6 +123,8 @@ export function buildPdf(spec: PdfSpec): Promise<Buffer> {
   const pages = doc.bufferedPageRange();
   for (let i = 0; i < pages.count; i += 1) {
     doc.switchToPage(i);
+    // Writing in the bottom margin would otherwise make pdfkit add a blank page.
+    doc.page.margins.bottom = 0;
     if (spec.watermark) {
       doc.save().rotate(-35, { origin: [doc.page.width / 2, doc.page.height / 2] }).font("Helvetica-Bold").fontSize(64).fillColor("#e5e7eb", 0.6)
         .text(spec.watermark, 0, doc.page.height / 2 - 40, { width: doc.page.width, align: "center", lineBreak: false }).restore();

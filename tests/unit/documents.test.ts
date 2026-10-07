@@ -28,6 +28,8 @@ describe("documents foundation", () => {
     });
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.toString("latin1")).toMatch(/\/Count [2-9]/);
+    const one = await buildPdf({ title: "One page", blocks: [{ type: "text", text: "Short" }] });
+    expect(one.toString("latin1")).toMatch(/\/Count 1\b/);
     const docx = await buildDocx({ title: "Letter", header: ["QEPEX India"], body: "# Heading\nBody line" });
     expect(docx.subarray(0, 2).toString()).toBe("PK");
   });

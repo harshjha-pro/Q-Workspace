@@ -28,6 +28,7 @@ const NAV: NavDef[] = [
   { href: "/documents", label: "Documents", section: "Registers", cap: "dms.view" },
   { href: "/billing", label: "Billing", section: "Billing", cap: "billing.view" },
   { href: "/billing/invoices", label: "Invoices", section: "Billing", cap: "billing.view" },
+  { href: "/billing/receipts", label: "Receipts", section: "Billing", cap: "billing.view" },
   { href: "/billing/disbursements", label: "Disbursements", section: "Billing", cap: "billing.view" },
   { href: "/crm/leads", label: "Leads", section: "Clients & growth", cap: "crm.view" },
   { href: "/crm/opportunities", label: "Opportunities & renewals", section: "Clients & growth", cap: "crm.view" },
