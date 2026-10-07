@@ -1,4 +1,5 @@
 import { db } from "../../lib/db";
+import { officeHolidayStates } from "../holidays";
 import { authorize, scopeOf } from "../../permissions/guards";
 import { assertUserAccess, taskWhere, userWhere } from "../../permissions/scopes";
 import type { Actor } from "../../permissions/actor";
@@ -50,7 +51,7 @@ export async function calendarItems(actor: Actor, f: CalendarFilter): Promise<Ca
   const names = new Map((await db().user.findMany({ where: { id: { in: leave.map((l) => l.userId) } }, select: { id: true, displayName: true } })).map((u) => [u.id, u.displayName]));
   for (const l of leave) items.push({ date: l.fromDate, endDate: l.toDate, kind: "LEAVE", title: mine ? "On leave" : `${names.get(l.userId) ?? ""} on leave` });
 
-  const holidays = await db().holiday.findMany({ where: { date: { gte: f.from, lte: f.to }, stateCode: "-" } });
+  const holidays = await db().holiday.findMany({ where: { date: { gte: f.from, lte: f.to }, stateCode: { in: await officeHolidayStates() } } });
   for (const h of holidays) items.push({ date: h.date, kind: "HOLIDAY", title: h.name });
   return items.sort((a, b) => a.date.localeCompare(b.date));
 }

@@ -20,6 +20,7 @@ export const SETTING_DEFAULTS = {
   "compliance.trackingFrom": { value: "2026-04-01", description: "Compliance tasks are generated from this date (no older periods are created)" },
   "compliance.agmCeilingMonths": { value: 6, description: "AGM deadline used for provisional dates: months after FY end (Q-10)" },
   "compliance.firstAgmCeilingMonths": { value: 9, description: "First AGM deadline: months after the first FY end (Q-10)" },
+  "compliance.createDueFrom": { value: "", description: "Go-live cut-off (YYYY-MM-DD): tasks due before this date are not created, because that work was done before the app was used. Blank = create everything from the tracking date (Q-32)" },
   "notice.defaultResponseDays": { value: 15, description: "Notice response due = received + days, when the notice gives no date (Q-13)" },
   "udin.awaitingDays": { value: 7, description: "Signed document shows 'Awaiting UDIN' after this many days" },
   "dsc.expiryAlertDays": { value: [30, 7], description: "DSC expiry alerts (days before expiry)" },

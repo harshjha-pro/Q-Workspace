@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
+import { officeHolidayStates } from "../holidays";
 import { parse } from "../../lib/validate";
 import { DomainError, forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, scopeOf } from "../../permissions/guards";
@@ -26,7 +27,7 @@ export type LeaveInput = z.input<typeof leaveInput>;
 /** Working days in a range: Sundays never; Saturdays per setting; firm/national holidays excluded. */
 export async function workingDays(from: string, to: string) {
   const sat = await getSetting<boolean>("work.workingSaturdays", true);
-  const holidays = new Set((await db().holiday.findMany({ where: { date: { gte: from, lte: to }, stateCode: "-" } })).map((h) => h.date));
+  const holidays = new Set((await db().holiday.findMany({ where: { date: { gte: from, lte: to }, stateCode: { in: await officeHolidayStates() } } })).map((h) => h.date));
   const out: string[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) {
     const dow = dayOfWeek(d);

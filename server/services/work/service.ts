@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, transaction, type Tx } from "../../lib/db";
+import { officeHolidayStates } from "../holidays";
 import { parse } from "../../lib/validate";
 import { DomainError, forbidden, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, scopeOf } from "../../permissions/guards";
@@ -259,7 +260,7 @@ export async function weekGrid(actor: Actor, userId: string, anyDate: string) {
     row.entryIds[idx]!.push(e.id);
     rows.set(key, row);
   }
-  const holidays = new Map((await db().holiday.findMany({ where: { date: { in: days }, stateCode: "-" } })).map((h) => [h.date, h.name]));
+  const holidays = new Map((await db().holiday.findMany({ where: { date: { in: days }, stateCode: { in: await officeHolidayStates() } } })).map((h) => [h.date, h.name]));
   const leave = await leaveDays(userId, days[0]!, days[6]!);
   const locked = await isLocked(userId, ws);
   return {

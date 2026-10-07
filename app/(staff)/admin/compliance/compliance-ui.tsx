@@ -78,7 +78,7 @@ export function HolidayPolicyDialog({ typeCode, policy }: { typeCode: string; po
 
 export function AddLateFeeDialog({ typeCode, typeName }: { typeCode: string; typeName: string }) {
   return (
-    <FormDialog trigger="Add rate" title={`Late fee rate — ${typeName}`} description="Starts Unverified until a Partner checks it." action={addLateFeeAction.bind(null, typeCode)} submitLabel="Add rate">
+    <FormDialog trigger="Add rate" title={`Late fee rate — ${typeName}`} description="Starts Unverified until the Practice Admin or a Partner checks it." action={addLateFeeAction.bind(null, typeCode)} submitLabel="Add rate">
       {(errorFor) => (
         <>
           <div className="grid grid-cols-2 gap-3">

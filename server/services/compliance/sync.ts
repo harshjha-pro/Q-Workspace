@@ -156,7 +156,13 @@ export async function syncClientCompliance(clientId: string, opts: { today?: str
         partyLabels, agmCeilingMonths: master.agmCeilingMonths, firstAgmCeilingMonths: master.firstAgmCeilingMonths,
       });
       const engCache = new Map<string, string>();
-      for (const t of creates) await createTask(tx, master, t, engCache, today);
+      // Go-live cut-off (Q-32): obligations already due before the firm started using the app were handled
+      // outside it, so they are not created. Tasks with no date yet (manual due dates) are still created.
+      const dueFrom = master.createDueFrom;
+      for (const t of creates) {
+        if (dueFrom && t.dueDate && t.dueDate < dueFrom) continue;
+        await createTask(tx, master, t, engCache, today);
+      }
 
       // Link superseded tasks (GST frequency change) to the task that now covers their period.
       for (const u of ends.filter((x) => x.supersededByKey)) {

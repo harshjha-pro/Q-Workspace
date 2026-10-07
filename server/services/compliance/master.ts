@@ -14,6 +14,7 @@ export type Master = {
   agmCeilingMonths: number;
   firstAgmCeilingMonths: number;
   trackingFrom: string;
+  createDueFrom: string;
 };
 
 /** Load the Due-Date Master into engine shapes. Inactive types are left out (no generation). */
@@ -43,5 +44,6 @@ export async function loadMaster(tx: Tx = db()): Promise<Master> {
     agmCeilingMonths: await getSettingNumber("compliance.agmCeilingMonths", 6),
     firstAgmCeilingMonths: await getSettingNumber("compliance.firstAgmCeilingMonths", 9),
     trackingFrom: await getSetting<string>("compliance.trackingFrom", "2026-04-01"),
+    createDueFrom: await getSetting<string>("compliance.createDueFrom", ""),
   };
 }

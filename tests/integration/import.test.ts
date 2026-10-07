@@ -87,6 +87,33 @@ describe("Excel import (P1-16)", () => {
     expect(stored.summaryJson).not.toContain("Tmp-");
   });
 
+  it("engagements: reuse the auto-created recurring engagement, staff it and its open tasks (Q-32)", async () => {
+    const partner = await makeUser("PARTNER");
+    const maker = await makeUser("STAFF");
+    const checker = await makeUser("STAFF", { isSenior: true });
+    const article = await makeUser("ARTICLE");
+    const c = await db().client.create({ data: { code: "CL-IMP1", name: "Import Engagements Ltd", searchName: "import engagements ltd", constitution: "PRIVATE_COMPANY", partnerId: partner.id } });
+    const auto = await db().engagement.create({ data: { code: "EN-IMP01", clientId: c.id, name: "GST returns (recurring)", serviceLine: "GST", engagementType: "GST_RETURN", recurrence: "RECURRING" } });
+    const task = await db().task.create({ data: { clientId: c.id, engagementId: auto.id, title: "GSTR-3B Oct 2026", periodKey: "2026-10", complianceTypeCode: "GST-3B-M", effectiveDueDate: "2026-11-20" } });
+    const t = await importTemplate(actorOf(partner), "ENGAGEMENTS");
+    const bad = await fill(t.data, { Engagements: [["CL-NOPE", "X", "GST", "GST_RETURN", "RECURRING", "", "", "", "", "", "", maker.username, article.username, "", ""]] });
+    const report = await validateImport(actorOf(partner), "ENGAGEMENTS", "e.xlsx", bad);
+    expect(report.status).not.toBe("VALIDATED");
+    const good = await fill(t.data, { Engagements: [
+      ["CL-IMP1", "GST returns FY 2026-27", "GST", "GST_RETURN", "RECURRING", "RETAINER", 30000, "", 60, "Y", "2026-04-01", maker.username, checker.username, "", ""],
+      ["CL-IMP1", "Project report for bank loan", "ADVISORY", "OTHER", "ONE_TIME", "FIXED", 75000, "", 40, "Y", "", maker.username, checker.username, "", article.username],
+    ] });
+    const job = await validateImport(actorOf(partner), "ENGAGEMENTS", "e.xlsx", good);
+    expect(job.status).toBe("VALIDATED");
+    const res = await applyImport(actorOf(partner), job.id);
+    expect(res.created).toBe(1);
+    const renamed = await db().engagement.findUniqueOrThrow({ where: { id: auto.id } });
+    expect([renamed.name, renamed.feePaise, renamed.budgetMinutes]).toEqual(["GST returns FY 2026-27", 30000_00, 3600]);
+    const roles = await db().taskAssignment.findMany({ where: { taskId: task.id, toDate: null } });
+    expect(roles.map((r) => `${r.role}:${r.userId === checker.id ? "checker" : "maker"}`).sort()).toEqual(["ASSIGNEE:maker", "CHECKER:checker", "MAKER:maker"]);
+    expect(await db().engagement.count({ where: { clientId: c.id } })).toBe(2);
+  });
+
   it("salary structures import as encrypted DRAFT rows (HR)", async () => {
     const hr = await makeUser("HR_ADMIN");
     const emp = await makeUser("STAFF");

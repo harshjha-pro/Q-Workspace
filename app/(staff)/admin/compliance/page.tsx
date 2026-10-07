@@ -34,7 +34,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
   requireCap(actor, "dueDateMaster.manage");
   const sp = await searchParams;
   const tab: Tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as Tab) : "types";
-  const isPartner = actor.role === "PARTNER";
+  const isPartner = actor.role === "PARTNER" || actor.role === "PRACTICE_ADMIN"; // may verify (Q-29)
   const today = todayIst();
 
   return (
@@ -43,7 +43,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         actions={can(actor, "task.regenerate") ? <RegenerateAll /> : null} />
       <Alert tone="warn">
         Statutory values here (due dates, late fees, interest, extensions) are editable by admins and are seeded as <strong>Unverified</strong>.
-        Check each against the official notification or circular before relying on it. Only a Partner can mark a value as verified.
+        Check each against the official notification or circular before relying on it. Only the Practice Admin or a Partner can mark a value as verified.
       </Alert>
 
       <nav className="flex gap-1 overflow-x-auto border-b border-line" aria-label="Sections">

@@ -137,7 +137,8 @@ export async function addRuleVersion(actor: Actor, typeCode: string, input: z.in
 /** A Partner marks a seeded/edited statutory row as checked against the law in force (decisions D-17). */
 export async function verifyRule(actor: Actor, ruleId: string) {
   authorize(actor, "dueDateMaster.manage");
-  if (actor.kind !== "SYSTEM" && actor.role !== "PARTNER") throw forbidden("Only a Partner can mark a statutory value as verified.");
+  // Q-29: the Practice Admin verifies statutory values against the official notification; Partners may too.
+  if (actor.kind !== "SYSTEM" && actor.role !== "PARTNER" && actor.role !== "PRACTICE_ADMIN") throw forbidden("Only the Practice Admin or a Partner can mark a statutory value as verified.");
   return transaction(async (tx) => {
     const r = await tx.dueDateRule.update({ where: { id: ruleId }, data: { verifiedById: idOf(actor), verifiedAt: new Date() } });
     await writeAudit(tx, actor, { entityType: "DueDateRule", entityId: ruleId, action: "VERIFY" });
@@ -147,7 +148,8 @@ export async function verifyRule(actor: Actor, ruleId: string) {
 
 export async function verifyLateFee(actor: Actor, id: string) {
   authorize(actor, "dueDateMaster.manage");
-  if (actor.kind !== "SYSTEM" && actor.role !== "PARTNER") throw forbidden("Only a Partner can mark a statutory value as verified.");
+  // Q-29: the Practice Admin verifies statutory values against the official notification; Partners may too.
+  if (actor.kind !== "SYSTEM" && actor.role !== "PARTNER" && actor.role !== "PRACTICE_ADMIN") throw forbidden("Only the Practice Admin or a Partner can mark a statutory value as verified.");
   return transaction(async (tx) => {
     const r = await tx.lateFeeRate.update({ where: { id }, data: { verifiedById: idOf(actor), verifiedAt: new Date() } });
     await writeAudit(tx, actor, { entityType: "LateFeeRate", entityId: id, action: "VERIFY" });

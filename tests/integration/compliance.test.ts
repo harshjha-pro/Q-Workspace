@@ -102,8 +102,7 @@ describe("compliance service (generation from master data)", () => {
       expect(nov.effectiveDueDate).toBe("2026-12-21");
       expect(nov.dueDateHistory.some((h) => h.source === "MASTER_UPDATE")).toBe(true);
     }
-    await expect(verifyRule(actorOf(pa), r.rule.id)).rejects.toThrow(/Partner/);
-    await verifyRule(actorOf(partner), r.rule.id);
+    await verifyRule(actorOf(pa), r.rule.id); // Q-29: the Practice Admin verifies
     await expect(addRuleVersion(actorOf(pa), "GST-3B-M", { paramsJson: "{bad", effectiveFrom: "2026-11-01", source: "x x x" })).rejects.toThrow(/JSON/);
   });
 

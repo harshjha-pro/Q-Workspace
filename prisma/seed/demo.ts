@@ -203,8 +203,8 @@ export async function seedDemo(db: PrismaClient) {
   // Firm profile + the firm as an internal client (spec 13.6)
   await db.firmProfile.create({
     data: {
-      name: "QEPEX India (Demo)", address: "401, Business Square, Andheri East, Mumbai 400069", stateCode: "MH",
-      gstin: fakeGstin("27", "AAFFQ1234K", 1), pan: "AAFFQ1234K", email: "accounts@qepex-demo.in", phone: "022 4000 0000",
+      name: "QEPEX India (Demo)", address: "401, Business Square, C-Scheme, Jaipur 302001", stateCode: "RJ",
+      gstin: fakeGstin("08", "AAFFQ1234K", 1), pan: "AAFFQ1234K", email: "accounts@qepex-demo.in", phone: "0141 400 0000",
       bankName: "HDFC Bank", bankAccount: "50200012345678", bankIfsc: "HDFC0000123", upiId: "qepex@hdfcbank", createdById: "system",
     },
   });

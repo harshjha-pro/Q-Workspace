@@ -10,13 +10,15 @@ import type { Actor } from "../../permissions/actor";
 import { createClient, addGstin, addDirector, addPtRegistration, saveContact, createGroup } from "../clients/service";
 import { createUser } from "../users/service";
 import { createTeam, addTeamMember } from "../teams/service";
+import { createEngagement, updateEngagement, assignToEngagement } from "../engagements/service";
+import { SERVICE_LINES, FEE_BASES, RECURRENCES } from "../../domain/enums";
 import { upsertEmployeeProfile } from "../employees/service";
 import { encryptJson, encrypt } from "../../lib/crypto";
 import { transaction } from "../../lib/db";
 import { writeAudit } from "../../audit";
 import { toSearch } from "../../lib/codes";
 
-export type ImportKind = "CLIENTS" | "USERS" | "CLIENT_TEAMS" | "EMPLOYEES" | "SALARY_STRUCTURES" | "LEAVE_BALANCES" | "RECEIVABLES" | "LEADS";
+export type ImportKind = "CLIENTS" | "ENGAGEMENTS" | "USERS" | "CLIENT_TEAMS" | "EMPLOYEES" | "SALARY_STRUCTURES" | "LEAVE_BALANCES" | "RECEIVABLES" | "LEADS";
 export type CheckedRow = { sheet: string; rowNumber: number; data: Record<string, string>; errors: string[] };
 export type ApplyResult = { created: number; notes: string[]; tempPasswords?: { username: string; tempPassword: string }[] };
 
@@ -646,8 +648,113 @@ const leadsDef: ImportDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// ENGAGEMENTS with maker / checker / EQR (go-live, Q-32)
+// ---------------------------------------------------------------------------
+const usernames = (v: string | undefined) => (v ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+
+const engagementsDef: ImportDef = {
+  kind: "ENGAGEMENTS",
+  title: "Engagements and assignments",
+  roles: ["PARTNER"], // engagements and their fees are Partner territory (matrix; D-32)
+  sheets: [{
+    name: "Engagements",
+    columns: [
+      col("clientCode", "Client code", { required: true, example: "CL-0004" }),
+      col("name", "Engagement name", { required: true, example: "GST returns FY 2026-27", width: 32 }),
+      col("serviceLine", "Service line", { required: true, example: "GST", note: SERVICE_LINES.join(", ") }),
+      col("engagementType", "Engagement type", { required: true, example: "GST_RETURN", note: "Stage template code: GST_RETURN, INCOME_TAX_RETURN, TDS_RETURN, AUDIT, BOOKKEEPING, ROC_ANNUAL, NOTICE, PAYROLL_STATUTORY, OTHER" }),
+      col("recurrence", "Recurring or one-time", { example: "RECURRING", note: RECURRENCES.join(", ") }),
+      col("feeBasis", "Fee basis", { example: "RETAINER", note: FEE_BASES.join(", ") }),
+      col("fee", "Fee (₹)", { example: 30000 }),
+      col("rate", "Hourly rate (₹, time-based only)", { example: "" }),
+      col("budgetHours", "Budget (hours)", { example: 60 }),
+      col("chargeable", "Chargeable (Y/N)", { example: "Y" }),
+      col("startDate", "Start date", { example: "2026-04-01" }),
+      col("makers", "Maker usernames", { example: "neha.gupta", note: "Comma-separated" }),
+      col("checkers", "Checker usernames", { example: "priya.nair", note: "Senior, Manager or Partner" }),
+      col("eqr", "EQR username", { example: "" }),
+      col("members", "Other member usernames", { example: "" }),
+    ],
+  }],
+  instructions: [
+    "One row per engagement. Import clients first: client codes must already exist.",
+    "Recurring engagements: if the client already has an active recurring engagement of the same type (for example one created automatically when its compliance tasks were generated), that engagement is updated and staffed instead of a duplicate being created.",
+    "Makers and checkers are copied to the engagement's open compliance tasks, so the right people get reminders.",
+  ],
+  async validate(sheets) {
+    const users = await userMap();
+    const clients = new Set((await db().client.findMany({ select: { code: true } })).map((c) => c.code));
+    const types = new Set((await db().stageTemplate.findMany({ select: { code: true } })).map((t) => t.code));
+    return (sheets.Engagements ?? []).map((r) => {
+      const e: string[] = [];
+      const d = r.data;
+      if (!clients.has(req(d, "clientCode", "Client code", e)) && d.clientCode) e.push("Client code not found");
+      req(d, "name", "Engagement name", e);
+      if (!(SERVICE_LINES as readonly string[]).includes(upper(req(d, "serviceLine", "Service line", e))) && d.serviceLine) e.push("Unknown service line");
+      if (!types.has(upper(req(d, "engagementType", "Engagement type", e))) && d.engagementType) e.push("Unknown engagement type");
+      if (d.recurrence && !(RECURRENCES as readonly string[]).includes(upper(d.recurrence))) e.push("Recurrence: RECURRING or ONE_TIME");
+      if (d.feeBasis && !(FEE_BASES as readonly string[]).includes(upper(d.feeBasis))) e.push("Unknown fee basis");
+      for (const [k, label] of [["fee", "Fee"], ["rate", "Hourly rate"]] as const) if (d[k] && parseInrToPaise(d[k]!) === null) e.push(`${label}: not an amount`);
+      if (upper(d.feeBasis ?? "") === "TIME" && !d.rate) e.push("Time-based engagements need an hourly rate");
+      if (d.budgetHours && (Number.isNaN(Number(d.budgetHours)) || (Number(d.budgetHours) * 4) % 1 !== 0)) e.push("Budget: hours in quarter-hour steps");
+      if (d.chargeable) yn(d.chargeable, e, "Chargeable");
+      dateOpt(d.startDate ?? "", "Start date", e);
+      const check = (names: string[], label: string, canCheck: boolean) => {
+        for (const n of names) {
+          const u = users.get(n);
+          if (!u) e.push(`${label} ${n} not found`);
+          else if (u.role === "HR_ADMIN" || u.role === "PRACTICE_ADMIN") e.push(`${n}: admins are not assigned to client work`);
+          else if (canCheck && (u.role === "ARTICLE" || (u.role === "STAFF" && !u.isSenior))) e.push(`${n} cannot be a checker (Senior, Manager or Partner only)`);
+        }
+      };
+      check(usernames(d.makers), "Maker", false);
+      check(usernames(d.checkers), "Checker", true);
+      check(usernames(d.eqr), "EQR", true);
+      check(usernames(d.members), "Member", false);
+      for (const m of usernames(d.makers)) if (usernames(d.checkers).includes(m)) e.push(`${m} cannot be both maker and checker`);
+      return { sheet: "Engagements", rowNumber: r.rowNumber, data: d, errors: e };
+    });
+  },
+  preview(rows) {
+    return [`${rows.length} engagement row(s); recurring rows reuse an existing recurring engagement of the same type where there is one.`];
+  },
+  async apply(actor, rows) {
+    const users = await userMap();
+    let created = 0;
+    const notes: string[] = [];
+    for (const r of rows) {
+      const d = r.data;
+      const client = await db().client.findUniqueOrThrow({ where: { code: d.clientCode! } });
+      const recurrence = (d.recurrence ? upper(d.recurrence) : "ONE_TIME") as (typeof RECURRENCES)[number];
+      const fields = {
+        name: d.name!, feeBasis: (d.feeBasis ? upper(d.feeBasis) : "FIXED") as (typeof FEE_BASES)[number],
+        feePaise: d.fee ? parseInrToPaise(d.fee)! : 0, ratePaisePerHour: d.rate ? parseInrToPaise(d.rate)! : 0,
+        budgetMinutes: Math.round(Number(d.budgetHours || 0) * 60), chargeable: d.chargeable ? YES.has(d.chargeable.trim().toLowerCase()) : true,
+      };
+      const existing = recurrence === "RECURRING"
+        ? await db().engagement.findFirst({ where: { clientId: client.id, recurrence: "RECURRING", status: "ACTIVE", engagementType: upper(d.engagementType!) }, orderBy: { createdAt: "asc" } })
+        : null;
+      let id: string;
+      if (existing) {
+        await updateEngagement(actor, existing.id, fields);
+        id = existing.id;
+        notes.push(`${client.code}: updated existing recurring engagement ${existing.code}`);
+      } else {
+        const e = await createEngagement(actor, { clientId: client.id, serviceLine: upper(d.serviceLine!) as (typeof SERVICE_LINES)[number], engagementType: upper(d.engagementType!), recurrence, startDate: d.startDate || null, ...fields });
+        id = e.id;
+        created += 1;
+      }
+      for (const [list, role] of [[d.makers, "MAKER"], [d.checkers, "CHECKER"], [d.eqr, "EQR"], [d.members, "MEMBER"]] as const) {
+        for (const n of usernames(list)) await assignToEngagement(actor, id, { userId: users.get(n)!.id, role });
+      }
+    }
+    return { created, notes };
+  },
+};
+
 export const IMPORT_DEFS: Record<ImportKind, ImportDef> = {
-  CLIENTS: clientsDef, USERS: usersDef, CLIENT_TEAMS: teamsDef, EMPLOYEES: employeesDef,
+  CLIENTS: clientsDef, ENGAGEMENTS: engagementsDef, USERS: usersDef, CLIENT_TEAMS: teamsDef, EMPLOYEES: employeesDef,
   SALARY_STRUCTURES: salaryDef, LEAVE_BALANCES: leaveDef, RECEIVABLES: receivablesDef, LEADS: leadsDef,
 };
 export const IMPORT_KINDS = Object.keys(IMPORT_DEFS) as ImportKind[];

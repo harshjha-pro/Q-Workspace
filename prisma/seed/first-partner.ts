@@ -15,5 +15,7 @@ export async function createFirstPartner(db: PrismaClient) {
       searchName: "partner",
     },
   });
+  // QEPEX India's office is in Rajasthan (Q-31); the rest of the profile is filled in by the Partner.
+  if ((await db.firmProfile.count()) === 0) await db.firmProfile.create({ data: { name: "QEPEX India", stateCode: "RJ", createdById: "system" } });
   return { username: "partner", password };
 }
