@@ -55,6 +55,14 @@ model Invoice {
   receivedPaise      Int       @default(0)
   writtenOffPaise    Int       @default(0)
   irn                String? // entered manually (no IRP connection)
+  // Phase 4 (Q-39): promoted from JSON in notes
+  recipientGstin String?
+  ackNo          String?
+  ackDate        String?
+  cancelReason   String?
+  retainerPeriod String?
+  periodFrom     String?
+  periodTo       String?
   pdfDocumentId      String?
   isRetainerDraft    Boolean   @default(false)
   approvedById       String?
@@ -103,6 +111,11 @@ model Receipt {
   amountPaise Int
   mode        String // UPI | NEFT | RTGS | IMPS | CHEQUE | CASH
   reference   String   @default("")
+  // Phase 4 (Q-39): promoted from JSON in notes
+  tdsPaise       Int       @default(0)
+  reversedAt     String?
+  reversedReason String?
+  reversedById   String?
   notes       String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -234,6 +247,8 @@ model ServiceTemplate {
   deliverables    String   @default("")
   timelines       String   @default("")
   feeBasis        String   @default("FIXED")
+  engagementType  String? // Phase 4 (Q-39): stage template code for engagements created from it
+  budgetMinutes   Int     @default(0)
   defaultFeePaise Int      @default(0)
   oopTerms        String   @default("")
   active          Boolean  @default(true)
@@ -248,6 +263,7 @@ model Proposal {
   leadId        String?
   clientId      String?
   version       Int       @default(1)
+  serviceTemplateId String? // Phase 4 (Q-39)
   parentId      String?
   title         String
   status        String    @default("DRAFT") // DRAFT | APPROVED | SENT | ACCEPTED | REJECTED | EXPIRED
@@ -280,6 +296,7 @@ model EngagementLetter {
   id                     String    @id @default(cuid())
   proposalId             String?
   clientId               String
+  leadId                 String? // Phase 4 (Q-39): the lead a letter was generated for
   templateVersionId      String?
   body                   String
   status                 String    @default("DRAFT") // DRAFT | ISSUED | ACCEPTED | SIGNED_UPLOADED | WITHDRAWN

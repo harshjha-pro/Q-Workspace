@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireStaff } from "@/server/context";
 import { requireCap, load } from "@/lib/page";
 import { can } from "@/server/permissions/guards";
-import { getInvoice, INVOICE_STATUS_LABELS, pct, readMeta, type ReceiptMeta } from "@/server/services/billing/service";
+import { getInvoice, INVOICE_STATUS_LABELS, pct, receiptMeta } from "@/server/services/billing/service";
 import { formatInr } from "@/server/lib/money";
 import { formatDate, formatDateTime, todayIst } from "@/server/lib/dates";
 import { amountInWords } from "@/server/documents/words";
@@ -105,7 +105,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <TBody>
               {inv.allocations.length === 0 ? <TR><TD colSpan={5} className="text-muted">No receipts yet.</TD></TR> : null}
               {inv.allocations.map((a) => (
-                <TR key={a.id}><TD className="whitespace-nowrap">{formatDate(a.receipt.date)}</TD><TD>{a.receipt.mode}</TD><TD className="font-mono text-xs">{a.receipt.reference}</TD><TD className="text-right tabular-nums">{formatInr(a.amountPaise)}</TD><TD className="text-right tabular-nums">{formatInr(readMeta<ReceiptMeta>(a.receipt.notes).tdsPaise ?? 0)}</TD></TR>
+                <TR key={a.id}><TD className="whitespace-nowrap">{formatDate(a.receipt.date)}</TD><TD>{a.receipt.mode}</TD><TD className="font-mono text-xs">{a.receipt.reference}</TD><TD className="text-right tabular-nums">{formatInr(a.amountPaise)}</TD><TD className="text-right tabular-nums">{formatInr(receiptMeta(a.receipt).tdsPaise ?? 0)}</TD></TR>
               ))}
             </TBody>
           </Table>

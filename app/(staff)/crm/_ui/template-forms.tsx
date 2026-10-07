@@ -4,11 +4,11 @@ import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/input"
 import { FEE_BASES, SERVICE_LINES, rupeesInput } from "../_lib/labels";
 import type { Action } from "./common";
 
-export type TemplateDefaults = { serviceLine: string; name: string; scope: string; deliverables: string; timelines: string; feeBasis: string; defaultFeePaise: number; oopTerms: string; active: boolean };
+export type TemplateDefaults = { serviceLine: string; name: string; engagementType: string | null; budgetMinutes: number; scope: string; deliverables: string; timelines: string; feeBasis: string; defaultFeePaise: number; oopTerms: string; active: boolean };
 
-export function TemplateDialog({ action, d }: { action: Action; d?: TemplateDefaults }) {
+export function TemplateDialog({ action, d, types }: { action: Action; d?: TemplateDefaults; types: { code: string; name: string }[] }) {
   return (
-    <FormDialog trigger={d ? "Edit" : "New template"} triggerVariant={d ? "ghost" : "default"} title={d ? "Edit service template" : "New service template"} description="Add a line “Estimated effort: 40 hrs” in timelines as the budget fallback when there are no past actuals." action={action} submitLabel="Save">
+    <FormDialog trigger={d ? "Edit" : "New template"} triggerVariant={d ? "ghost" : "default"} title={d ? "Edit service template" : "New service template"} description="Estimated effort is the budget fallback when there are no past actuals for this engagement type." action={action} submitLabel="Save">
       {(err) => (
         <>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -16,6 +16,8 @@ export function TemplateDialog({ action, d }: { action: Action; d?: TemplateDefa
             <Field label="Service line" error={err("serviceLine")}><Select name="serviceLine" defaultValue={d?.serviceLine ?? "GST"}>{SERVICE_LINES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
             <Field label="Fee basis" error={err("feeBasis")}><Select name="feeBasis" defaultValue={d?.feeBasis ?? "FIXED"}>{FEE_BASES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
             <Field label="Default fee / hourly rate (₹)" error={err("defaultFeePaise")}><Input name="fee" inputMode="decimal" defaultValue={rupeesInput(d?.defaultFeePaise ?? 0)} /></Field>
+            <Field label="Engagement type" error={err("engagementType")}><Select name="engagementType" defaultValue={d?.engagementType ?? ""}><option value="">Suggest from the name</option>{types.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}</Select></Field>
+            <Field label="Estimated effort (hours)" error={err("budgetMinutes")}><Input name="budgetHours" inputMode="decimal" defaultValue={d?.budgetMinutes ? String(d.budgetMinutes / 60) : ""} /></Field>
           </div>
           <Field label="Scope" error={err("scope")}><Textarea name="scope" rows={3} defaultValue={d?.scope} /></Field>
           <Field label="Deliverables" error={err("deliverables")}><Textarea name="deliverables" rows={2} defaultValue={d?.deliverables} /></Field>

@@ -435,6 +435,7 @@ export async function saveTemplateAction(id: string | null, _: R, f: FormData): 
     await templates.saveServiceTemplate(actor, {
       serviceLine: str(f, "serviceLine") as never, name: str(f, "name"), scope: str(f, "scope"), deliverables: str(f, "deliverables"), timelines: str(f, "timelines"),
       feeBasis: str(f, "feeBasis") as never, defaultFeePaise: paise(f, "fee"), oopTerms: str(f, "oopTerms"), active: id ? bool(f, "active") : true,
+      engagementType: opt(f, "engagementType"), budgetMinutes: hoursToMinutes(f, "budgetHours"),
     }, id ?? undefined);
     return done("Template saved.", "/crm/templates");
   } catch (e) {

@@ -54,6 +54,10 @@ async function main() {
     const { createBackupFile } = await import("../server/services/backup/archive");
     const file = await createBackupFile("PRE_MIGRATION");
     console.log(`• Backed up existing database to ${file}`);
+    // The backup opened the database (WAL); prisma migrate deploy fails with "SQLite database error" while
+    // that connection is held, so release it first.
+    const { disconnectDb } = await import("../server/lib/db");
+    await disconnectDb();
   }
 
   // Nothing leaves this machine: switch off Next.js anonymous telemetry (decisions D-34).

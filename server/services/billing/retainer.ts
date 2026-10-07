@@ -3,13 +3,13 @@ import { isoFromParts, parseIso, todayIst } from "../../lib/dates";
 import { systemActor } from "../../permissions/actor";
 import { logger } from "../../lib/logger";
 import { notifyUsers } from "../notifications/service";
-import { billingSettings, readMeta, type InvoiceMeta } from "./common";
+import { billingSettings } from "./common";
 import { createDraft, suggestFeeLines } from "./invoices";
 
 /**
  * Retainer drafts (P3-35, job): for every active, chargeable RECURRING engagement on a RETAINER fee basis,
  * create one DRAFT invoice per month (fee ÷ billing.retainerMonthlyDivisor) for Partner approval.
- * Idempotent per engagement + month (the month is kept in the invoice meta as retainerPeriod), including
+ * Idempotent per engagement + month (Invoice.retainerPeriod), including
  * drafts the Partner discarded. Runs from billing.retainerDraftDay of the month onwards.
  */
 export async function runRetainerDrafts(today: string = todayIst()) {
@@ -28,8 +28,8 @@ export async function runRetainerDrafts(today: string = todayIst()) {
     },
     select: { id: true, clientId: true, name: true },
   });
-  const existing = await db().invoice.findMany({ where: { isRetainerDraft: true, engagementId: { in: engs.map((e) => e.id) } }, select: { engagementId: true, notes: true } });
-  const done = new Set(existing.filter((i) => readMeta<InvoiceMeta>(i.notes).retainerPeriod === period).map((i) => i.engagementId));
+  const existing = await db().invoice.findMany({ where: { isRetainerDraft: true, retainerPeriod: period, engagementId: { in: engs.map((e) => e.id) } }, select: { engagementId: true } });
+  const done = new Set(existing.map((i) => i.engagementId));
   let created = 0;
   let skipped = 0;
   for (const e of engs) {

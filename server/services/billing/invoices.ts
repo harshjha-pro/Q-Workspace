@@ -8,10 +8,7 @@ import type { Actor } from "../../permissions/actor";
 import { writeAudit, logSensitiveView } from "../../audit";
 import { addDays, diffDays, fyKey, fyStartYear, isIsoDate, todayIst } from "../../lib/dates";
 import { zIsoDate } from "../../domain/enums";
-import {
-  assertInvoiceAccess, authorizeBilling, billingClientIds, billingSettings, idOf, inClients, ISSUED_STATUSES, OPEN_STATUSES,
-  outstandingOf, readMeta, recomputeInvoice, writeMeta, type InvoiceMeta,
-} from "./common";
+import { assertInvoiceAccess, authorizeBilling, billingClientIds, billingSettings, idOf, inClients, ISSUED_STATUSES, OPEN_STATUSES, outstandingOf, recomputeInvoice, type InvoiceMeta, invoiceMeta, invoiceMetaColumns } from "./common";
 import { computeTotals, formatInvoiceNumber, isIntraState, lineAmount, MAX_INVOICE_NUMBER_LENGTH, placeOfSupply, seriesPrefix } from "./gst";
 import { firmProfileGaps, firmStateCode, getFirmProfile } from "./firm";
 
@@ -105,7 +102,7 @@ async function prepare(d: z.infer<typeof draftInput>, invoiceId: string | null, 
   const totals = computeTotals(lines.map((l) => ({ kind: l.kind as "FEE" | "REIMBURSEMENT", amountPaise: l.amountPaise, gstRateBp: l.gstRateBp })), isIntraState(firmState, pos));
   if (totals.totalPaise <= 0) throw new DomainError("VALIDATION", "The invoice total must be above zero.");
   const meta: InvoiceMeta = { ...keepMeta, text: d.notes || undefined, recipientGstin: recipientGstin || undefined, periodFrom: d.periodFrom ?? undefined, periodTo: d.periodTo ?? undefined };
-  return { header: { engagementId: d.engagementId ?? null, date: d.date, placeOfSupply: pos, ...totals, notes: writeMeta(meta) }, lines };
+  return { header: { engagementId: d.engagementId ?? null, date: d.date, placeOfSupply: pos, ...totals, ...invoiceMetaColumns(meta) }, lines };
 }
 
 async function writeLines(tx: Tx, actor: Actor, invoiceId: string, lines: Prepared["lines"]) {
@@ -141,7 +138,7 @@ export async function updateDraft(actor: Actor, id: string, input: Partial<Omit<
   const inv = await assertInvoiceAccess(actor, "billing.raise", id);
   if (inv.status !== "DRAFT") throw ruleViolation("Only a draft can be edited; an issued invoice is final (cancel it with a reason instead).");
   const patch = parsePartial(draftInput.omit({ clientId: true }), input);
-  const meta = readMeta<InvoiceMeta>(inv.notes);
+  const meta = invoiceMeta(inv);
   const existing = await db().invoiceLine.findMany({ where: { invoiceId: id }, orderBy: { createdAt: "asc" } });
   const merged = parse(draftInput, {
     clientId: inv.clientId,
@@ -222,10 +219,10 @@ export async function cancelInvoice(actor: Actor, id: string, reason: string) {
     const [alloc, wo] = await Promise.all([db().receiptAllocation.count({ where: { invoiceId: id } }), db().writeOff.count({ where: { invoiceId: id, status: { in: ["APPROVED", "PENDING"] } } })]);
     if (alloc || wo) throw ruleViolation("Receipts or write-offs exist against this invoice; reverse them before cancelling.");
   }
-  const meta = readMeta<InvoiceMeta>(inv.notes);
+  const meta = invoiceMeta(inv);
   return transaction(async (tx) => {
     await releaseDisbursements(tx, actor, id);
-    const after = await tx.invoice.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), notes: writeMeta({ ...meta, cancelReason: reason.trim() }), updatedById: idOf(actor) } });
+    const after = await tx.invoice.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), ...invoiceMetaColumns({ ...meta, cancelReason: reason.trim() }), updatedById: idOf(actor) } });
     await writeAudit(tx, actor, { entityType: "Invoice", entityId: id, action: inv.status === "DRAFT" ? "DISCARD_DRAFT" : "CANCEL", reason: reason.trim(), before: { status: inv.status }, after: { status: "CANCELLED" } });
     return after;
   });
@@ -244,9 +241,9 @@ export async function setEInvoiceDetails(actor: Actor, id: string, input: z.inpu
   if (!ISSUED_STATUSES.includes(inv.status)) throw ruleViolation("Enter the IRN after the invoice is issued.");
   const d = parse(eInvoiceInput, input);
   if (d.ackDate && d.ackDate < inv.date) throw new DomainError("VALIDATION", "The acknowledgement is dated before the invoice.", { ackDate: "Check the date" });
-  const meta = readMeta<InvoiceMeta>(inv.notes);
+  const meta = invoiceMeta(inv);
   return transaction(async (tx) => {
-    const after = await tx.invoice.update({ where: { id }, data: { irn: d.irn || null, notes: writeMeta({ ...meta, ackNo: d.ackNo, ackDate: d.ackDate }), updatedById: idOf(actor) } });
+    const after = await tx.invoice.update({ where: { id }, data: { irn: d.irn || null, ...invoiceMetaColumns({ ...meta, ackNo: d.ackNo, ackDate: d.ackDate }), updatedById: idOf(actor) } });
     await writeAudit(tx, actor, { entityType: "Invoice", entityId: id, action: "E_INVOICE", before: { irn: inv.irn, ackNo: meta.ackNo, ackDate: meta.ackDate }, after: d });
     return after;
   });
@@ -307,7 +304,7 @@ export async function getInvoice(actor: Actor, id: string) {
   await logSensitiveView(actor, "BILLING", "Invoice", id, inv.number ?? "draft");
   return {
     ...inv,
-    meta: readMeta<InvoiceMeta>(inv.notes),
+    meta: invoiceMeta(inv),
     outstandingPaise: OPEN_STATUSES.includes(inv.status) ? outstandingOf(inv) : 0,
     overdue: OPEN_STATUSES.includes(inv.status) && !!inv.dueDate && inv.dueDate < todayIst(),
     lines,

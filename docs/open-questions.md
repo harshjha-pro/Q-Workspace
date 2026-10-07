@@ -69,7 +69,7 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-36 | Firm GSTIN, PAN, bank and UPI for invoices | Enter under Admin → Firm profile | Needed before the first invoice |
 | Q-37 | Old-regime surcharge above about ₹2 crore cannot be stored | Accept for now; widen the column additively if ever needed | — |
 | Q-38 | Accounting export layout | Generic CSV/Excel until you name Tally or Zoho | — |
-| Q-39 | Make the JSON-kept fields real columns | One additive migration at the start of Phase 4 | — |
+| Q-39 | Make the JSON-kept fields real columns | **Yes** (7 Oct 2026) | Done: one additive migration with backfill (D-77) |
 
 ## Needed during Phase 3 (proposals applied, still open for confirmation)
 

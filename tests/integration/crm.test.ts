@@ -8,7 +8,7 @@ import { addDays, todayIst } from "@/server/lib/dates";
 import { seedCrmReference } from "@/prisma/seed/phase3/crm";
 import { createLead, updateLead, setLeadStage, addLeadActivity, listLeads, getLead, leadHours, findDuplicates, runLeadFollowUps } from "@/server/services/crm/leads";
 import { createProposal, updateProposal, approveProposal, markProposalSent, decideProposal, runProposalExpiry, getProposal, proposalPdf } from "@/server/services/crm/proposals";
-import { suggestBudgetMinutes, engagementSpecFor, saveServiceTemplate } from "@/server/services/crm/templates";
+import { suggestBudgetMinutes, engagementSpecFor, saveServiceTemplate, templateSpec } from "@/server/services/crm/templates";
 import { generateLetter, acceptLetterWithSignedCopy, letterFile, getLetter } from "@/server/services/crm/letters";
 import { getOnboarding, setOnboardingItem, attachOnboardingDocument, decideConflict, startOnboarding } from "@/server/services/crm/onboarding";
 import { runCrossSell, listOpportunities, convertOpportunity, evaluateCrossSell } from "@/server/services/crm/crosssell";
@@ -110,6 +110,7 @@ describe("proposals: approval limits, versioning, expiry (P3-09)", () => {
     const p = await createProposal(actorOf(w.m1), { leadId, serviceTemplateId: (await template("Statutory audit")).id });
     expect(p.status).toBe("DRAFT");
     expect(p.budgetMinutes).toBe(150 * 60); // template placeholder, no past actuals yet
+    expect(p.serviceTemplateId).toBe((await template("Statutory audit")).id); // Q-39 column
     expect(p.feePaise).toBe(1_50_000_00);
     await expect(approveProposal(actorOf(w.m1), p.id)).rejects.toThrow(/Partner/);
     await setSetting("crm.proposalApprovalLimitPaise", 1_00_000_00);
@@ -169,6 +170,20 @@ describe("proposals: approval limits, versioning, expiry (P3-09)", () => {
     await expect(saveServiceTemplate(actorOf(w.m1), { serviceLine: "GST", name: "GST refund" })).rejects.toThrow();
     const t = await saveServiceTemplate(actorOf(w.pa), { serviceLine: "GST", name: "GST refund", timelines: "Estimated effort: 10 hrs" });
     expect(t.active).toBe(true);
+    // Pre-Q-39 template: no columns set, so the type is derived and the effort read from timelines.
+    expect(templateSpec(t)).toEqual({ engagementType: "GST_RETURN", recurrence: "RECURRING", effortMinutes: 600 });
+  });
+
+  it("a template's own engagement type and effort drive the proposal and its suggested engagement (Q-39)", async () => {
+    await expect(saveServiceTemplate(actorOf(w.pa), { serviceLine: "ADVISORY", name: "Valuation report", engagementType: "NOPE" })).rejects.toThrow(/Unknown engagement type/);
+    await expect(saveServiceTemplate(actorOf(w.pa), { serviceLine: "ADVISORY", name: "Valuation report", budgetMinutes: 50 })).rejects.toThrow();
+    const t = await saveServiceTemplate(actorOf(w.pa), { serviceLine: "ADVISORY", name: "Bookkeeping clean-up project", engagementType: "BOOKKEEPING", budgetMinutes: 12 * 60 });
+    expect(templateSpec(t)).toEqual({ engagementType: "BOOKKEEPING", recurrence: "ONE_TIME", effortMinutes: 720 });
+    const lead = await createLead(actorOf(w.m1), { name: "Spec Traders", phone: "9811122233" });
+    const p = await createProposal(actorOf(w.m1), { leadId: lead.id, serviceTemplateId: t.id });
+    expect(p.budgetMinutes).toBe(720);
+    // ADVISORY alone would derive OTHER; the template's column wins.
+    expect((await getProposal(actorOf(w.m1), p.id)).spec.engagementType).toBe("BOOKKEEPING");
   });
 });
 
@@ -182,6 +197,7 @@ describe("engagement letter acceptance → client + engagement (P3-10) and onboa
     const { letter } = await generateLetter(actorOf(w.m1), p.id);
     letterId = letter.id;
     expect(letter.clientId.startsWith("LEAD:")).toBe(true);
+    expect(letter.leadId).toBe(p.leadId); // Q-39 column
     expect(letter.body).toContain("Proposal Industries Private Limited");
     expect(letter.body).toContain("Rs. 1,20,000");
     expect(await db().client.count({ where: { pan: "AAACP5555K" } })).toBe(0);

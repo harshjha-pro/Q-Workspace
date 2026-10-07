@@ -11,5 +11,5 @@ export * from "./retainer";
 export * from "./export";
 export { invoicePdf } from "./pdf";
 export { BUCKETS, bucketOf } from "./ageing";
-export { INVOICE_STATUS_LABELS, OPEN_STATUSES, ISSUED_STATUSES, outstandingOf, statusFromAmounts, canSeeCosts, readMeta, type InvoiceMeta, type ReceiptMeta } from "./common";
+export { INVOICE_STATUS_LABELS, OPEN_STATUSES, ISSUED_STATUSES, outstandingOf, statusFromAmounts, canSeeCosts, readMeta, invoiceMeta, receiptMeta, type InvoiceMeta, type ReceiptMeta } from "./common";
 export { computeTotals, placeOfSupply, isIntraState, formatInvoiceNumber, seriesPrefix, pct } from "./gst";

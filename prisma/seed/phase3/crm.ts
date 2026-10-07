@@ -1,78 +1,87 @@
 /**
  * CRM seed (spec 10, P3-08 … P3-16).
  * Reference: service templates (scope / deliverables / timelines / fee basis). Fees and the
- * "Estimated effort" hours are firm placeholders to be replaced by the firm — not statutory values.
+ * effort hours (budgetMinutes) are firm placeholders to be replaced by the firm — not statutory values.
  * Demo: leads across stages (some duplicating existing clients by PAN), activities, proposals,
  * engagement letters (one accepted → client + engagement), cross-sell opportunities, renewals,
  * feedback (one low score) and a campaign — all created through the CRM services.
  */
 import type { PrismaClient } from "../../../generated/prisma/client";
 
-type T = { serviceLine: string; name: string; scope: string; deliverables: string; timelines: string; feeBasis: string; defaultFeePaise: number; oopTerms: string };
+type T = { serviceLine: string; name: string; engagementType: string; budgetMinutes: number; scope: string; deliverables: string; timelines: string; feeBasis: string; defaultFeePaise: number; oopTerms: string };
 const OOP = "Government fees, challans, stamp duty and travel outside the city are billed at actuals.";
 
 export const SERVICE_TEMPLATES: T[] = [
   {
-    serviceLine: "GST", name: "GST returns (monthly / QRMP)",
+    serviceLine: "GST", name: "GST returns (monthly / QRMP)", engagementType: "GST_RETURN",
     scope: "Preparation and filing of GSTR-1 and GSTR-3B for each GSTIN; reconciliation of input tax credit with GSTR-2B; computation of tax payable and challan preparation.",
     deliverables: "Filed returns with acknowledgment (ARN); monthly ITC reconciliation statement; tax payable working.",
-    timelines: "Within the statutory due dates, provided data is received by the 5th of the following month.\nEstimated effort: 60 hrs (placeholder)",
+    timelines: "Within the statutory due dates, provided data is received by the 5th of the following month.",
+    budgetMinutes: 3600, // placeholder effort
     feeBasis: "RETAINER", defaultFeePaise: 30_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "DIRECT_TAX", name: "Income tax return (ITR)",
+    serviceLine: "DIRECT_TAX", name: "Income tax return (ITR)", engagementType: "INCOME_TAX_RETURN",
     scope: "Computation of total income, reconciliation with Form 26AS / AIS / TIS, preparation and e-filing of the income tax return and e-verification support.",
     deliverables: "Computation of income; filed ITR with acknowledgment.",
-    timelines: "Within the due date for the assessment year, provided documents are received at least 15 days before.\nEstimated effort: 8 hrs (placeholder)",
+    timelines: "Within the due date for the assessment year, provided documents are received at least 15 days before.",
+    budgetMinutes: 480, // placeholder effort
     feeBasis: "FIXED", defaultFeePaise: 7_500_00, oopTerms: OOP,
   },
   {
-    serviceLine: "DIRECT_TAX", name: "TDS returns (quarterly)",
+    serviceLine: "DIRECT_TAX", name: "TDS returns (quarterly)", engagementType: "TDS_RETURN",
     scope: "Computation of TDS, challan preparation, filing of quarterly TDS statements (24Q / 26Q / 27Q as applicable) and issue of TDS certificates.",
     deliverables: "Filed TDS statements with token numbers; Form 16 / 16A downloads.",
-    timelines: "Within the quarterly due dates, provided data is received by the 10th of the month following the quarter.\nEstimated effort: 32 hrs (placeholder)",
+    timelines: "Within the quarterly due dates, provided data is received by the 10th of the month following the quarter.",
+    budgetMinutes: 1920, // placeholder effort
     feeBasis: "RETAINER", defaultFeePaise: 24_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "AUDIT", name: "Statutory audit",
+    serviceLine: "AUDIT", name: "Statutory audit", engagementType: "AUDIT",
     scope: "Audit of the financial statements in accordance with the Standards on Auditing and the applicable law, and reporting thereon.",
     deliverables: "Independent auditor's report (with CARO where applicable); management letter on observations.",
-    timelines: "Fieldwork and report within the period agreed after the books are closed.\nEstimated effort: 150 hrs (placeholder)",
+    timelines: "Fieldwork and report within the period agreed after the books are closed.",
+    budgetMinutes: 9000, // placeholder effort
     feeBasis: "FIXED", defaultFeePaise: 1_50_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "AUDIT", name: "Tax audit",
+    serviceLine: "AUDIT", name: "Tax audit", engagementType: "AUDIT",
     scope: "Audit of accounts under the Income-tax Act and preparation of the tax audit report in the prescribed form.",
     deliverables: "Tax audit report uploaded on the income tax portal with UDIN.",
-    timelines: "Before the due date of the tax audit report.\nEstimated effort: 45 hrs (placeholder)",
+    timelines: "Before the due date of the tax audit report.",
+    budgetMinutes: 2700, // placeholder effort
     feeBasis: "FIXED", defaultFeePaise: 50_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "COMPANY_LAW", name: "ROC annual filing",
+    serviceLine: "COMPANY_LAW", name: "ROC annual filing", engagementType: "ROC_ANNUAL",
     scope: "Preparation of annual return and financial statement filings with the Registrar of Companies, board / AGM documentation support and statutory registers update.",
     deliverables: "Filed annual forms with SRN; minutes and notices drafts.",
-    timelines: "Within the statutory time after the AGM.\nEstimated effort: 20 hrs (placeholder)",
+    timelines: "Within the statutory time after the AGM.",
+    budgetMinutes: 1200, // placeholder effort
     feeBasis: "FIXED", defaultFeePaise: 35_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "ACCOUNTING", name: "Bookkeeping (monthly)",
+    serviceLine: "ACCOUNTING", name: "Bookkeeping (monthly)", engagementType: "BOOKKEEPING",
     scope: "Recording of sales, purchases, expenses, bank and payroll entries; bank reconciliation; monthly MIS.",
     deliverables: "Updated books of account; monthly MIS pack; bank reconciliation statements.",
-    timelines: "Books updated by the 10th of the following month.\nEstimated effort: 200 hrs (placeholder)",
+    timelines: "Books updated by the 10th of the following month.",
+    budgetMinutes: 12000, // placeholder effort
     feeBasis: "RETAINER", defaultFeePaise: 96_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "ACCOUNTING", name: "Payroll compliance (PF / ESI / PT)",
+    serviceLine: "ACCOUNTING", name: "Payroll compliance (PF / ESI / PT)", engagementType: "PAYROLL_STATUTORY",
     scope: "Monthly PF, ESI and professional tax computation, challans and returns for the employees on the payroll.",
     deliverables: "Challans and returns filed each month; annual returns.",
-    timelines: "Within the monthly statutory due dates, provided payroll data is received by the 5th.\nEstimated effort: 36 hrs (placeholder)",
+    timelines: "Within the monthly statutory due dates, provided payroll data is received by the 5th.",
+    budgetMinutes: 2160, // placeholder effort
     feeBasis: "RETAINER", defaultFeePaise: 36_000_00, oopTerms: OOP,
   },
   {
-    serviceLine: "ADVISORY", name: "Advisory / project (one-time)",
+    serviceLine: "ADVISORY", name: "Advisory / project (one-time)", engagementType: "OTHER",
     scope: "Advisory assignment as agreed — e.g. project report, valuation, FEMA review or registrations.",
     deliverables: "Report / filings as agreed in the scope.",
-    timelines: "As agreed for the assignment.\nEstimated effort: 40 hrs (placeholder)",
+    timelines: "As agreed for the assignment.",
+    budgetMinutes: 2400, // placeholder effort
     feeBasis: "TIME", defaultFeePaise: 2_500_00, oopTerms: OOP,
   },
 ];
@@ -82,6 +91,9 @@ export async function seedCrmReference(db: PrismaClient) {
   for (const t of SERVICE_TEMPLATES) {
     const existing = await db.serviceTemplate.findFirst({ where: { serviceLine: t.serviceLine, name: t.name } });
     if (!existing) await db.serviceTemplate.create({ data: { ...t, createdById: "system" } });
+    // Q-39: templates seeded before the columns existed get them filled once; values the firm set are kept.
+    else if (!existing.engagementType && !existing.budgetMinutes)
+      await db.serviceTemplate.update({ where: { id: existing.id }, data: { engagementType: t.engagementType, budgetMinutes: t.budgetMinutes } });
   }
 }
 

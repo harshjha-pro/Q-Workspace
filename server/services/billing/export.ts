@@ -3,7 +3,7 @@ import { toCsv } from "../../lib/csv";
 import { buildSheet, type Column } from "../../excel/workbook";
 import { writeAudit, logSensitiveView } from "../../audit";
 import type { Actor } from "../../permissions/actor";
-import { billingClientIds, inClients, outstandingOf, readMeta, type InvoiceMeta, type ReceiptMeta, idOf } from "./common";
+import { billingClientIds, inClients, outstandingOf, idOf, invoiceMeta, receiptMeta } from "./common";
 
 export const BILLING_EXPORT_KINDS = ["invoices", "lines", "receipts"] as const;
 export type BillingExportKind = (typeof BILLING_EXPORT_KINDS)[number];
@@ -38,7 +38,7 @@ export async function runBillingExport(actor: Actor, kind: BillingExportKind, fo
         { key: "ackDate", header: "Ack Date" }, { key: "cancelReason", header: "Cancellation Reason" },
       ];
       rows = invs.map((i) => {
-        const m = readMeta<InvoiceMeta>(i.notes);
+        const m = invoiceMeta(i);
         const c = clients.get(i.clientId);
         return {
           number: i.number, date: i.date, dueDate: i.dueDate ?? "", status: i.status, clientCode: c?.code ?? "", clientName: c?.name ?? "", gstin: m.recipientGstin ?? "",
@@ -56,7 +56,7 @@ export async function runBillingExport(actor: Actor, kind: BillingExportKind, fo
         { key: "sgst", header: "SGST" }, { key: "igst", header: "IGST" }, { key: "lineTotal", header: "Line Total" },
       ];
       for (const i of invs) {
-        const m = readMeta<InvoiceMeta>(i.notes);
+        const m = invoiceMeta(i);
         const c = clients.get(i.clientId);
         const intra = i.igstPaise === 0 && (i.cgstPaise > 0 || i.sgstPaise > 0);
         i.lines.forEach((l, n) => {
@@ -81,7 +81,7 @@ export async function runBillingExport(actor: Actor, kind: BillingExportKind, fo
       { key: "allocations", header: "Allocations (Invoice No:Amount)", width: 40 }, { key: "reversed", header: "Reversed" }, { key: "reversalReason", header: "Reversal Reason" }, { key: "notes", header: "Notes" },
     ];
     rows = recs.map((x) => {
-      const m = readMeta<ReceiptMeta>(x.notes);
+      const m = receiptMeta(x);
       const tds = m.tdsPaise ?? 0;
       const allocated = x.allocations.reduce((t, a) => t + a.amountPaise, 0);
       const c = clients.get(x.clientId);

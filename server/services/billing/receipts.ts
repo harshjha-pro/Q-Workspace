@@ -9,10 +9,7 @@ import { writeAudit, logSensitiveView } from "../../audit";
 import { isIsoDate, todayIst } from "../../lib/dates";
 import { zIsoDate } from "../../domain/enums";
 import { notifyUsers } from "../notifications/service";
-import {
-  assertInvoiceAccess, authorizeBilling, billingClientIds, idOf, inClients, isReversed, OPEN_STATUSES, outstandingOf, readMeta,
-  recomputeInvoice, staffOnly, tdsOf, writeMeta, type ReceiptMeta,
-} from "./common";
+import { assertInvoiceAccess, authorizeBilling, billingClientIds, idOf, inClients, isReversed, OPEN_STATUSES, outstandingOf, recomputeInvoice, staffOnly, tdsOf, type ReceiptMeta, receiptMeta, receiptMetaColumns } from "./common";
 
 export const RECEIPT_MODES = ["UPI", "NEFT", "RTGS", "IMPS", "CHEQUE", "CASH"] as const;
 
@@ -58,7 +55,7 @@ export async function recordReceipt(actor: Actor, input: ReceiptInput) {
   if (allocated > d.amountPaise + d.tdsPaise) throw new DomainError("VALIDATION", "Allocations exceed the receipt plus TDS.", { allocations: "Reduce the allocations" });
   return transaction(async (tx) => {
     const meta: ReceiptMeta = { text: d.notes || undefined, tdsPaise: d.tdsPaise || undefined };
-    const r = await tx.receipt.create({ data: { clientId: d.clientId, date: d.date, amountPaise: d.amountPaise, mode: d.mode, reference: d.reference, notes: writeMeta(meta), createdById: idOf(actor) } });
+    const r = await tx.receipt.create({ data: { clientId: d.clientId, date: d.date, amountPaise: d.amountPaise, mode: d.mode, reference: d.reference, ...receiptMetaColumns(meta), createdById: idOf(actor) } });
     await allocate(tx, actor, r.id, d.clientId, d.allocations);
     await writeAudit(tx, actor, { entityType: "Receipt", entityId: r.id, action: "CREATE", after: { ...d } });
     return r;
@@ -99,8 +96,8 @@ export async function reverseReceipt(actor: Actor, receiptId: string, reason: st
   return transaction(async (tx) => {
     await tx.receiptAllocation.deleteMany({ where: { receiptId } });
     for (const a of r.allocations) await recomputeInvoice(tx, a.invoiceId);
-    const meta = readMeta<ReceiptMeta>(r.notes);
-    await tx.receipt.update({ where: { id: receiptId }, data: { notes: writeMeta({ ...meta, reversedAt: todayIst(), reversedReason: reason.trim(), reversedById: idOf(actor) ?? undefined }), updatedById: idOf(actor) } });
+    const meta = receiptMeta(r);
+    await tx.receipt.update({ where: { id: receiptId }, data: { ...receiptMetaColumns({ ...meta, reversedAt: todayIst(), reversedReason: reason.trim(), reversedById: idOf(actor) ?? undefined }), updatedById: idOf(actor) } });
     await writeAudit(tx, actor, { entityType: "Receipt", entityId: receiptId, action: "REVERSE", reason: reason.trim(), before: { allocations: r.allocations.map((a) => ({ invoiceId: a.invoiceId, amountPaise: a.amountPaise })) } });
   });
 }
@@ -116,7 +113,7 @@ export async function listReceipts(actor: Actor, f: { clientId?: string; from?: 
   const clients = new Map((await db().client.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.clientId))] } }, select: { id: true, name: true, code: true } })).map((c) => [c.id, c]));
   await logSensitiveView(actor, "BILLING", "Receipt", "list", JSON.stringify({ ...f, rows: rows.length }));
   return rows.map((r) => {
-    const meta = readMeta<ReceiptMeta>(r.notes);
+    const meta = receiptMeta(r);
     const allocated = r.allocations.reduce((t, a) => t + a.amountPaise, 0);
     const tds = meta.tdsPaise ?? 0;
     return {

@@ -80,8 +80,32 @@ export function writeMeta(meta: Record<string, unknown>): string {
   const clean = Object.fromEntries(Object.entries(meta).filter(([, v]) => v !== undefined && v !== null && v !== ""));
   return Object.keys(clean).length ? JSON.stringify(clean) : "";
 }
-export const tdsOf = (r: { notes: string }) => readMeta<ReceiptMeta>(r.notes).tdsPaise ?? 0;
-export const isReversed = (r: { notes: string }) => !!readMeta<ReceiptMeta>(r.notes).reversedAt;
+// Phase 4 (Q-39, D-77): the fields above are real columns now; `notes` keeps only the free text.
+type InvoiceRow = { notes: string; recipientGstin?: string | null; ackNo?: string | null; ackDate?: string | null; cancelReason?: string | null; retainerPeriod?: string | null; periodFrom?: string | null; periodTo?: string | null };
+type ReceiptRow = { notes: string; tdsPaise?: number | null; reversedAt?: string | null; reversedReason?: string | null; reversedById?: string | null };
+const u = <T,>(v: T | null | undefined) => (v === null || v === "" ? undefined : v);
+
+export function invoiceMeta(r: InvoiceRow): InvoiceMeta {
+  return {
+    text: readMeta<InvoiceMeta>(r.notes).text,
+    recipientGstin: u(r.recipientGstin), ackNo: u(r.ackNo), ackDate: u(r.ackDate), cancelReason: u(r.cancelReason),
+    retainerPeriod: u(r.retainerPeriod), periodFrom: u(r.periodFrom), periodTo: u(r.periodTo),
+  };
+}
+export function invoiceMetaColumns(m: InvoiceMeta) {
+  return {
+    notes: m.text ?? "", recipientGstin: m.recipientGstin || null, ackNo: m.ackNo || null, ackDate: m.ackDate || null, cancelReason: m.cancelReason || null,
+    retainerPeriod: m.retainerPeriod || null, periodFrom: m.periodFrom || null, periodTo: m.periodTo || null,
+  };
+}
+export function receiptMeta(r: ReceiptRow): ReceiptMeta {
+  return { text: readMeta<ReceiptMeta>(r.notes).text, tdsPaise: r.tdsPaise ?? 0, reversedAt: u(r.reversedAt), reversedReason: u(r.reversedReason), reversedById: u(r.reversedById) };
+}
+export function receiptMetaColumns(m: ReceiptMeta) {
+  return { notes: m.text ?? "", tdsPaise: m.tdsPaise ?? 0, reversedAt: m.reversedAt || null, reversedReason: m.reversedReason || null, reversedById: m.reversedById || null };
+}
+export const tdsOf = (r: ReceiptRow) => r.tdsPaise ?? 0;
+export const isReversed = (r: ReceiptRow) => !!r.reversedAt;
 
 // ---------------------------------------------------------------------------
 // Status

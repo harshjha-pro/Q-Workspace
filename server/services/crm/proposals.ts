@@ -13,7 +13,7 @@ import { getSetting } from "../settings/service";
 import { buildPdf, rs, type PdfBlock } from "../../documents/pdf";
 import { amountInWords } from "../../documents/words";
 import { assertFees, assertLeadAccess, firmHeader, idOf } from "./common";
-import { effortPlaceholderMinutes, engagementSpecFor, suggestBudgetMinutes } from "./templates";
+import { proposalSpec, suggestBudgetMinutes, templateSpec } from "./templates";
 
 const blankToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
 
@@ -59,13 +59,13 @@ export async function createProposal(actor: Actor, input: z.input<typeof createI
   const t = await db().serviceTemplate.findUnique({ where: { id: d.serviceTemplateId } });
   if (!t || !t.active) throw new DomainError("VALIDATION", "Choose an active service template.", { serviceTemplateId: "Not available" });
   const title = d.title ?? t.name;
-  const spec = engagementSpecFor(t.serviceLine, t.name);
-  const budget = await suggestBudgetMinutes(spec.engagementType, effortPlaceholderMinutes(t.timelines));
+  const spec = templateSpec(t);
+  const budget = await suggestBudgetMinutes(spec.engagementType, spec.effortMinutes);
   const validity = await getSetting<number>("crm.proposalValidityDays", 30);
   return transaction(async (tx) => {
     const p = await tx.proposal.create({
       data: {
-        leadId: d.leadId ?? null, clientId, title, serviceLine: t.serviceLine, scope: t.scope, deliverables: t.deliverables, timelines: t.timelines,
+        leadId: d.leadId ?? null, clientId, serviceTemplateId: t.id, title, serviceLine: t.serviceLine, scope: t.scope, deliverables: t.deliverables, timelines: t.timelines,
         feeBasis: t.feeBasis, feePaise: t.feeBasis === "TIME" ? 0 : t.defaultFeePaise, ratePaise: t.feeBasis === "TIME" ? t.defaultFeePaise : 0,
         budgetMinutes: budget.minutes, oopTerms: t.oopTerms, validUntil: d.validUntil ?? addDays(todayIst(), validity),
         createdById: idOf(actor), updatedById: idOf(actor),
@@ -229,7 +229,7 @@ export async function getProposal(actor: Actor, id: string) {
     approvalRight(actor, p),
     p.approvedById ? db().user.findUnique({ where: { id: p.approvedById }, select: { displayName: true } }) : null,
   ]);
-  const spec = engagementSpecFor(p.serviceLine, p.title);
+  const spec = await proposalSpec(p);
   return { proposal: p, versions, lead, client, letters, canApprove: right.ok, approvalNote: right.reason, approverName: approver?.displayName ?? null, spec, valuePaise: proposalValuePaise(p) };
 }
 

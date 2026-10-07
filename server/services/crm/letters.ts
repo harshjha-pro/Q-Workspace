@@ -16,13 +16,13 @@ import { createClient, saveContact } from "../clients/service";
 import { assignToEngagement, createEngagement } from "../engagements/service";
 import { assertFees, assertLeadAccess, firmHeader, idOf, rupees } from "./common";
 import { assertClientAccess } from "../../permissions/scopes";
-import { engagementSpecFor } from "./templates";
+import { proposalSpec } from "./templates";
 import { ensureChecklistTx, runConflictCheck } from "./onboarding";
 
 /**
  * Engagement letters (P3-10). The schema requires EngagementLetter.clientId, but a new client only
  * exists once the letter is accepted; until then the letter carries the placeholder `LEAD:<leadId>`,
- * replaced by the real client id on acceptance.
+ * replaced by the real client id on acceptance. Since Q-39 the lead is also kept in `leadId` (D-77).
  */
 export const LEAD_PLACEHOLDER = "LEAD:";
 export const isPlaceholderClient = (clientId: string) => clientId.startsWith(LEAD_PLACEHOLDER);
@@ -72,10 +72,11 @@ Accepted on behalf of {{extra.clientName}}
 
 Signature: ____________________     Date: ____________`;
 
-async function assertLetterAccess(actor: Actor, letter: { proposalId: string | null; clientId: string }, cap: "crm.view" | "crm.manage") {
+async function assertLetterAccess(actor: Actor, letter: { proposalId: string | null; clientId: string; leadId: string | null }, cap: "crm.view" | "crm.manage") {
   assertFees(actor);
-  const p = letter.proposalId ? await db().proposal.findUnique({ where: { id: letter.proposalId } }) : null;
-  if (p?.leadId) return assertLeadAccess(actor, cap, p.leadId);
+  const p = !letter.leadId && letter.proposalId ? await db().proposal.findUnique({ where: { id: letter.proposalId } }) : null;
+  const leadId = letter.leadId ?? p?.leadId;
+  if (leadId) return assertLeadAccess(actor, cap, leadId);
   if (!isPlaceholderClient(letter.clientId)) return void (await assertClientAccess(actor, cap, letter.clientId));
   throw forbidden();
 }
@@ -130,7 +131,7 @@ export async function generateLetter(actor: Actor, proposalId: string) {
   const r = await renderTemplateFor(`ENGAGEMENT_LETTER_${p.serviceLine}`, DEFAULT_LETTER, { clientId: p.clientId, extra, fallback });
   return transaction(async (tx) => {
     const l = await tx.engagementLetter.create({
-      data: { proposalId, clientId: p.clientId ?? `${LEAD_PLACEHOLDER}${p.leadId}`, templateVersionId: r.templateVersionId, body: r.text, createdById: idOf(actor), updatedById: idOf(actor) },
+      data: { proposalId, clientId: p.clientId ?? `${LEAD_PLACEHOLDER}${p.leadId}`, leadId: p.leadId, templateVersionId: r.templateVersionId, body: r.text, createdById: idOf(actor), updatedById: idOf(actor) },
     });
     await writeAudit(tx, actor, { entityType: "EngagementLetter", entityId: l.id, action: "CREATE", after: { proposalId, templateVersionId: r.templateVersionId, missing: r.missing } });
     return { letter: l, missing: r.missing };
@@ -175,7 +176,7 @@ export async function getLetter(actor: Actor, id: string) {
   const client = isPlaceholderClient(l.clientId) ? null : await db().client.findUnique({ where: { id: l.clientId }, select: { id: true, code: true, name: true } });
   const engagements = await db().engagement.findMany({ where: { engagementLetterId: id }, select: { id: true, code: true, name: true } });
   const renewal = await db().renewal.findFirst({ where: { letterId: id } });
-  return { letter: l, proposal: p, lead, client, engagements, renewal, spec: p ? engagementSpecFor(p.serviceLine, p.title) : null, missing: [...l.body.matchAll(/\[\[([a-zA-Z]+\.[a-zA-Z0-9_]+)\]\]/g)].map((m) => m[1]!) };
+  return { letter: l, proposal: p, lead, client, engagements, renewal, spec: p ? await proposalSpec(p) : null, missing: [...l.body.matchAll(/\[\[([a-zA-Z]+\.[a-zA-Z0-9_]+)\]\]/g)].map((m) => m[1]!) };
 }
 
 /** Paragraphs → PDF blocks; a paragraph starting "# Heading" becomes a heading plus its text. */
@@ -228,7 +229,7 @@ export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string,
   const p = l.proposalId ? await db().proposal.findUnique({ where: { id: l.proposalId } }) : null;
   if (!p || p.status !== "ACCEPTED") throw ruleViolation("The proposal behind this letter is not accepted.");
   const lead = p.leadId ? await db().lead.findUnique({ where: { id: p.leadId } }) : null;
-  const spec = engagementSpecFor(p.serviceLine, p.title);
+  const spec = await proposalSpec(p);
   const engagementType = d.engagementType ?? spec.engagementType;
   if (!(await db().stageTemplate.findUnique({ where: { code: engagementType } }))) throw new DomainError("VALIDATION", `Unknown engagement type ${engagementType}.`, { engagementType: "Choose a type" });
   for (const uid of d.memberUserIds) {
