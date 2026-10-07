@@ -21,6 +21,9 @@ import {
   AddChecklistItemDialog, MarkAllRequestedButton, SetPendingDialog, ClearPendingDialog,
 } from "./dialogs";
 import { ChecklistStatus, ConfirmUploadButton, PendingMessage } from "./checklist-controls";
+import { RequestApprovalDialog, WithdrawApprovalButton } from "./approval-controls";
+import { taskApprovalPanel } from "@/server/services/portal/actions";
+import { requestApprovalAction, withdrawApprovalAction } from "../actions";
 
 export const metadata = { title: "Task" };
 
@@ -46,6 +49,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const canWork = can(actor, "task.work") && isOpen;
   const canCheck = can(actor, "review.check");
   const msg = isOpen ? await pendingMessage(actor, id) : null;
+  const approvals = await taskApprovalPanel(actor, id);
+  const canShare = canWork && can(actor, "portal.share");
   // Names for history rows; the detail payload only names hours, reviews and sign-offs.
   const people = new Map((await listUserOptions(actor)).map((u) => [u.id, u.displayName]));
   const who = (uid: string | null | undefined) => (uid ? people.get(uid) ?? "former staff" : "System");
@@ -214,6 +219,32 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           </CardContent>
         </Card>
       </div>
+
+      {/* Client approval through the portal (D-80) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Client approval</CardTitle>
+          {canShare && approvals.hasPortalUser ? <RequestApprovalDialog action={requestApprovalAction.bind(null, t.id)} documents={approvals.documents} /> : null}
+        </CardHeader>
+        <CardContent className="text-sm">
+          {!approvals.hasPortalUser ? <p className="text-muted">This client has no portal user yet, so approvals cannot be asked online.</p> : null}
+          {approvals.requests.length === 0 ? (approvals.hasPortalUser ? <p className="text-muted">No approvals asked on this task.</p> : null) : (
+            <ul className="divide-y divide-line">
+              {approvals.requests.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-start gap-2 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{r.title}</div>
+                    <div className="text-xs text-muted">Asked {formatDateTime(r.requestedAt)} by {who(r.requestedById)}{r.documentId ? <> · <a className="underline" href={`/api/dms/${r.documentId}`}>document</a></> : null}</div>
+                    {r.decision ? <div className="mt-1 text-xs">{r.decision.decision === "APPROVED" ? "Approved" : "Not approved"} by {r.decision.byName} on {formatDateTime(r.decision.decidedAt)}{r.decision.ip ? ` (IP ${r.decision.ip})` : ""}{r.decision.comment ? ` — “${r.decision.comment}”` : ""}</div> : null}
+                  </div>
+                  <Badge tone={r.status === "OPEN" ? "amber" : r.decision?.decision === "APPROVED" ? "green" : r.status === "WITHDRAWN" ? "neutral" : "red"}>{r.status === "OPEN" ? "Waiting" : r.status === "WITHDRAWN" ? "Withdrawn" : r.decision?.decision === "APPROVED" ? "Approved" : "Not approved"}</Badge>
+                  {r.status === "OPEN" && canWork ? <WithdrawApprovalButton action={withdrawApprovalAction.bind(null, t.id, r.id)} /> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Reminder log */}
       <Card>

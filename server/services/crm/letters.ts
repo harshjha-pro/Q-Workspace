@@ -222,10 +222,17 @@ export type AcceptLetterInput = z.input<typeof acceptInput>;
  */
 const isPracticeAdmin = (a: Actor) => a.kind === "USER" && a.role === "PRACTICE_ADMIN";
 
-export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string, file: { name: string; data: Buffer }, input: AcceptLetterInput = {}) {
+/**
+ * Set up the client and engagement from an accepted letter. Either staff upload the signed copy, or the client
+ * already accepted it in the portal (Q-23: the logged-in click is enough; a signed copy stays optional).
+ */
+export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string, file: { name: string; data: Buffer } | null, input: AcceptLetterInput = {}) {
   const l = await loadLetter(actor, letterId, "crm.manage");
   const d = parse(acceptInput, input);
-  if (!["DRAFT", "ISSUED"].includes(l.status)) throw ruleViolation("This letter is already accepted or withdrawn.");
+  const portalAccepted = l.status === "ACCEPTED" && !!l.acceptedByPortalUserId;
+  if (!["DRAFT", "ISSUED"].includes(l.status) && !portalAccepted) throw ruleViolation("This letter is already accepted or withdrawn.");
+  if (portalAccepted && (await db().engagement.count({ where: { engagementLetterId: letterId } }))) throw ruleViolation("The engagement for this letter is already set up.");
+  if (!file && !portalAccepted) throw new DomainError("VALIDATION", "Upload the signed copy, or wait for the client to accept in the portal.", { file: "Required" });
   const p = l.proposalId ? await db().proposal.findUnique({ where: { id: l.proposalId } }) : null;
   if (!p || p.status !== "ACCEPTED") throw ruleViolation("The proposal behind this letter is not accepted.");
   const lead = p.leadId ? await db().lead.findUnique({ where: { id: p.leadId } }) : null;
@@ -249,7 +256,7 @@ export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string,
   } else {
     await assertClientAccess(actor, isPracticeAdmin(actor) ? "client.manage" : "engagement.manage", clientId!);
   }
-  const stored = await storeFile(["_crm", "engagement-letters"], file.name, file.data);
+  const stored = file ? await storeFile(["_crm", "engagement-letters"], file.name, file.data) : null;
   const today = todayIst();
 
   if (newClient && lead) {
@@ -282,20 +289,23 @@ export async function acceptLetterWithSignedCopy(actor: Actor, letterId: string,
   for (const uid of d.memberUserIds) await assignToEngagement(actor, engagement.id, { userId: uid, role: "MEMBER" }, { fromAcceptedLetter: true });
 
   const result = await transaction(async (tx) => {
-    const doc = await tx.document.create({
-      data: {
-        clientId, engagementId: engagement!.id, name: `Signed engagement letter - ${file.name}`, kind: "ENGAGEMENT_LETTER", sourceType: "UPLOAD", confidentiality: "NORMAL", createdById: idOf(actor),
-        versions: { create: { version: 1, storagePath: stored.storagePath, originalName: file.name, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256, createdById: idOf(actor) } },
-      },
-    });
-    const letter = await tx.engagementLetter.update({ where: { id: letterId }, data: { clientId: clientId!, status: "SIGNED_UPLOADED", acceptedAt: new Date(), signedCopyDocumentId: doc.id, updatedById: idOf(actor) } });
+    const doc = file && stored
+      ? await tx.document.create({
+          data: {
+            clientId, engagementId: engagement!.id, name: `Signed engagement letter - ${file.name}`, kind: "ENGAGEMENT_LETTER", sourceType: "UPLOAD", confidentiality: "NORMAL", createdById: idOf(actor),
+            versions: { create: { version: 1, storagePath: stored.storagePath, originalName: file.name, mimeType: stored.mimeType, sizeBytes: stored.sizeBytes, sha256: stored.sha256, createdById: idOf(actor) } },
+          },
+        })
+      : null;
+    const status = doc ? "SIGNED_UPLOADED" : "ACCEPTED";
+    const letter = await tx.engagementLetter.update({ where: { id: letterId }, data: { clientId: clientId!, status, acceptedAt: l.acceptedAt ?? new Date(), signedCopyDocumentId: doc?.id ?? null, updatedById: idOf(actor) } });
     await tx.engagement.update({ where: { id: engagement!.id }, data: { proposalId: p.id, engagementLetterId: letterId, updatedById: idOf(actor) } });
     if (lead && lead.stage !== "WON") {
       await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON", wonAt: new Date(), clientId, nextFollowUp: null, updatedById: idOf(actor) } });
       await writeAudit(tx, actor, { entityType: "Lead", entityId: lead.id, action: "STAGE", before: { stage: lead.stage }, after: { stage: "WON" }, reason: "Engagement letter accepted" });
     }
     if (newClient) await ensureChecklistTx(tx, actor, clientId!, { audit: p.serviceLine === "AUDIT" || engagementType === "AUDIT" });
-    await writeAudit(tx, actor, { entityType: "EngagementLetter", entityId: letterId, action: "ACCEPTED", before: { status: l.status }, after: { status: "SIGNED_UPLOADED", documentId: doc.id, engagementId: engagement!.id, clientId } });
+    await writeAudit(tx, actor, { entityType: "EngagementLetter", entityId: letterId, action: "ACCEPTED", before: { status: l.status }, after: { status, documentId: doc?.id ?? null, engagementId: engagement!.id, clientId, portalAccepted } });
     return { letter, engagementId: engagement!.id, clientId: clientId!, newClient };
   });
   if (newClient) await runConflictCheck(actor, clientId!);

@@ -3,6 +3,12 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/portal", label: "Home" },
+  { href: "/portal/requests", label: "Send documents" },
+  { href: "/portal/filings", label: "Filings" },
+  { href: "/portal/documents", label: "Documents" },
+  { href: "/portal/approvals", label: "Approvals" },
+  { href: "/portal/agreements", label: "Proposals & letters" },
+  { href: "/portal/invoices", label: "Invoices" },
   { href: "/portal/account", label: "Account" },
 ];
 
@@ -16,7 +22,7 @@ export function PortalShell({ name, logout, children }: { name: string; logout: 
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">Q</span>
             Client Portal
           </Link>
-          <nav className="flex gap-4 text-sm">
+          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {NAV.map((n) => <Link key={n.href} href={n.href} className="text-muted hover:text-ink">{n.label}</Link>)}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">

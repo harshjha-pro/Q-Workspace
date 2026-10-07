@@ -186,7 +186,6 @@ export async function acceptLetterAction(id: string, _: R, f: FormData): Promise
   const actor = await requireStaff();
   try {
     const file = await fileOf(f);
-    if (!file) return { ok: false, error: "Choose the signed copy.", fieldErrors: { file: "Signed copy (PDF or image)" } };
     const r = await letters.acceptLetterWithSignedCopy(actor, id, file, {
       engagementType: str(f, "engagementType") || undefined, recurrence: (str(f, "recurrence") || undefined) as never, engagementName: str(f, "engagementName") || undefined,
       startDate: str(f, "startDate") || undefined, memberUserIds: list(f, "memberUserIds"),

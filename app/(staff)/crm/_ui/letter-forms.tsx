@@ -11,19 +11,19 @@ export function EditLetterDialog({ action, body }: { action: Action; body: strin
   );
 }
 
-export function AcceptLetterDialog({ action, types, team, defaults, today }: { action: Action; types: Option[]; team: Option[]; defaults: { engagementType: string; recurrence: string; name: string }; today: string }) {
+export function AcceptLetterDialog({ action, types, team, defaults, today, signedCopyOptional }: { action: Action; types: Option[]; team: Option[]; defaults: { engagementType: string; recurrence: string; name: string }; today: string; signedCopyOptional?: boolean }) {
   return (
     <FormDialog
-      trigger="Upload signed copy"
+      trigger={signedCopyOptional ? "Set up engagement" : "Upload signed copy"}
       triggerVariant="default"
-      title="Client accepted — upload the signed letter"
+      title={signedCopyOptional ? "Accepted in the portal — set up the engagement" : "Client accepted — upload the signed letter"}
       description="Creates the client (if new) and the engagement with the proposal's fee, budget and stage template, starts onboarding and marks the lead Won."
       action={action}
       submitLabel="Accept"
     >
       {(err) => (
         <>
-          <Field label="Signed copy *" error={err("file")}><Input type="file" name="file" required className="h-auto py-1.5" accept=".pdf,.jpg,.jpeg,.png" /></Field>
+          <Field label={signedCopyOptional ? "Signed copy (optional)" : "Signed copy *"} error={err("file")}><Input type="file" name="file" required={!signedCopyOptional} className="h-auto py-1.5" accept=".pdf,.jpg,.jpeg,.png" /></Field>
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Engagement type (stage template)" error={err("engagementType")}>
               <Select name="engagementType" defaultValue={defaults.engagementType}>{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select>

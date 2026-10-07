@@ -73,13 +73,17 @@ const ratingInput = z.object({ rating: z.number().int().min(1, "1 to 5").max(5, 
 export async function recordFeedback(actor: Actor, feedbackId: string, input: z.input<typeof ratingInput>) {
   const f = await db().feedback.findUnique({ where: { id: feedbackId } });
   if (!f) throw notFound("Feedback");
-  await assertClientAccess(actor, "crm.manage", f.clientId);
+  if (actor.kind === "PORTAL") {
+    // P4-02: the client answers in the portal, once, for one of their own clients.
+    if (!actor.clientIds.includes(f.clientId)) throw notFound("Feedback");
+    if (f.receivedAt) throw ruleViolation("Thank you — this feedback is already recorded.");
+  } else await assertClientAccess(actor, "crm.manage", f.clientId);
   const d = parse(ratingInput, input);
   const low = await getSetting<number>("crm.feedbackLowScore", 2);
   const e = await db().engagement.findUniqueOrThrow({ where: { id: f.engagementId }, select: { name: true, partnerId: true, client: { select: { name: true, partnerId: true } } } });
   const alert = d.rating <= low && !f.alertedAt;
   const after = await transaction(async (tx) => {
-    const row = await tx.feedback.update({ where: { id: feedbackId }, data: { rating: d.rating, comment: d.comment, receivedAt: f.receivedAt ?? new Date(), alertedAt: alert ? new Date() : f.alertedAt, updatedById: idOf(actor) } });
+    const row = await tx.feedback.update({ where: { id: feedbackId }, data: { rating: d.rating, comment: d.comment, receivedAt: f.receivedAt ?? new Date(), portalUserId: actor.kind === "PORTAL" ? actor.portalUserId : f.portalUserId, alertedAt: alert ? new Date() : f.alertedAt, updatedById: idOf(actor) } });
     await writeAudit(tx, actor, { entityType: "Feedback", entityId: feedbackId, action: "RECORD", before: { rating: f.rating }, after: { rating: d.rating, comment: d.comment } });
     return row;
   });

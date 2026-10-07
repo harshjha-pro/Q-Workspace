@@ -5,6 +5,7 @@ import { requireStaff } from "@/server/context";
 import * as tasks from "@/server/services/tasks/service";
 import * as review from "@/server/services/review/service";
 import * as pending from "@/server/services/pending/service";
+import * as portalActions from "@/server/services/portal/actions";
 import { setManualDueDate } from "@/server/services/compliance/admin";
 import { toActionError, type ActionResult } from "@/lib/action";
 
@@ -174,4 +175,17 @@ export async function clearPendingAction(taskId: string, _: ActionResult, f: For
 export async function logReminderAction(taskId: string, _: ActionResult, f: FormData): Promise<ActionResult> {
   const actor = await requireStaff();
   return run(() => pending.logReminder(actor, taskId, { channel: s(f, "channel") as "EMAIL", messageText: s(f, "messageText"), note: s(f, "note") }), "Reminder logged.", taskId);
+}
+
+// ---------------------------------------------------------------------------
+// Client approvals in the portal (D-80)
+// ---------------------------------------------------------------------------
+export async function requestApprovalAction(taskId: string, _: ActionResult, f: FormData): Promise<ActionResult> {
+  const actor = await requireStaff();
+  return run(() => portalActions.requestClientApproval(actor, taskId, { title: s(f, "title"), note: s(f, "note"), documentId: s(f, "documentId") }), "Sent to the client's portal.", taskId);
+}
+
+export async function withdrawApprovalAction(taskId: string, requestId: string, _: ActionResult): Promise<ActionResult> {
+  const actor = await requireStaff();
+  return run(() => portalActions.withdrawApprovalRequest(actor, requestId), "Request withdrawn.", taskId);
 }

@@ -145,6 +145,29 @@ model ClientApproval {
   @@index([taskId])
 }
 
+// Phase 4 (additive, D-80): staff ask the client to approve something (a draft return, financials). The
+// decision itself is a ClientApproval row; this records the open request so the portal can list it.
+model ClientApprovalRequest {
+  id            String    @id @default(cuid())
+  clientId      String
+  taskId        String
+  documentId    String?
+  title         String
+  note          String    @default("")
+  status        String    @default("OPEN") // OPEN | DECIDED | WITHDRAWN
+  approvalId    String?
+  requestedById String
+  requestedAt   DateTime  @default(now())
+  withdrawnAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String?
+  updatedById   String?
+
+  @@index([clientId, status])
+  @@index([taskId])
+}
+
 // ---------------------------------------------------------------------------
 // Documents and working papers (13.1)
 // ---------------------------------------------------------------------------

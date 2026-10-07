@@ -45,6 +45,9 @@ export async function updateChecklistItem(actor: Actor, itemId: string, input: z
     }
     if (d.confirm && item.receivedPendingConfirm) Object.assign(data, { receivedPendingConfirm: false, confirmedById: idOf(actor), confirmedAt: new Date(), status: "RECEIVED" });
     await tx.checklistItem.update({ where: { id: itemId }, data });
+    if (item.receivedPendingConfirm && data.confirmedAt) {
+      await tx.portalUpload.updateMany({ where: { checklistItemId: itemId, confirmedAt: null }, data: { confirmedAt: data.confirmedAt as Date, confirmedById: idOf(actor) } });
+    }
     await writeAudit(tx, actor, { entityType: "ChecklistItem", entityId: itemId, action: "UPDATE", before: { status: item.status, note: item.note }, after: data });
     await autoClearPending(tx, actor, item.taskId!);
   });
