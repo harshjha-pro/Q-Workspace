@@ -81,14 +81,15 @@ Download each template from the Import page. Each import shows a row-by-row chec
 | 1 | Users | Partner | Gives a one-time password per person; share each privately. Mark Seniors. Managers, Partners and Admins set up 2FA at first login |
 | 2 | Client teams | Partner / Practice Admin | Team name, lead Manager, members |
 | 3 | Employees | HR Admin | Joining date, PAN, Aadhaar, bank (stored encrypted), ICAI/ICSI numbers |
-| 4 | Clients | Partner / Practice Admin | Constitution, PAN/TAN, GSTINs with frequency, directors with DIN, PT registrations, applicability flags, Partner/Manager/team. Compliance tasks are generated as each client is saved |
-| 5 | Engagements | Partner | Fee basis, fee, budget, makers, checkers. A recurring row updates the engagement created automatically in step 4 (no duplicates), and its makers/checkers are copied to the open tasks |
+| 4 | Clients | Partner / Practice Admin | Constitution, PAN/TAN, GSTINs with frequency, directors with DIN, PT registrations, applicability flags, Partner/Manager/team. **Leave "Onboarding date" blank for existing clients** (fill it only for a client taken on after the tracking date). Compliance tasks are generated as each client is saved |
+| 5 | Engagements | Partner | Name the client by code, PAN or exact name. Fee basis, fee, budget, makers, checkers. A recurring row updates the engagement created automatically in step 4 (no duplicates), and its makers/checkers are copied to the open tasks |
 
 Leave balances, receivables, salary structures and leads can wait for Phase 3.
 
 After step 5, open **Home** as a Manager:
 
-- **Allocations pending** lists open tasks with nobody assigned. Assign them from the task list (select the
+- **Allocations pending** lists open tasks with nobody assigned, typically from engagement types not in your
+  engagements file. Assign them from the task list (select the
   rows, then Reassign).
 - Professional Tax due dates are typed per task (Q-02b). Rajasthan does not levy PT, so only clients
   registered in other states have PT tasks.

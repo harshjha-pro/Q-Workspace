@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, transaction, type Tx } from "../../lib/db";
+import { getSetting } from "../settings/service";
 import { parse, parsePartial } from "../../lib/validate";
 import { DomainError, conflict, notFound, ruleViolation } from "../../lib/errors";
 import { authorize, isReadOnlyScope } from "../../permissions/guards";
@@ -121,6 +122,10 @@ export async function createClient(actor: Actor, input: ClientInput & { flags?: 
   if (isCompany(data.constitution) && flags.dpt3Applicable === undefined) flags.dpt3Applicable = true; // Q-03 default
   if (!isCompany(data.constitution)) flags.dpt3Applicable = false; // DPT-3 is a Companies Act form (Q-03)
   const today = todayIst();
+  // Flags given at creation are the client's standing position: they apply from the onboarding date, or
+  // for an existing client brought into the app, from the start of compliance tracking (D-48, Q-32).
+  const trackingFrom = await getSetting<string>("compliance.trackingFrom", "2026-04-01");
+  const openingFrom = trackingFrom < today ? trackingFrom : today;
   const client = await transaction(async (tx) => {
     if (data.pan) {
       const dup = await tx.client.findFirst({ where: { pan: data.pan, status: { not: "DISCONTINUED_CLOSED" } } });
@@ -140,7 +145,7 @@ export async function createClient(actor: Actor, input: ClientInput & { flags?: 
     for (const [flag, value] of Object.entries(flags)) {
       if (value) {
         await tx.clientFlagHistory.create({
-          data: { clientId: c.id, flag, oldValue: null, newValue: "true", effectiveDate: data.onboardingDate ?? today, reason: "Client created", createdById: idOf(actor) },
+          data: { clientId: c.id, flag, oldValue: null, newValue: "true", effectiveDate: data.onboardingDate ?? openingFrom, reason: "Client created", createdById: idOf(actor) },
         });
       }
     }

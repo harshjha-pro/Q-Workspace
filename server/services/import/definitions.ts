@@ -653,6 +653,30 @@ const leadsDef: ImportDef = {
 // ---------------------------------------------------------------------------
 const usernames = (v: string | undefined) => (v ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
 
+/** Client codes are assigned on import, so a row may name the client by code, PAN or exact name. */
+async function clientResolver() {
+  const rows = await db().client.findMany({ select: { id: true, code: true, pan: true, name: true } });
+  const byCode = new Map(rows.map((c) => [c.code.toUpperCase(), c]));
+  const byPan = new Map<string, (typeof rows)[number][]>();
+  const byName = new Map<string, (typeof rows)[number][]>();
+  for (const c of rows) {
+    if (c.pan) byPan.set(c.pan.toUpperCase(), [...(byPan.get(c.pan.toUpperCase()) ?? []), c]);
+    byName.set(c.name.trim().toLowerCase(), [...(byName.get(c.name.trim().toLowerCase()) ?? []), c]);
+  }
+  return (ref: string): { client?: (typeof rows)[number]; error?: string } => {
+    const k = ref.trim();
+    const code = byCode.get(k.toUpperCase());
+    if (code) return { client: code };
+    const pan = byPan.get(k.toUpperCase()) ?? [];
+    if (pan.length === 1) return { client: pan[0] };
+    if (pan.length > 1) return { error: `PAN ${k} belongs to ${pan.length} clients — use the client code` };
+    const name = byName.get(k.toLowerCase()) ?? [];
+    if (name.length === 1) return { client: name[0] };
+    if (name.length > 1) return { error: `More than one client is called "${k}" — use the client code` };
+    return { error: "Client not found (give the client code, PAN or exact name)" };
+  };
+}
+
 const engagementsDef: ImportDef = {
   kind: "ENGAGEMENTS",
   title: "Engagements and assignments",
@@ -660,7 +684,7 @@ const engagementsDef: ImportDef = {
   sheets: [{
     name: "Engagements",
     columns: [
-      col("clientCode", "Client code", { required: true, example: "CL-0004" }),
+      col("clientCode", "Client (code, PAN or exact name)", { required: true, example: "CL-0004", width: 26 }),
       col("name", "Engagement name", { required: true, example: "GST returns FY 2026-27", width: 32 }),
       col("serviceLine", "Service line", { required: true, example: "GST", note: SERVICE_LINES.join(", ") }),
       col("engagementType", "Engagement type", { required: true, example: "GST_RETURN", note: "Stage template code: GST_RETURN, INCOME_TAX_RETURN, TDS_RETURN, AUDIT, BOOKKEEPING, ROC_ANNUAL, NOTICE, PAYROLL_STATUTORY, OTHER" }),
@@ -678,18 +702,21 @@ const engagementsDef: ImportDef = {
     ],
   }],
   instructions: [
-    "One row per engagement. Import clients first: client codes must already exist.",
+    "One row per engagement. Import clients first. Name the client by its code (Clients list), its PAN, or its exact name.",
     "Recurring engagements: if the client already has an active recurring engagement of the same type (for example one created automatically when its compliance tasks were generated), that engagement is updated and staffed instead of a duplicate being created.",
     "Makers and checkers are copied to the engagement's open compliance tasks, so the right people get reminders.",
   ],
   async validate(sheets) {
     const users = await userMap();
-    const clients = new Set((await db().client.findMany({ select: { code: true } })).map((c) => c.code));
+    const findClient = await clientResolver();
     const types = new Set((await db().stageTemplate.findMany({ select: { code: true } })).map((t) => t.code));
     return (sheets.Engagements ?? []).map((r) => {
       const e: string[] = [];
       const d = r.data;
-      if (!clients.has(req(d, "clientCode", "Client code", e)) && d.clientCode) e.push("Client code not found");
+      if (req(d, "clientCode", "Client", e)) {
+        const found = findClient(d.clientCode!);
+        if (found.error) e.push(found.error);
+      }
       req(d, "name", "Engagement name", e);
       if (!(SERVICE_LINES as readonly string[]).includes(upper(req(d, "serviceLine", "Service line", e))) && d.serviceLine) e.push("Unknown service line");
       if (!types.has(upper(req(d, "engagementType", "Engagement type", e))) && d.engagementType) e.push("Unknown engagement type");
@@ -721,11 +748,12 @@ const engagementsDef: ImportDef = {
   },
   async apply(actor, rows) {
     const users = await userMap();
+    const findClient = await clientResolver();
     let created = 0;
     const notes: string[] = [];
     for (const r of rows) {
       const d = r.data;
-      const client = await db().client.findUniqueOrThrow({ where: { code: d.clientCode! } });
+      const client = findClient(d.clientCode!).client!;
       const recurrence = (d.recurrence ? upper(d.recurrence) : "ONE_TIME") as (typeof RECURRENCES)[number];
       const fields = {
         name: d.name!, feeBasis: (d.feeBasis ? upper(d.feeBasis) : "FIXED") as (typeof FEE_BASES)[number],

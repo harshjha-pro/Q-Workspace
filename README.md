@@ -56,7 +56,11 @@ unless `DEMO_MODE=true`.
 
 ## Using it for real
 
-1. Set `DEMO_MODE="false"` in `.env` **before** the first `npm run setup` on the firm's computer.
+Follow **[`docs/go-live.md`](docs/go-live.md)**: install, settings before import, Rajasthan holidays,
+verification of statutory values, the import order (users → teams → employees → clients → engagements) and
+the first week. In short:
+
+1. Copy `.env.example` to `.env` and set `DEMO_MODE="false"` **before** the first `npm run setup` on the firm's computer.
 2. `npm run setup` prints a one-time password for the first Partner (`partner`). Sign in, set a password,
    and set up two-factor login.
 3. Add people under **People**, or in bulk under **Import**. Then add clients the same way.
@@ -89,7 +93,7 @@ browsers do not allow offline mode over plain HTTP on another device.
 
 | Command | What it does |
 |---|---|
-| `npm run setup` | Keys, folders, safe migration, reference + demo data |
+| `npm run setup` | Keys, folders, safe migration, reference data, then the demo firm (demo mode) or the first Partner login (real install) |
 | `npm run dev` / `dev:lan` | Development server (local / office network) |
 | `npm run build` then `npm start` / `start:lan:https` | Production server (this computer / office network over HTTPS) |
 | `npm run lan:cert` | Create or refresh the office-network certificate only |
@@ -121,7 +125,7 @@ needs only Node.js.
 - **Engagements**: fee basis, budgets, versioned stage templates, maker/checker/EQR assignment rules.
 - **People**: users and roles, client teams, offboarding with a custody list, employee records and
   documents.
-- **Import from Excel**: 8 import types (clients with GSTINs/directors/PT, users, teams, employees,
+- **Import from Excel**: 9 import types (clients with GSTINs/directors/PT, engagements with makers/checkers, users, teams, employees,
   salary structures, leave balances, receivables, leads). Each has a template, a row-by-row validation
   report and an apply step.
 - **Backup & restore**: nightly + on demand. Restore needs Partner approval and takes an automatic
