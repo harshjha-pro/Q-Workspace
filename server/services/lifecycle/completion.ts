@@ -7,7 +7,7 @@ import { logSensitiveView } from "../../audit";
 import { formatDate, toIstDate } from "../../lib/dates";
 import { formatMinutes } from "../../lib/money";
 import { buildPdf, rs, type PdfBlock } from "../../documents/pdf";
-import { billingStatusFor } from "../billing/invoices";
+import { billingStatusFor } from "../billing/service";
 
 /**
  * Engagement completion report (spec 7.2, P3-01): hours by person and stage (effort only), key dates,

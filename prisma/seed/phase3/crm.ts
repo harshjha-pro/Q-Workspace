@@ -85,7 +85,6 @@ export async function seedCrmReference(db: PrismaClient) {
   }
 }
 
-/* eslint-disable max-lines-per-function */
 export async function seedCrmDemo() {
   const { db } = await import("../../../server/lib/db");
   const { addDays, todayIst } = await import("../../../server/lib/dates");

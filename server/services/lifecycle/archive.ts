@@ -8,6 +8,11 @@ import type { Actor } from "../../permissions/actor";
 import { writeAudit } from "../../audit";
 import { todayIst } from "../../lib/dates";
 import { notifyUsers } from "../notifications/service";
+import { isDomainError } from "../../lib/errors";
+import { logger } from "../../lib/logger";
+import { systemActor } from "../../permissions/actor";
+import { requestFeedback } from "../crm/feedback";
+import { startRenewal } from "../crm/renewals";
 
 /**
  * Close and archive (spec 7.2, P3-06). Closing needs every task closed (Filed / Filed Late / Not Applicable), or a
@@ -31,7 +36,7 @@ export async function closeEngagement(actor: Actor, engagementId: string, input:
   requireStaff(actor);
   await assertEngagementAccess(actor, "engagement.manage", engagementId);
   const d = parse(closeInput, input);
-  const e = await db().engagement.findUniqueOrThrow({ where: { id: engagementId }, include: { client: { select: { id: true, name: true, isFirm: true } } } });
+  const e = await db().engagement.findUniqueOrThrow({ where: { id: engagementId }, include: { client: { select: { id: true, name: true, isFirm: true, managerId: true, partnerId: true } } } });
   if (e.archivedAt) throw ruleViolation("This engagement is already closed and archived.");
   if (e.status === "CANCELLED") throw ruleViolation("A cancelled engagement cannot be closed.");
   const open = await db().task.count({ where: { engagementId, status: { in: OPEN } } });
@@ -52,27 +57,46 @@ export async function closeEngagement(actor: Actor, engagementId: string, input:
     });
     return row;
   });
-  const hooks = await afterClose({ id: e.id, code: e.code, name: e.name, clientId: e.clientId, clientName: e.client.name, isFirm: e.client.isFirm, recurrence: e.recurrence, managerId: e.managerId, partnerId: e.partnerId });
+  const hooks = await afterClose(actor, { id: e.id, code: e.code, name: e.name, clientId: e.clientId, clientName: e.client.name, isFirm: e.client.isFirm, recurrence: e.recurrence, managerId: e.managerId ?? e.client.managerId, partnerId: e.partnerId ?? e.client.partnerId });
   return { engagement: after, ...hooks };
 }
 
 /**
- * Follow-ups after closing (spec 7.2 → 10.8). The CRM module owns feedback requests and renewals; until it exposes a
- * function for them, the engagement's Manager and Partner get an actionable notification instead.
+ * Follow-ups after closing (spec 7.2 → 10.8): the CRM module's feedback request and, for recurring work, its renewal
+ * prompt. If the CRM call is refused or fails, the engagement's Manager and Partner get an actionable notification
+ * instead, so the follow-up is never lost.
  */
-async function afterClose(e: { id: string; code: string; name: string; clientId: string; clientName: string; isFirm: boolean; recurrence: string; managerId: string | null; partnerId: string | null }) {
+type Closed = { id: string; code: string; name: string; clientId: string; clientName: string; isFirm: boolean; recurrence: string; managerId: string | null; partnerId: string | null };
+
+async function afterClose(actor: Actor, e: Closed) {
   if (e.isFirm) return { feedbackRequested: false, renewalReminder: false };
   const people = [e.managerId, e.partnerId].filter((x): x is string => !!x);
-  await notifyUsers(people, {
-    kind: "FEEDBACK_REQUEST", title: `Ask ${e.clientName} for feedback`, body: `${e.name} (${e.code}) was closed. Send the client feedback request.`,
-    link: `/archive/${e.id}`, entityType: "Engagement", entityId: e.id, dedupeKey: `feedback|${e.id}`,
-  });
+  const viaCrm = async (fn: (a: Actor) => Promise<unknown>) => {
+    for (const a of [actor, systemActor()]) {
+      try {
+        await fn(a);
+        return true;
+      } catch (err) {
+        if (isDomainError(err) && (err.code === "CONFLICT" || err.code === "RULE_VIOLATION")) return true; // already requested
+        if (!isDomainError(err)) logger().error({ engagementId: e.id, err: err instanceof Error ? err.message : String(err) }, "close follow-up failed");
+      }
+    }
+    return false;
+  };
+  if (!(await viaCrm((a) => requestFeedback(a, e.id)))) {
+    await notifyUsers(people, {
+      kind: "FEEDBACK_REQUEST", title: `Ask ${e.clientName} for feedback`, body: `${e.name} (${e.code}) was closed. Send the client feedback request.`,
+      link: `/archive/${e.id}`, entityType: "Engagement", entityId: e.id, dedupeKey: `feedback|${e.id}`,
+    });
+  }
   let renewal = false;
   if (e.recurrence === "RECURRING") {
-    await notifyUsers(people, {
-      kind: "RENEWAL", title: `Renewal due: ${e.clientName}`, body: `${e.name} (${e.code}) is recurring work and was closed. Plan the renewal / next engagement.`,
-      link: `/clients/${e.clientId}`, entityType: "Engagement", entityId: e.id, dedupeKey: `renewal|${e.id}`,
-    });
+    if (!(await viaCrm((a) => startRenewal(a, e.id)))) {
+      await notifyUsers(people, {
+        kind: "RENEWAL", title: `Renewal due: ${e.clientName}`, body: `${e.name} (${e.code}) is recurring work and was closed. Plan the renewal / next engagement.`,
+        link: `/clients/${e.clientId}`, entityType: "Engagement", entityId: e.id, dedupeKey: `renewal|${e.id}`,
+      });
+    }
     renewal = true;
   }
   return { feedbackRequested: true, renewalReminder: renewal };

@@ -136,16 +136,17 @@ function checkSource(d: { source?: string; referrerClientId?: string | null; ref
 
 /** New enquiry (P3-08). Duplicates block saving until an override reason is given. */
 export async function createLead(actor: Actor, input: LeadInput) {
-  const scope = authorize(actor, "crm.manage");
+  authorize(actor, "crm.manage");
   const d = parse(leadInput, input);
   checkSource(d);
   if (!d.ownerId && actor.kind === "USER" && (actor.role === "PARTNER" || actor.role === "MANAGER")) d.ownerId = actor.userId;
   await checkOwner(d.ownerId);
-  if (d.clientId || d.referrerClientId) {
+  // The lead's own client must be in scope; a referring client may be any client of the firm.
+  if (d.clientId) {
     const ids = await visibleClientIds(actor, "crm.view");
-    for (const cid of [d.clientId, d.referrerClientId]) if (cid && ids && !ids.includes(cid)) throw new DomainError("FORBIDDEN", "That client is outside your scope.");
+    if (ids && !ids.includes(d.clientId)) throw new DomainError("FORBIDDEN", "That client is outside your scope.");
   }
-  void scope;
+  if (d.referrerClientId && !(await db().client.count({ where: { id: d.referrerClientId } }))) throw new DomainError("VALIDATION", "Unknown referring client.", { referrerClientId: "Choose a client" });
   const dups = d.clientId ? [] : await findDuplicates(actor, d);
   const override = input.overrideReason?.trim() ?? "";
   if (dups.length && override.length < 5) {

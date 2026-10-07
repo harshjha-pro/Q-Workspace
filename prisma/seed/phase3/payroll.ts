@@ -221,6 +221,19 @@ export async function seedPayrollDemo() {
 
   await runLeaveAccrual(today);
 
+  // The demo activity gives the office administrators no work entries; attendance is derived from entries,
+  // so log their practice-administration days (otherwise every day would be loss of pay).
+  const { workingDays } = await import("../../../server/services/leave/service");
+  const adminCat = await db().internalCategory.findFirst({ where: { code: "PRACTICE_ADMIN" } });
+  const days = (await workingDays(structureFrom, today)).filter((d) => d < today);
+  for (const username of ["suresh.pillai", "lakshmi.narayanan"]) {
+    const u = users.get(username);
+    if (!u) continue;
+    const have = new Set((await db().workEntry.findMany({ where: { userId: u.id, date: { gte: structureFrom } }, select: { date: true } })).map((e) => e.date));
+    const data = days.filter((d) => !have.has(d)).map((date) => ({ userId: u.id, date, minutes: 480, internalCategoryId: adminCat?.id ?? null, description: "Office administration", location: "OFFICE", createdById: u.id }));
+    if (data.length) await db().workEntry.createMany({ data });
+  }
+
   // Six months of runs: five locked, the current month in Draft.
   for (const month of months) {
     for (const kind of ["SALARY", "STIPEND"] as const) {

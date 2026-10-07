@@ -54,7 +54,7 @@ describe("close and archive (P3-06) + completion report (P3-01)", () => {
   it("Partner override closes and archives; follow-ups are raised; archive is read-only and scoped", async () => {
     const r = await closeEngagement(actorOf(w.partner), w.e1.id, { overrideReason: "Client moved to another firm" });
     expect([r.engagement.status, !!r.engagement.archivedAt, r.feedbackRequested, r.renewalReminder]).toEqual(["COMPLETED", true, true, false]);
-    expect(await db().notification.count({ where: { userId: w.m1.id, kind: "FEEDBACK_REQUEST" } })).toBe(1);
+    expect(await db().feedback.count({ where: { engagementId: w.e1.id } })).toBe(1); // CRM feedback request (P3-15)
     const audit = await db().auditLog.findFirstOrThrow({ where: { entityId: w.e1.id, action: "CLOSE_ARCHIVE" } });
     expect(audit.reason).toContain("Partner override");
     await expect(closeEngagement(actorOf(w.partner), w.e1.id, { overrideReason: "again please" })).rejects.toMatchObject({ code: "RULE_VIOLATION" });
@@ -69,7 +69,8 @@ describe("close and archive (P3-06) + completion report (P3-01)", () => {
     await db().task.create({ data: { clientId: w.c1.id, engagementId: e.id, title: "Done", periodKey: "D-1", isOneOff: true, status: "NOT_APPLICABLE" } });
     const r = await closeEngagement(actorOf(w.m1), e.id);
     expect(r.renewalReminder).toBe(true);
-    expect(await db().notification.count({ where: { userId: w.m1.id, kind: "RENEWAL" } })).toBe(1);
+    expect(await db().renewal.count({ where: { engagementId: e.id } })).toBe(1); // CRM renewal prompt
+    expect(await db().feedback.count({ where: { engagementId: e.id } })).toBe(1);
   });
 });
 
