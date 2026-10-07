@@ -24,8 +24,13 @@ describe("template library (P3-28)", () => {
     await createTemplate(actorOf(w.hr), { code: "HR_TEST_X", name: "HR test", category: "HR_LETTER", body: "Dear {{employee.name}}" });
     await expect(createTemplate(actorOf(w.m1), { code: "M_TEST", name: "Manager", category: "OTHER" })).rejects.toThrow();
     await expect(createTemplate(actorOf(w.pa), { code: "TEST_LETTER", name: "Dup", category: "OTHER" })).rejects.toThrow(/already used/);
-    expect((await listTemplates(actorOf(w.hr))).map((t) => t.code)).toEqual(["HR_TEST_X"]);
-    expect((await listTemplates(actorOf(w.pa))).length).toBe(2);
+    // HR sees HR letters only (the seeded HR_* defaults plus its own); the Practice Admin sees every category.
+    const hrCodes = (await listTemplates(actorOf(w.hr))).map((t) => t.code);
+    expect(hrCodes).toContain("HR_TEST_X");
+    expect(hrCodes.every((c) => c.startsWith("HR_"))).toBe(true);
+    const paCodes = (await listTemplates(actorOf(w.pa))).map((t) => t.code);
+    expect(paCodes).toEqual(expect.arrayContaining(["HR_TEST_X", "TEST_LETTER"]));
+    expect(paCodes.some((c) => !c.startsWith("HR_"))).toBe(true);
   });
 
   it("only a Partner approves, and only APPROVED versions are used by renderTemplateFor", async () => {

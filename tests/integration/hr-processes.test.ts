@@ -18,6 +18,10 @@ const today = todayIst();
 
 beforeAll(async () => {
   await resetDb();
+  // Seeded reference placeholders (leave and HR policies) would change counts; these tests set up their own.
+  await db().leavePolicy.deleteMany({});
+  await db().policyAcknowledgment.deleteMany({});
+  await db().policyDocument.deleteMany({});
   w = await buildWorld();
   await db().firmProfile.create({ data: { name: "Test Firm", address: "Jaipur" } });
 });

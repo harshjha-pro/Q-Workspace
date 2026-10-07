@@ -16,6 +16,7 @@ const MONTH = "2026-06"; // June 2026: 1 June is a Monday
 beforeAll(async () => {
   await resetDb();
   await seedGoldenRates(); // also clears holidays
+  await db().leavePolicy.deleteMany({}); // the tests below define their own policies, not the seeded placeholders
   w = await buildWorld();
   let i = 0;
   for (const u of [w.s1, w.senior, w.a1, w.s2, w.m1]) {
