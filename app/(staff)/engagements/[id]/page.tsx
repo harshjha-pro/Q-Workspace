@@ -1,3 +1,4 @@
+import { Comments } from "@/components/comments/comments";
 import Link from "next/link";
 import { requireStaff } from "@/server/context";
 import { getEngagement } from "@/server/services/engagements/service";
@@ -77,6 +78,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
           </ol>
         </CardContent>
       </Card>
+      <Comments entityType="ENGAGEMENT" entityId={id} />
     </div>
   );
 }

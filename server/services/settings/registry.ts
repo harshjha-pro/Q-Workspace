@@ -33,6 +33,44 @@ export const SETTING_DEFAULTS = {
   "reminders.pendingEscalationDays": { value: 10, description: "Pending from client this long with the due date near → escalate to the Manager" },
   "reminders.pendingEscalationDueWithinDays": { value: 5, description: "…when the due date is within this many days" },
   "reminders.reviewSlaDays": { value: 2, description: "Review waiting this long → remind the checker (twice as long → Partner)" },
+  // Phase 3 — billing (Q-18). GST rate and SAC codes are statutory: confirm against the GST notifications.
+  "billing.gstRateBp": { value: 1800, description: "GST rate on professional fees, in basis points (1800 = 18%) — Unverified, confirm (Q-18)" },
+  "billing.sacByServiceLine": { value: { ACCOUNTING: "998222", AUDIT: "998221", DIRECT_TAX: "998231", GST: "998231", COMPANY_LAW: "998216", ADVISORY: "998311" }, description: "SAC code per service line — Unverified, confirm (Q-18)" },
+  "billing.defaultSac": { value: "998231", description: "SAC when the service line is not mapped — Unverified" },
+  "billing.invoicePrefix": { value: "QI", description: "Invoice series code; numbers are <code>/yy-yy/0001 (≤16 characters, Q-18)" },
+  "billing.paymentTermsDays": { value: 15, description: "Invoice due date = invoice date + days" },
+  "billing.unbilledAlertDays": { value: 30, description: "Flag unbilled chargeable work older than this" },
+  "billing.reminderDays": { value: [15, 30, 60], description: "Payment reminder points (days since invoice, overdue invoices only)" },
+  "billing.retainerMonthlyDivisor": { value: 12, description: "Monthly retainer draft = engagement fee ÷ this" },
+  "billing.retainerDraftDay": { value: 1, description: "Day of the month from which retainer drafts are created" },
+  // Phase 3 — CRM
+  "crm.proposalApprovalLimitPaise": { value: 0, description: "Managers may approve proposals up to this fee (0 = Partner only)" },
+  "crm.proposalValidityDays": { value: 30, description: "Default proposal validity" },
+  "crm.renewalLeadDays": { value: 60, description: "Renewal prompt this many days before the new period (spec 10.7)" },
+  "crm.renewalTargetMarkupPct": { value: 50, description: "Renewal fee suggestion is at least last period's cost plus this %" },
+  "crm.renewalMinIncreasePct": { value: 0, description: "Renewal fee suggestion is at least last fee plus this %" },
+  "crm.feedbackLowScore": { value: 2, description: "Client ratings at or below this alert the Partner" },
+  "crm.feedbackLookbackDays": { value: 30, description: "Feedback requests for engagements closed within this many days" },
+  // Phase 3 — HR processes
+  "articleship.extendByExcessLeave": { value: true, description: "Excess articleship leave extends the completion date day for day" },
+  "articleship.completionAlertDays": { value: 90, description: "Flag articles completing within this many days" },
+  "articleship.countedLeaveTypes": { value: ["PERSONAL", "SICK", "EXAM_STUDY", "OTHER"], description: "Leave types counted against the articleship entitlement" },
+  "cpe.memberClass": { value: "PRACTICE", description: "CPE requirement class that applies to the firm's members" },
+  "cpe.shortfallAlertDays": { value: 90, description: "Warn about a CPE shortfall this many days before the year/block end" },
+  "expenses.conveyanceLookbackDays": { value: 30, description: "Days of Client Site entries offered as conveyance suggestions" },
+  "exit.noticeDaysByRole": { value: { PARTNER: 90, MANAGER: 60, STAFF: 30, ARTICLE: 30, PRACTICE_ADMIN: 30, HR_ADMIN: 30 }, description: "Default notice period by role (firm policy)" },
+  "exit.recoverNoticeShortfall": { value: true, description: "Recover unserved notice days in full-and-final" },
+  // Phase 3 — payroll (Q-09). Statutory rates are in the effective-dated rate tables, not here.
+  "payroll.daysBasis": { value: "CALENDAR", description: "Days a month is paid on: CALENDAR, FIXED_30 or FIXED_26" },
+  "payroll.pfWageBasis": { value: "CAPPED", description: "PF on basic capped at the wage ceiling, or FULL basic (Q-09c)" },
+  "payroll.defaultRegime": { value: "NEW", description: "Default income-tax regime on new salary structures" },
+  "payroll.esiRoundUpToRupee": { value: true, description: "Round each ESI share up to the next rupee" },
+  "payroll.stipendLocationClass": { value: "POP_20L_PLUS", description: "Firm's city class for the minimum article stipend (Jaipur: over 20 lakh population)" },
+  "payroll.form16Label": { value: "Form 16", description: "Label of the annual salary TDS certificate (renumbered under the Income-tax Act, 2025 — verify)" },
+  // Phase 3 — documents, QC, collaboration
+  "qc.inspectionSampleSize": { value: 5, description: "Engagements sampled at random for a periodic file inspection" },
+  "comments.editWindowMinutes": { value: 15, description: "Minutes an author can edit their own comment" },
+  "helpdesk.longOpenDays": { value: 7, description: "Open or in-progress tickets older than this are flagged" },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

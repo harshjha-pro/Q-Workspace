@@ -1,3 +1,4 @@
+import { Comments } from "@/components/comments/comments";
 import Link from "next/link";
 import { requireStaff } from "@/server/context";
 import { getLead } from "@/server/services/crm/leads";
@@ -167,6 +168,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </ol>
         </CardContent>
       </Card>
+      <Comments entityType="LEAD" entityId={id} />
     </div>
   );
 }

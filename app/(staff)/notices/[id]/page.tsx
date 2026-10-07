@@ -1,3 +1,4 @@
+import { Comments } from "@/components/comments/comments";
 import Link from "next/link";
 import { requireStaff } from "@/server/context";
 import { getNotice, label, NOTICE_STATUSES } from "@/server/services/registers/notices";
@@ -116,6 +117,7 @@ export default async function NoticePage({ params }: { params: Promise<{ id: str
           </TBody>
         </Table>
       </Card>
+      <Comments entityType="NOTICE" entityId={id} />
     </div>
   );
 }

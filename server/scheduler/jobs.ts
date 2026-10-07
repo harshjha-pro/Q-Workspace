@@ -1,7 +1,15 @@
 import { db } from "../lib/db";
+import { todayIst } from "../lib/dates";
 import { automaticBackup } from "../services/backup/service";
 import { syncAllClients } from "../services/compliance/sync";
 import { runReminders } from "../services/reminders/service";
+import { runRetainerDrafts } from "../services/billing/retainer";
+import { runCrmDaily } from "../services/crm/jobs";
+import { runQcFindingReminders } from "../services/qc/inspections";
+import { runRetentionPurgeProposals } from "../services/lifecycle/retention";
+import { runArticleshipCompletion } from "../services/hr/articleship";
+import { runCpeShortfall } from "../services/hr/growth";
+import { runLeaveAccrual } from "../services/attendance/leave-policies";
 
 export type JobDef = {
   code: string;
@@ -35,6 +43,56 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "PRACTICE_ADMIN"],
     run: async () => runReminders(),
+  },
+  {
+    code: "RETAINER_DRAFTS",
+    name: "Retainer invoice drafts",
+    description: "Creates this month's draft invoice for each recurring retainer engagement, for Partner approval (P3-35). Never issues anything.",
+    cron: "0 6 * * *",
+    scheduleLabel: "Daily 06:00 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runRetainerDrafts() as unknown as Record<string, unknown>,
+  },
+  {
+    code: "CRM_DAILY",
+    name: "Leads, proposals, renewals and feedback",
+    description: "Lead follow-up reminders, proposal expiry, renewal prompts (60 days ahead), feedback requests for closed engagements and cross-sell suggestions.",
+    cron: "15 7 * * *",
+    scheduleLabel: "Daily 07:15 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runCrmDaily() as unknown as Record<string, unknown>,
+  },
+  {
+    code: "HR_DAILY",
+    name: "Leave accrual, articleship and CPE alerts",
+    description: "Leave accrual by policy (idempotent); articleship completion dates (excess leave) and approaching completions; CPE shortfall warnings before the year or block ends.",
+    cron: "45 7 * * *",
+    scheduleLabel: "Daily 07:45 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "HR_ADMIN"],
+    run: async () => ({ leaveAccrual: await runLeaveAccrual(todayIst()), articleship: await runArticleshipCompletion(), cpe: await runCpeShortfall() }) as unknown as Record<string, unknown>,
+  },
+  {
+    code: "QC_FINDINGS",
+    name: "Quality-control corrective actions",
+    description: "Reminds owners and inspectors of overdue corrective actions from file inspections.",
+    cron: "0 8 * * 1-6",
+    scheduleLabel: "Mon–Sat 08:00 IST",
+    catchUpAfterHours: 50,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runQcFindingReminders() as unknown as Record<string, unknown>,
+  },
+  {
+    code: "RETENTION_PROPOSALS",
+    name: "Retention: purge proposals",
+    description: "Lists records past their retention period (only for rules a Partner has enabled) and asks a Partner to approve. Never deletes anything itself.",
+    cron: "30 2 * * 0",
+    scheduleLabel: "Sundays 02:30 IST",
+    catchUpAfterHours: 24 * 8,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runRetentionPurgeProposals() as unknown as Record<string, unknown>,
   },
   {
     code: "AUTO_BACKUP",

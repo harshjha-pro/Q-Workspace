@@ -1,3 +1,4 @@
+import { Comments } from "@/components/comments/comments";
 import Link from "next/link";
 import { CheckCircle2, Circle, CircleDot } from "lucide-react";
 import { requireStaff } from "@/server/context";
@@ -354,6 +355,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           </CardContent>
         </Card>
       </div>
+      <Comments entityType="TASK" entityId={id} />
     </div>
   );
 }
