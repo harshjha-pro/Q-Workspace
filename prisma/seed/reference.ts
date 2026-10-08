@@ -227,4 +227,8 @@ export async function seedComplianceMaster(db: PrismaClient) {
   await p3.hr.seedHrReference(db);
   await p3.dms.seedDmsReference(db);
   await p3.collab.seedCollabReference(db);
+
+  // Phase 4: reminder schedules (firm placeholders).
+  const p4 = { portal: await import("./phase4/portal") };
+  await p4.portal.seedPortalReference(db);
 }

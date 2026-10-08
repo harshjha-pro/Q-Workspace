@@ -11,6 +11,7 @@ import { runArticleshipCompletion } from "../services/hr/articleship";
 import { runCpeShortfall } from "../services/hr/growth";
 import { runLeaveAccrual } from "../services/attendance/leave-policies";
 import { runUnansweredMessageReminders } from "../services/messages/service";
+import { runReminderDueLists } from "../services/reminders/due-lists";
 
 export type JobDef = {
   code: string;
@@ -74,6 +75,16 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "HR_ADMIN"],
     run: async () => ({ leaveAccrual: await runLeaveAccrual(todayIst()), articleship: await runArticleshipCompletion(), cpe: await runCpeShortfall() }) as unknown as Record<string, unknown>,
+  },
+  {
+    code: "REMINDER_DUE_LISTS",
+    name: "Reminder-due lists",
+    description: "Builds the day's client-document reminders (per schedule, escalation after N) and overdue-invoice reminders with ready-to-copy text. Sends nothing: staff copy and mark as sent (P4-03, P4-08).",
+    cron: "0 7 * * *",
+    scheduleLabel: "Daily 07:00 IST",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runReminderDueLists(),
   },
   {
     code: "MESSAGES_UNANSWERED",

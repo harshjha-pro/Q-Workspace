@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requirePortal } from "@/server/context";
 import { portalDashboard } from "@/server/services/portal/service";
 import { portalFeedbackRequests } from "@/server/services/portal/actions";
-import { formatDate } from "@/server/lib/dates";
+import { portalReminders } from "@/server/services/reminders/due-lists";
+import { formatDate, formatDateTime } from "@/server/lib/dates";
 import { formatInr } from "@/server/lib/money";
 import { PageHeader, Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { FeedbackForm } from "../_ui/forms";
@@ -22,7 +23,8 @@ function Tile({ href, label, value, alert }: { href: string; label: string; valu
 
 export default async function PortalHome() {
   const actor = await requirePortal();
-  const [d, feedback] = await Promise.all([portalDashboard(actor), portalFeedbackRequests(actor)]);
+  const [d, feedback, reminders] = await Promise.all([portalDashboard(actor), portalFeedbackRequests(actor), portalReminders(actor)]);
+  const openReminders = reminders.filter((r) => r.open);
   return (
     <div className="space-y-4">
       <PageHeader title={`Hello, ${actor.displayName}`} subtitle="What the firm needs from you, and where your work stands." />
@@ -33,6 +35,21 @@ export default async function PortalHome() {
         <Tile href="/portal/invoices" label={d.overdueInvoices ? `Outstanding (${d.overdueInvoices} overdue)` : "Outstanding"} value={formatInr(d.outstandingPaise)} alert={d.overdueInvoices > 0} />
         <Tile href="/portal/requests" label="Uploaded, being checked" value={d.beingChecked} />
       </div>
+      {openReminders.length ? (
+        <Card>
+          <CardHeader><CardTitle>Reminders from the firm</CardTitle></CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {openReminders.map((r) => (
+                <li key={r.id} className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <div className="mb-1 text-xs text-muted">{formatDateTime(r.sentAt)} · {r.kind === "PAYMENT" ? <Link className="underline" href="/portal/invoices">Invoices</Link> : <Link className="underline" href="/portal/requests">Send documents</Link>}</div>
+                  <p className="whitespace-pre-wrap">{r.text}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
       {feedback.map((f) => (
         <Card key={f.id}>
           <CardHeader><CardTitle>Your feedback on {f.engagement}</CardTitle></CardHeader>

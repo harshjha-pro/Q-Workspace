@@ -20,6 +20,7 @@ const NAV: NavDef[] = [
   { href: "/leave", label: "Leave", section: "Work", cap: "leave.apply" },
   { href: "/notifications", label: "Notifications", section: "Work" },
   { href: "/messages", label: "Client messages", section: "Work", cap: "portal.share" },
+  { href: "/reminders", label: "Reminders due", section: "Work", anyOf: ["task.work", "billing.view"] },
   { href: "/clients", label: "Clients", section: "Practice", cap: "client.view" },
   { href: "/engagements", label: "Engagements", section: "Practice", cap: "engagement.view" },
   { href: "/notices", label: "Notices", section: "Registers", cap: "notice.view" },
