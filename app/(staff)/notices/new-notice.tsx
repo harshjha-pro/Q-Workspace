@@ -3,6 +3,7 @@ import { FormDialog } from "@/components/action-form";
 import { Field, Input, Select, Textarea, Checkbox } from "@/components/ui/input";
 import { AUTHORITY_LABELS } from "./labels";
 import { createNoticeAction } from "./actions";
+import { FillFromText } from "./fill-from-text";
 
 type Option = { id: string; name: string };
 
@@ -11,6 +12,7 @@ export function NewNoticeDialog({ authorities, clients, people, today }: { autho
     <FormDialog trigger="New notice" triggerVariant="default" title="Record a notice" description="A response task is created for the assignee." action={createNoticeAction} submitLabel="Record notice">
       {(err) => (
         <>
+          <FillFromText today={today} />
           <Field label="Client *" error={err("clientId")}>
             <Select name="clientId" required defaultValue=""><option value="" disabled>Choose client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
           </Field>

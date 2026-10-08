@@ -77,7 +77,7 @@ export function label(n: { authority: string; section: string; ayOrPeriod: strin
   return [n.authority.replace(/_/g, " "), n.section && `u/s ${n.section}`, n.ayOrPeriod].filter(Boolean).join(" · ");
 }
 
-async function loadNotice(actor: Actor, id: string, cap: "notice.view" | "notice.manage") {
+export async function loadNotice(actor: Actor, id: string, cap: "notice.view" | "notice.manage") {
   const n = await db().notice.findUnique({ where: { id }, include: { hearings: { orderBy: { date: "asc" } } } });
   if (!n) throw notFound("Notice");
   const ids = await visibleClientIds(actor, cap);

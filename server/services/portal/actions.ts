@@ -12,6 +12,8 @@ import { loadTask } from "../tasks/service";
 import { invoicePdf } from "../billing/pdf";
 import { systemActor } from "../../permissions/actor";
 import { assertPortalClient } from "./service";
+import { suggestItem, suggestTags } from "../../helpers/upload-tagging";
+import { extractText } from "../dms/text";
 
 /**
  * What a portal user can do (P4-02): upload requested documents, decide approvals, accept proposals and
@@ -55,9 +57,13 @@ export async function portalUpload(actor: PortalActor, input: z.input<typeof upl
   if (item && item.status !== "REQUESTED" && !(item.status === "RECEIVED" && item.receivedPendingConfirm)) throw ruleViolation("This item is no longer requested.");
   if (!item && !d.description) throw new DomainError("VALIDATION", "Say what the document is.", { description: "Required" });
   const task = item?.taskId ? await db().task.findUnique({ where: { id: item.taskId }, select: { id: true, title: true, engagementId: true } }) : null;
+  // Keyword tagging (D-85): dictionary tags always; for an unrequested upload, the open request it most likely answers.
+  const sample = safeText(file.name, file.data);
+  const tags = ["from-client", ...suggestTags(file.name, `${d.description} ${sample}`)];
+  const suggestion = item ? null : suggestItem(`${file.name} ${d.description}`, sample, await openRequests(d.clientId));
   const doc = await fileGeneratedDocument({
     clientId: d.clientId, engagementId: task?.engagementId ?? item?.engagementId ?? null, taskId: task?.id ?? null,
-    name: file.name, buffer: file.data, kind: "CLIENT_DOCUMENT", sourceType: "PORTAL", tags: ["from-client"],
+    name: file.name, buffer: file.data, kind: "CLIENT_DOCUMENT", sourceType: "PORTAL", tags,
     note: item ? `For: ${item.label}` : d.description, actor,
   });
   const today = todayIst();
@@ -66,7 +72,7 @@ export async function portalUpload(actor: PortalActor, input: z.input<typeof upl
     await tx.document.update({ where: { id: doc.id }, data: { sharedWithClient: true } });
     await tx.documentVersion.updateMany({ where: { documentId: doc.id }, data: { uploadedByPortalUserId: actor.portalUserId } });
     const up = await tx.portalUpload.create({
-      data: { portalUserId: actor.portalUserId, clientId: d.clientId, engagementId: task?.engagementId ?? null, taskId: task?.id ?? null, checklistItemId: item?.id ?? null, documentId: doc.id },
+      data: { portalUserId: actor.portalUserId, clientId: d.clientId, engagementId: task?.engagementId ?? null, taskId: task?.id ?? null, checklistItemId: item?.id ?? null, documentId: doc.id, autoTag: suggestion ? `ITEM:${suggestion.id}` : null },
     });
     if (item) {
       await tx.checklistItem.update({ where: { id: item.id }, data: { status: "RECEIVED", receivedAt: item.receivedAt ?? today, receivedPendingConfirm: true, confirmedById: null, confirmedAt: null } });
@@ -80,10 +86,25 @@ export async function portalUpload(actor: PortalActor, input: z.input<typeof upl
   });
   const client = await db().client.findUniqueOrThrow({ where: { id: d.clientId }, select: { name: true } });
   await notifyUsers(await firmPeopleFor(d.clientId, task?.id), {
-    kind: "PORTAL_UPLOAD", title: `${client.name} uploaded: ${what}`, body: task ? `${task.title} — confirm it on the task.` : "Check it in Documents.",
-    link: task ? `/tasks/${task.id}` : `/documents/${doc.id}`, entityType: "PortalUpload", entityId: upload.id,
+    kind: "PORTAL_UPLOAD", title: `${client.name} uploaded: ${what}`,
+    body: task ? `${task.title} — confirm it on the task.` : suggestion ? `Looks like: ${suggestion.label}. Link it under Client uploads.` : "Check it under Client uploads.",
+    link: task ? `/tasks/${task.id}` : "/portal-uploads", entityType: "PortalUpload", entityId: upload.id,
   });
   return { uploadId: upload.id, documentId: doc.id };
+}
+
+/** Open requested items of a client (not yet uploaded), as tagging candidates. */
+export async function openRequests(clientId: string) {
+  return db().checklistItem.findMany({ where: { clientId, status: "REQUESTED" }, select: { id: true, label: true, keywords: true } });
+}
+
+/** Text for tagging; a file the extractor cannot read simply contributes nothing. */
+function safeText(name: string, data: Buffer) {
+  try {
+    return extractText(name, data).slice(0, 5000);
+  } catch {
+    return "";
+  }
 }
 
 /** Download a shared document (or the client's own upload). Audited as DOWNLOAD by the DMS. */

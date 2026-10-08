@@ -12,6 +12,10 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { peopleOptions } from "../../registers/_lib/pickers";
 import { AUTHORITY_LABELS, DEMAND_LABELS, NOTICE_STATUS_LABELS, NOTICE_STATUS_TONE, dueTone } from "../labels";
 import { NoticeActions } from "./notice-actions";
+import { DraftReplyDialog } from "./draft-reply";
+import { noticeReplyContext } from "@/server/services/registers/notice-reply";
+import { draftReplyAction } from "../actions";
+import { isDomainError } from "@/server/lib/errors";
 
 export const metadata = { title: "Notice" };
 
@@ -35,6 +39,11 @@ export default async function NoticePage({ params }: { params: Promise<{ id: str
   const days = n.responseDueDate && n.status !== "CLOSED" ? diffDays(today, n.responseDueDate) : null;
   const tone = dueTone(days);
   const person = (uid: string | null) => (uid ? n.people[uid] ?? "—" : "—");
+  const replyCtx = canManage && n.status !== "CLOSED" ? await noticeReplyContext(actor, id).catch((e) => {
+    // Someone who can view but not manage this notice simply gets no button; anything else is a real error.
+    if (isDomainError(e) && e.code === "FORBIDDEN") return null;
+    throw e;
+  }) : null;
 
   return (
     <div className="space-y-4">
@@ -47,6 +56,7 @@ export default async function NoticePage({ params }: { params: Promise<{ id: str
             <Badge tone={NOTICE_STATUS_TONE[n.status] ?? "neutral"}>{NOTICE_STATUS_LABELS[n.status] ?? n.status}</Badge>
           </span>
         }
+        actions={replyCtx ? <DraftReplyDialog action={draftReplyAction.bind(null, id)} ctx={replyCtx} /> : null}
       />
       {canManage ? (
         <NoticeActions

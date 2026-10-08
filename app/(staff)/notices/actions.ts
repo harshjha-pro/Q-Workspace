@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/server/context";
 import * as svc from "@/server/services/registers/notices";
+import { draftNoticeReply } from "@/server/services/registers/notice-reply";
 import { toActionError, type ActionResult } from "@/lib/action";
 import { parseInrToPaise } from "@/server/lib/money";
 import { str, opt, bool } from "../registers/_lib/form";
@@ -56,6 +57,18 @@ export async function addHearingAction(id: string, _: ActionResult, f: FormData)
     revalidatePath(`/notices/${id}`);
     revalidatePath("/notices");
     return { ok: true, message: "Hearing recorded." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function draftReplyAction(id: string, _: ActionResult<{ documentId: string | null; missing: string[] }>, f: FormData): Promise<ActionResult<{ documentId: string | null; missing: string[] }>> {
+  const actor = await requireStaff();
+  try {
+    const extra = Object.fromEntries(["officerDesignation", "officeAddress", "noticeReference", "noticeDate", "period", "matterRequested", "submissions", "enclosures"].map((k) => [k, str(f, k)]));
+    const out = await draftNoticeReply(actor, id, { code: str(f, "code"), extra });
+    revalidatePath(`/notices/${id}`);
+    return { ok: true, data: { documentId: out.documentId, missing: out.missing }, message: "Draft reply filed with the notice's documents." };
   } catch (e) {
     return toActionError(e);
   }
