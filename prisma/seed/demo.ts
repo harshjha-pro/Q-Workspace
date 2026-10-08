@@ -404,4 +404,8 @@ export async function seedDemo(db: PrismaClient) {
   await seedCollabDemo();
   await seedDmsDemo();
   await seedHrDemo();
+
+  // Phase 4: portal users and their activity (needs clients, tasks, checklists and invoices from above).
+  const { seedPortalDemo } = await import("./phase4/portal");
+  await seedPortalDemo();
 }

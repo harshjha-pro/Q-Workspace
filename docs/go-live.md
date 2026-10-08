@@ -104,6 +104,21 @@ After step 5, open **Home** as a Manager:
 - **HR → Cost rates**: ₹/hour per designation, so realization works (Q-22).
 - **People → each person → profile**: salary structures (HR proposes, a Partner approves), UAN / ESI numbers.
 
+## 6b. Before inviting the first client to the portal (Phase 4)
+
+- **Admin → Firm profile**: bank account and UPI ID. The portal's Invoices page shows them (Q-36).
+- **Settings**: `portal.inviteDays` (link validity, 7 days), `portal.totpMandatory` (Q-07), and
+  `messages.responseHours` (reply target, 24 hours).
+- **Reminders due → Schedules**: replace the two placeholder schedules (3rd and 12th, escalate after 3) with
+  the firm's own, per compliance type if needed.
+- **Admin → Document templates**: a Partner approves the notice-reply templates the firm will use (Income
+  Tax, GST, TRACES, MCA/ROC); **Draft reply** only offers approved ones.
+- **Admin → Portal users → Invite portal user**: copy the one-time link and send it to the client yourself
+  (WhatsApp or email). The client sets a password from it. A new link also serves as a password reset.
+- The portal is for the **office network** (HTTPS on the LAN). Before it is reachable from the internet, read
+  `docs/security-checklist.md` §6: you need a reverse proxy with a real certificate and rate limiting, plus an
+  external penetration test (Q-15).
+
 ## 7. First week
 
 - Everyone logs daily work on **Add work**. Phones can install it to the home screen.

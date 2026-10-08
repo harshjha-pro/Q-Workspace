@@ -93,6 +93,16 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-24 | Capacity forecast: hours per task type come from past actuals — what standard working hours/day for available capacity? | 8 h × working days, setting (used only in Partner analytics, never shown to staff) |
 | Q-25 | Weekly summary audience: every Manager for their team + every Partner for the firm? | Yes |
 
+## New from Phase 4 (built with my proposal; please confirm)
+
+| # | Question | Proposal (as built) |
+|---|---|---|
+| Q-40 | Client-document reminder **schedules**: on which days does the firm chase documents, per compliance type, and after how many reminders should it escalate to a call by the Manager? | Two placeholders: 3rd and 12th of every month for any type, escalating after 3. Change them under Reminders due → Schedules |
+| Q-41 | Should clients see the **name of the staff member** who replied to their message? | Yes, as with any correspondence (D-83). The alternative is to show "QEPEX India" only |
+| Q-42 | Will the portal be used only on the **office network**, or opened to the internet so clients can sign in from home? | Office network for now. Internet access needs a reverse proxy, a real certificate, rate limiting and an external penetration test first (security checklist §6) |
+
+Phase 4 also built on these earlier proposals, which still stand until you confirm them: **Q-07** (portal 2FA optional, with a firm setting to make it mandatory), **Q-23** (a logged-in portal click accepts an engagement letter; the signed copy is optional) and **Q-36** (firm bank and UPI details, now also shown in the portal).
+
 ## Decisions from Product Spec §16.1 that are yours (not answerable by me)
 
 1. Start daily use after Phase 2, or single go-live after Phase 5.

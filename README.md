@@ -35,7 +35,7 @@ Every demo user's password is **`Qepex@2026`**.
 | Article Assistant | `aditya.kumar` | 2FA optional |
 | Practice Admin | `suresh.pillai` | 2FA required |
 | HR / Payroll Admin | `lakshmi.narayanan` | 2FA required |
-| Client Portal User | — | portal arrives in Phase 4 |
+| Client Portal User | at **`/portal/login`**: `cfo@kulkarnigroup.example.com` (group CFO, 3 entities); `accounts@sharmatextiles.example.com` (one entity) | 2FA optional (firm setting) |
 
 **Two-factor codes for the demo.** Demo users who need 2FA share one authenticator secret,
 `JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP`. You can add it to an authenticator app, or run
@@ -51,7 +51,9 @@ portal credentials with grants, the inward/outward register, leave (including on
 due dates) and today's reminders. Phase 3 adds about 45 invoices with receipts, write-offs and retainer drafts,
 leads and proposals through to a won engagement, six months of payroll and stipend runs, appraisals,
 articleship records, expenses, assets, an exit in progress, about 60 documents with QC checklists, knowledge
-articles, helpdesk tickets, meetings and applause. Dates are relative to the day you run setup, so the demo always looks
+articles, helpdesk tickets, meetings and applause. Phase 4 adds 15 client portal users (two of them group users,
+one invite still open) with uploads awaiting confirmation, conversations, approvals and today's reminder-due
+lists. Dates are relative to the day you run setup, so the demo always looks
 current. All PAN, GSTIN, DIN, Aadhaar, UDIN and bank numbers are **fake** but correctly formatted.
 
 **Reset demo data:** go to Settings → Demo data (Partner only), or run `npm run demo:reset`. Both refuse
@@ -184,6 +186,31 @@ Statutory values (GST rate, SAC codes, PF/ESI/PT, income-tax slabs, stipend mini
 **Unverified**. The Income-tax Act, 2025 replaced the 1961 Act from 1 April 2026, so payroll tax values and form
 names must be verified before the first real run (docs/open-questions.md Q-34).
 
+## What Phase 4 delivers
+
+- **Client portal** (`/portal`): sign-in by an invite link the firm sends itself (no email service), optional
+  2FA, group users across several entities. Clients see:
+  - what the firm has asked for, with an upload for each item;
+  - filings in plain words, with acknowledgment numbers;
+  - shared documents and invoices, with the bank/UPI details;
+  - approvals, and proposals and engagement letters to accept with one click;
+  - feedback requests and reminders the firm sent.
+
+  They never see hours, staff notes, review points or other clients.
+- **Uploads** become *Received, pending confirmation* on the task and an inward-register entry, and the task
+  team is told. **Client uploads** lists them, with keyword suggestions for files sent without a request.
+- **Secure messages** per client or engagement, with attachments filed in Documents and response-time tracking
+  (the target is a setting; overdue threads remind the team).
+- **Reminders due**: each morning, client-document reminders (per schedule, escalating after N) and
+  overdue-invoice reminders, with ready-to-copy text. Copy it, send it yourself, then mark it as sent; it is
+  logged and appears in the portal.
+- **Rule-based helpers**: fill a notice's fields from its pasted text, suggest which request an upload
+  answers, and draft a notice reply from the firm's approved template. These are suggestions only, with no
+  AI and no external service.
+- **Security**: security headers and a Content Security Policy, a cross-site guard, an authorization review that
+  runs as a test on every build, a portal-isolation test, `docs/security-checklist.md`, and
+  `docs/service-boundaries.md` (where future connectors would plug in).
+
 ## Project layout
 
 ```
@@ -217,4 +244,7 @@ storage/ backups/ logs/ certs/   Local data (git-ignored)
 - [`docs/phase-1-report.md`](docs/phase-1-report.md): Phase 1 report
 - [`docs/phase-2-report.md`](docs/phase-2-report.md): Phase 2 report
 - [`docs/phase-3-report.md`](docs/phase-3-report.md): Phase 3 report
+- [`docs/phase-4-report.md`](docs/phase-4-report.md): Phase 4 report
+- [`docs/security-checklist.md`](docs/security-checklist.md): internal security checklist (in place of an external test, Q-15)
+- [`docs/service-boundaries.md`](docs/service-boundaries.md): where future connectors would plug in
 - [`docs/go-live.md`](docs/go-live.md): going live with real data
