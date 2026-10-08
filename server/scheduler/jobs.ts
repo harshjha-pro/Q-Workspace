@@ -10,6 +10,7 @@ import { runRetentionPurgeProposals } from "../services/lifecycle/retention";
 import { runArticleshipCompletion } from "../services/hr/articleship";
 import { runCpeShortfall } from "../services/hr/growth";
 import { runLeaveAccrual } from "../services/attendance/leave-policies";
+import { runUnansweredMessageReminders } from "../services/messages/service";
 
 export type JobDef = {
   code: string;
@@ -73,6 +74,16 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "HR_ADMIN"],
     run: async () => ({ leaveAccrual: await runLeaveAccrual(todayIst()), articleship: await runArticleshipCompletion(), cpe: await runCpeShortfall() }) as unknown as Record<string, unknown>,
+  },
+  {
+    code: "MESSAGES_UNANSWERED",
+    name: "Unanswered client messages",
+    description: "Reminds the team (and the client's Manager) once per waiting spell when a portal message has had no reply for longer than the response target (P4-04).",
+    cron: "15 9-19 * * 1-6",
+    scheduleLabel: "Hourly 09:15–19:15 IST, Mon–Sat",
+    catchUpAfterHours: 26,
+    roles: ["PARTNER", "PRACTICE_ADMIN"],
+    run: async () => runUnansweredMessageReminders(),
   },
   {
     code: "QC_FINDINGS",

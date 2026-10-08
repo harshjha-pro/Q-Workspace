@@ -9,11 +9,12 @@ const NAV = [
   { href: "/portal/approvals", label: "Approvals" },
   { href: "/portal/agreements", label: "Proposals & letters" },
   { href: "/portal/invoices", label: "Invoices" },
+  { href: "/portal/messages", label: "Messages" },
   { href: "/portal/account", label: "Account" },
 ];
 
 /** A plain header and content column: client users see far fewer screens than staff, so no side menu. */
-export function PortalShell({ name, logout, children }: { name: string; logout: () => Promise<void>; children: React.ReactNode }) {
+export function PortalShell({ name, logout, unread = 0, children }: { name: string; logout: () => Promise<void>; unread?: number; children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-bg">
       <header className="border-b border-line bg-white">
@@ -23,7 +24,11 @@ export function PortalShell({ name, logout, children }: { name: string; logout: 
             Client Portal
           </Link>
           <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {NAV.map((n) => <Link key={n.href} href={n.href} className="text-muted hover:text-ink">{n.label}</Link>)}
+            {NAV.map((n) => (
+              <Link key={n.href} href={n.href} className="text-muted hover:text-ink">
+                {n.label}{n.href === "/portal/messages" && unread ? <span className="ml-1 rounded-full bg-brand px-1.5 text-xs text-white">{unread}</span> : null}
+              </Link>
+            ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="text-muted">{name}</span>

@@ -20,7 +20,8 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const path = usePathname();
   const sections = [...new Set(nav.map((n) => n.section))];
-  const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  // Whole path segments only: "/me" must not light up on "/messages".
+  const isActive = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
   const navList = (
     <nav className="space-y-5 p-3 text-sm">
       {sections.map((s) => (

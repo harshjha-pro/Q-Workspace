@@ -6,6 +6,7 @@ import { toActionError, type ActionResult } from "@/lib/action";
 import { DomainError } from "@/server/lib/errors";
 import * as portal from "@/server/services/portal/actions";
 import { recordFeedback } from "@/server/services/crm/feedback";
+import * as messages from "@/server/services/messages/service";
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
@@ -55,4 +56,32 @@ export async function acceptLetterAction(letterId: string, _: ActionResult): Pro
 export async function feedbackAction(feedbackId: string, _: ActionResult, f: FormData): Promise<ActionResult> {
   const actor = await requirePortal();
   return run(() => recordFeedback(actor, feedbackId, { rating: Number(s(f, "rating")), comment: s(f, "comment") }), "Thank you for your feedback.");
+}
+
+// ---- Messages (P4-04) ----------------------------------------------------------
+async function attached(f: FormData) {
+  const file = f.get("file");
+  return file instanceof File && file.size > 0 ? { name: file.name, data: Buffer.from(await file.arrayBuffer()) } : null;
+}
+
+export async function portalStartThreadAction(_: ActionResult<{ id: string }>, f: FormData): Promise<ActionResult<{ id: string }>> {
+  const actor = await requirePortal();
+  try {
+    const t = await messages.startThread(actor, { clientId: s(f, "clientId"), engagementId: s(f, "engagementId"), subject: s(f, "subject"), body: s(f, "body") }, await attached(f), { ip: await clientIp() });
+    revalidatePath("/portal", "layout");
+    return { ok: true, data: { id: t.id }, message: "Sent." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function portalReplyAction(threadId: string, _: ActionResult<{ id: string }>, f: FormData): Promise<ActionResult<{ id: string }>> {
+  const actor = await requirePortal();
+  try {
+    await messages.postMessage(actor, threadId, { body: s(f, "body") }, await attached(f), { ip: await clientIp() });
+    revalidatePath("/portal", "layout");
+    return { ok: true, message: "Sent." };
+  } catch (e) {
+    return toActionError(e);
+  }
 }

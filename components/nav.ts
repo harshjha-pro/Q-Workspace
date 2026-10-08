@@ -19,6 +19,7 @@ const NAV: NavDef[] = [
   { href: "/firm-compliance", label: "Firm's own compliance", section: "Work", anyOf: ["dueDateMaster.manage", "signoff.final"] },
   { href: "/leave", label: "Leave", section: "Work", cap: "leave.apply" },
   { href: "/notifications", label: "Notifications", section: "Work" },
+  { href: "/messages", label: "Client messages", section: "Work", cap: "portal.share" },
   { href: "/clients", label: "Clients", section: "Practice", cap: "client.view" },
   { href: "/engagements", label: "Engagements", section: "Practice", cap: "engagement.view" },
   { href: "/notices", label: "Notices", section: "Registers", cap: "notice.view" },

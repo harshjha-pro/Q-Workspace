@@ -70,6 +70,7 @@ export const SETTING_DEFAULTS = {
   // Phase 3 — documents, QC, collaboration
   "qc.inspectionSampleSize": { value: 5, description: "Engagements sampled at random for a periodic file inspection" },
   "comments.editWindowMinutes": { value: 15, description: "Minutes an author can edit their own comment" },
+  "messages.responseHours": { value: 24, description: "Portal messages: a client message unanswered this long is flagged and the team reminded (P4-04)" },
   "helpdesk.longOpenDays": { value: 7, description: "Open or in-progress tickets older than this are flagged" },
 } as const;
 

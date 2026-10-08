@@ -217,3 +217,10 @@ export async function portalDashboard(actor: PortalActor, opts: { clientId?: str
     unreadMessages: unread,
   };
 }
+
+/** Entities and their live engagements, by name only, for "new message" (no codes, fees or budgets). */
+export async function portalThreadOptions(actor: PortalActor) {
+  const clients = await portalClients(actor);
+  const engs = await db().engagement.findMany({ where: { clientId: { in: clients.map((c) => c.id) }, status: { notIn: ["ARCHIVED", "CANCELLED"] } }, select: { id: true, clientId: true, name: true }, orderBy: { name: "asc" } });
+  return clients.map((c) => ({ id: c.id, name: c.name, engagements: engs.filter((e) => e.clientId === c.id).map((e) => ({ id: e.id, name: e.name })) }));
+}
