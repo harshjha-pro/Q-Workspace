@@ -87,7 +87,7 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 
 | # | Question | Proposal |
 |---|---|---|
-| Q-15 | P4-09 external penetration test is not in the brief's replacement table. OK to treat it as out of scope for this build (you arrange it before go-live)? | Yes; I deliver a security checklist + automated authz tests |
+| Q-15 | P4-09 external penetration test is not in the brief's replacement table. OK to treat it as out of scope for this build (you arrange it before go-live)? | Yes; I deliver a security checklist + automated authz tests. **Delivered in 4.7:** `docs/security-checklist.md`, `tests/permissions/authz-review.test.ts`, `tests/permissions/portal-isolation.test.ts` (D-86). An external test is still advised before the portal faces the internet |
 | Q-16 | AI "ask-the-data" (§13.10) has no code-only replacement in the brief. Omit? | Omit; saved filters on dashboards instead |
 | Q-17 | Spec lets Articles see billing "if granted"; brief says never. Never? | Never (brief is stricter) |
 | Q-24 | Capacity forecast: hours per task type come from past actuals — what standard working hours/day for available capacity? | 8 h × working days, setting (used only in Partner analytics, never shown to staff) |

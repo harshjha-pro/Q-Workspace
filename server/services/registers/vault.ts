@@ -77,6 +77,8 @@ export async function deactivateCredential(actor: Actor, id: string) {
 
 /** List shows portal, label and change status only — never the secret (spec 6.4). */
 export async function listCredentials(actor: Actor, clientId: string) {
+  // Refuse up front (portal, HR): the per-row check below would otherwise only run when rows exist.
+  authorize(actor, "vault.view");
   const all = await db().credential.findMany({ where: { clientId, active: true }, orderBy: { portal: "asc" } });
   const out = [];
   const days = await getSettingNumber("credentials.changeAfterDays", 90);

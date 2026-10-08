@@ -2,6 +2,7 @@ import { getSession } from "@/server/context";
 import { generateFromTemplate } from "@/server/services/doc-templates/service";
 import { isDomainError } from "@/server/lib/errors";
 import { logger } from "@/server/lib/logger";
+import { crossSiteRefused } from "@/lib/same-origin";
 
 /**
  * POST /api/doc-templates/generate (form fields: code, userId | clientId [+ engagementId], format, extra_<name>)
@@ -12,8 +13,8 @@ export async function POST(req: Request) {
   const s = await getSession();
   if (!s || s.actor.kind !== "USER") return new Response("Unauthorised", { status: 401 });
   if (s.needsTotpEnrolment || s.mustChangePassword) return new Response("Finish account setup first", { status: 403 });
-  const origin = req.headers.get("origin");
-  if (origin && origin !== new URL(req.url).origin) return new Response("Cross-site request refused", { status: 403 });
+  const refused = crossSiteRefused(req);
+  if (refused) return refused;
   const f = await req.formData();
   const str = (k: string) => String(f.get(k) ?? "").trim() || undefined;
   const extra: Record<string, string> = {};

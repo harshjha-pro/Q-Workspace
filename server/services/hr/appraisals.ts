@@ -246,6 +246,8 @@ export type Evidence = {
  * and non-client details.
  */
 export async function evidencePanel(actor: Actor, userId: string, from: string, to: string): Promise<Evidence> {
+  // Guarded on its own (not only through getReview): the same people who may see this person's appraisal.
+  if (!(await accessTo(actor, { userId, managerId: (await db().user.findUnique({ where: { id: userId }, select: { reportingManagerId: true } }))?.reportingManagerId ?? null })).see) throw forbidden();
   const names = seesClientNames(actor);
   const fromDt = new Date(`${from}T00:00:00+05:30`);
   const toDt = new Date(`${to}T23:59:59+05:30`);
