@@ -1,8 +1,8 @@
 /**
  * Phase 3 billing seed (P3-03, P3-30, P3-34, P3-35).
  * Reference: the default invoice series for the current financial year (QI/yy-yy/, numbers allocated on issue).
- * Demo: about 25 engagements invoiced over the last six months (fixed, time-based and monthly retainer
- * invoices), receipts (full, partial, with client TDS, one advance), two write-offs, overdue invoices with
+ * Demo: about three quarters of the chargeable engagements invoiced over the last six months (fixed,
+ * time-based and monthly retainer invoices; widened in Phase 5 so analytics has a realistic billing base), receipts (full, partial, with client TDS, one advance), two write-offs, overdue invoices with
  * one reminder logged, disbursements (some recovered through invoices), IRNs on a few invoices and three
  * retainer drafts awaiting Partner approval. Uses the billing services so numbering, GST and audit apply.
  */
@@ -83,9 +83,12 @@ export async function seedBillingDemo() {
   });
   const byBasis = (b: string) => engs.filter((e) => e.feeBasis === b);
   const shuffle = <T,>(a: T[]) => a.map((x) => [rand(), x] as const).sort((p, q) => p[0] - q[0]).map(([, x]) => x);
-  const retainers = shuffle(byBasis("RETAINER").filter((e) => e.recurrence === "RECURRING")).slice(0, 9);
-  const fixed = shuffle(byBasis("FIXED")).slice(0, 12);
-  const timed = shuffle(byBasis("TIME")).slice(0, 4);
+  // The first three retainers get Partner-approval drafts (step 7); the rest bill monthly. A quarter of the
+  // engagements stay unbilled so the unbilled-work alert has something to show.
+  const allRetainers = byBasis("RETAINER").filter((e) => e.recurrence === "RECURRING");
+  const retainers = shuffle(allRetainers).slice(0, Math.max(9, Math.round(allRetainers.length * 0.75)));
+  const fixed = shuffle(byBasis("FIXED")).slice(0, Math.max(12, Math.round(byBasis("FIXED").length * 0.7)));
+  const timed = shuffle(byBasis("TIME"));
 
   // 1. Disbursements first (so some can be recovered through the invoices below).
   const disbClients = shuffle([...new Set([...fixed, ...retainers].map((e) => e.clientId))]).slice(0, 10);

@@ -6,8 +6,8 @@ calendar, review and sign-off, registers, billing, CRM, HRMS and payroll, a clie
 It runs on **one computer with only Node.js**. There is no cloud account, external database, API key or
 paid service, and nothing leaves the machine.
 
-> **Build status:** Phases 1 (Foundation), 2 (Core practice) and 3 (Firm modules) are complete. The data
-> model is frozen. Phases 4–5 (client portal, analytics) are listed in [`docs/build-plan.md`](docs/build-plan.md).
+> **Build status:** all five phases of [`docs/build-plan.md`](docs/build-plan.md) are built: Foundation, Core
+> practice, Firm modules, Client portal and Analytics. The data model is frozen, and later changes are additive.
 
 ## Quick start
 
@@ -48,12 +48,13 @@ Professional Tax registrations. On top of that the seed generates the compliance
 (about 1,500 tasks, most past ones filed, some late, some overdue), about six months of daily work entries,
 work pending from clients and under review, notices with a hearing, DSCs in every expiry band, UDINs,
 portal credentials with grants, the inward/outward register, leave (including one request that clashes with
-due dates) and today's reminders. Phase 3 adds about 45 invoices with receipts, write-offs and retainer drafts,
+due dates) and today's reminders. Phase 3 adds invoices for about three quarters of the chargeable engagements, with receipts, write-offs and retainer drafts,
 leads and proposals through to a won engagement, six months of payroll and stipend runs, appraisals,
 articleship records, expenses, assets, an exit in progress, about 60 documents with QC checklists, knowledge
 articles, helpdesk tickets, meetings and applause. Phase 4 adds 15 client portal users (two of them group users,
 one invite still open) with uploads awaiting confirmation, conversations, approvals and today's reminder-due
-lists. Dates are relative to the day you run setup, so the demo always looks
+lists. Phase 5 adds last year's completed engagements with hours and invoices, last month's Partner MIS and this
+week's summary notices. Dates are relative to the day you run setup, so the demo always looks
 current. All PAN, GSTIN, DIN, Aadhaar, UDIN and bank numbers are **fake** but correctly formatted.
 
 **Reset demo data:** go to Settings → Demo data (Partner only), or run `npm run demo:reset`. Both refuse
@@ -109,6 +110,7 @@ browsers do not allow offline mode over plain HTTP on another device.
 | `npm run db:stats` | Row counts of the main tables |
 | `npm run demo:totp` | Current 2FA code for demo users |
 | `npm run demo:reset` | Reload demo data (demo mode only) |
+| `npm run analytics:reconcile` | Check every analytics number against a direct query on the data (exit code 1 on a mismatch) |
 
 The e2e tests need a Chromium for Playwright (`npx playwright install chromium` once). Everything else
 needs only Node.js.
@@ -210,6 +212,33 @@ names must be verified before the first real run (docs/open-questions.md Q-34).
 - **Security**: security headers and a Content Security Policy, a cross-site guard, an authorization review that
   runs as a test on every build, a portal-isolation test, `docs/security-checklist.md`, and
   `docs/service-boundaries.md` (where future connectors would plug in).
+
+## What Phase 5 delivers
+
+Analytics under **Analytics** in the menu. Each person sees only what the permission matrix allows. Hours are
+always effort logged ("6 hrs logged"), never a target and never a ranking.
+
+- **My dashboard** (everyone): your own hours, open and overdue tasks, filing record, review points and CPE.
+- **Compliance** (Partner, Manager for the team, Practice Admin): filings due, on time, late and overdue, by
+  type and by month; client delays; late-fee exposure on overdue work.
+- **Engagements** and **Timeline board**: budget burn per engagement, and the coming weeks by client, engagement
+  or person, with each cell drilling down to its tasks.
+- **Weekly summary** (Partner, Manager): last week and the week ahead in plain lines, each from a fixed rule,
+  with a notice every Monday at 07:00.
+- **Partners only:**
+  - **Firm**: headline numbers.
+  - **Profitability and cash**: realization, unbilled work, receivables, DSO, client concentration, cost rate per
+    designation.
+  - **Capacity forecast**: available hours (8 h × working days, less leave) against work forecast from past
+    actuals, with overload flags and suggested rebalancing.
+  - **CRM**.
+  - **Partner MIS**: a PDF and an Excel file built on the 5th for the month before, filed in the firm's documents
+    and announced in-app.
+- **People** (Partner, HR): headcount, attrition, tenure, leave, recruitment, appraisals, articleship and CPE,
+  with no client data.
+- **Budget estimates** from past actuals on the new-engagement form, the edit dialog and the engagement dashboard.
+- **Reconciliation**: `npm run analytics:reconcile` checks every dashboard number against a direct query on
+  the data.
 
 ## Project layout
 

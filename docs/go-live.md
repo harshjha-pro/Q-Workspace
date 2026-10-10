@@ -119,6 +119,16 @@ After step 5, open **Home** as a Manager:
   `docs/security-checklist.md` §6: you need a reverse proxy with a real certificate and rate limiting, plus an
   external penetration test (Q-15).
 
+## 6c. Before relying on analytics (Phase 5)
+
+- **HR → Cost rates**: ₹/hour per designation, effective-dated (Q-22). Without them, profitability and
+  realization are understated, and the page says how many hours have no rate.
+- **Settings**: `capacity.hoursPerDay` (8, Q-24), `capacity.leadDays`, `capacity.bands`,
+  `capacity.historyMonths` and `capacity.minSamples` (the forecast), and `budget.bands` (budget health).
+- **Partner MIS**: the MONTHLY_MIS job builds last month's report on the 5th. To build a month by hand, open
+  **Analytics → Partner MIS → Build now**.
+- After importing history, run `npm run analytics:reconcile` once. It should end with every check matching.
+
 ## 7. First week
 
 - Everyone logs daily work on **Add work**. Phones can install it to the home screen.

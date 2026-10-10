@@ -100,6 +100,9 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-40 | Client-document reminder **schedules**: on which days does the firm chase documents, per compliance type, and after how many reminders should it escalate to a call by the Manager? | Two placeholders: 3rd and 12th of every month for any type, escalating after 3. Change them under Reminders due → Schedules |
 | Q-41 | Should clients see the **name of the staff member** who replied to their message? | Yes, as with any correspondence (D-83). The alternative is to show "QEPEX India" only |
 | Q-42 | Will the portal be used only on the **office network**, or opened to the internet so clients can sign in from home? | Office network for now. Internet access needs a reverse proxy, a real certificate, rate limiting and an external penetration test first (security checklist §6) |
+| Q-43 | **Partner MIS** contents: is the monthly pack right? It covers compliance, effort, billing, profitability, budgets, CRM and people, plus balances on the build date. Should anything be added (e.g. per-Partner pages) or removed? | As built (D-92). Contents can change without data changes |
+| Q-44 | **Capacity forecast**: which people count as capacity? Should Partners' hours be included, and should Articles count at full hours during exam-study months? | Partners, Managers, Staff and Articles, all at `capacity.hoursPerDay`, less approved leave (exam leave included) |
+| Q-45 | **Weekly summary**: anything the Partners or Managers want added to the Monday lines (e.g. new clients, notices received, DSC expiries)? | The lines in D-93 |
 
 Phase 4 also built on these earlier proposals, which still stand until you confirm them: **Q-07** (portal 2FA optional, with a firm setting to make it mandatory), **Q-23** (a logged-in portal click accepts an engagement letter; the signed copy is optional) and **Q-36** (firm bank and UPI details, now also shown in the portal).
 
