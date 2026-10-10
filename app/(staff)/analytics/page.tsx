@@ -17,6 +17,8 @@ export default async function AnalyticsHome() {
     { href: "/analytics/firm", title: "Firm", text: "Headline numbers for the whole firm with a 12-month trend.", show: can(actor, "analytics.firm") },
     { href: "/analytics/profitability", title: "Profitability and cash", text: "Realization, unbilled work, receivables, DSO, client concentration and cost rates.", show: can(actor, "analytics.firm") },
     { href: "/analytics/capacity", title: "Capacity forecast", text: "Available hours against forecast work for the coming weeks or months, overload flags and suggested rebalancing.", show: can(actor, "analytics.firm") },
+    { href: "/analytics/crm", title: "CRM", text: "Lead conversion and sources, proposal pipeline, renewals, client feedback and growth.", show: can(actor, "analytics.firm") },
+    { href: "/analytics/people", title: "People", text: "Headcount, attrition, tenure, leave, recruitment, appraisals, articleship and CPE (no client data).", show: can(actor, "analytics.hr") },
   ].filter((i) => i.show);
   return (
     <div className="space-y-4">

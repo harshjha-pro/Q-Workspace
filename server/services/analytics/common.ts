@@ -94,3 +94,10 @@ export function assertFirmAnalytics(actor: Actor): asserts actor is StaffActor {
 export const hrs = (minutes: number) => Math.round((minutes / 60) * 10) / 10;
 
 export const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
+
+/** People analytics (Partner, HR Admin): headcount, leave, hiring, CPE — never client data. */
+export function assertHrAnalytics(actor: Actor): asserts actor is StaffActor {
+  if (actor.kind === "PORTAL") throw forbidden();
+  if (actor.kind === "SYSTEM") return;
+  if (authorize(actor, "analytics.hr") !== "firm") throw forbidden();
+}
