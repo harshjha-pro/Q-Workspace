@@ -13,6 +13,7 @@ export default async function AnalyticsHome() {
     { href: "/analytics/me", title: "My dashboard", text: "Your own effort, tasks, reviews and CPE.", show: can(actor, "analytics.personal") },
     { href: "/analytics/compliance", title: "Compliance", text: "Filings due, on time and late, client delays and late-fee exposure.", show: practice },
     { href: "/analytics/engagements", title: "Engagements", text: "Budget against effort for every active engagement.", show: practice },
+    { href: "/analytics/timeline", title: "Timeline board", text: "What is due over the coming weeks by client, engagement or person, with drill-down.", show: practice },
     { href: "/analytics/firm", title: "Firm", text: "Headline numbers for the whole firm with a 12-month trend.", show: can(actor, "analytics.firm") },
   ].filter((i) => i.show);
   return (
