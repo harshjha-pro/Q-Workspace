@@ -72,6 +72,12 @@ export const SETTING_DEFAULTS = {
   "comments.editWindowMinutes": { value: 15, description: "Minutes an author can edit their own comment" },
   "messages.responseHours": { value: 24, description: "Portal messages: a client message unanswered this long is flagged and the team reminded (P4-04)" },
   "helpdesk.longOpenDays": { value: 7, description: "Open or in-progress tickets older than this are flagged" },
+  // Phase 5 — analytics (Q-24: capacity is Partner analytics only, never shown to staff)
+  "capacity.hoursPerDay": { value: 8, description: "Available hours per working day for the capacity forecast (Q-24)" },
+  "capacity.leadDays": { value: 14, description: "Forecast work on a task is spread over this many days before its due date" },
+  "capacity.bands": { value: [85, 100], description: "Forecast load bands in %: approaching from the first, overloaded above the second" },
+  "capacity.historyMonths": { value: 24, description: "Months of filed tasks used to estimate effort per compliance type" },
+  "capacity.minSamples": { value: 3, description: "Filed tasks with hours needed before a compliance type's median is used as the estimate" },
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
