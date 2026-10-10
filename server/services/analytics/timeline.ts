@@ -66,6 +66,8 @@ export async function timelineBoard(actor: Actor, opts: Opts = {}) {
     ...lineFilter,
     supersededByTaskId: null,
     client: { isFirm: false },
+    // Not Applicable tasks are not work; the compliance dashboard leaves them out too (5.8 reconciles the two).
+    NOT: { status: "NOT_APPLICABLE" },
     OR: [{ effectiveDueDate: { gte: w.from, lte: w.to } }, { status: { notIn: CLOSED }, effectiveDueDate: { lt: w.from } }],
   };
   const select = { id: true, title: true, status: true, effectiveDueDate: true, clientId: true, engagementId: true, client: { select: { name: true } } } as const;
@@ -184,7 +186,7 @@ export async function timelineCell(actor: Actor, opts: Opts & { rowId: string; c
     supersededByTaskId: null,
     client: { isFirm: false },
     effectiveDueDate: col === 0 ? { lt: w.from } : { gte: w.cols[col - 1]!.from, lte: w.cols[col - 1]!.to },
-    ...(col === 0 || view === "people" ? { status: { notIn: CLOSED } } : {}),
+    status: col === 0 || view === "people" ? { notIn: CLOSED } : { not: "NOT_APPLICABLE" },
   };
   const rowWhere =
     view === "compliance" ? { clientId: opts.rowId }
