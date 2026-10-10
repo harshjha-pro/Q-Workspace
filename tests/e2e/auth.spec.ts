@@ -30,5 +30,5 @@ test("HR Admin has no client menu", async ({ page }) => {
   await login(page, "lakshmi.narayanan");
   await openNav(page);
   await expect(page.getByRole("link", { name: "Clients" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "People" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "People", exact: true })).toBeVisible();
 });
