@@ -13,6 +13,7 @@ import { runLeaveAccrual } from "../services/attendance/leave-policies";
 import { runUnansweredMessageReminders } from "../services/messages/service";
 import { runReminderDueLists } from "../services/reminders/due-lists";
 import { runMonthlyMis } from "../services/analytics/mis";
+import { runWeeklySummaries } from "../services/analytics/weekly";
 
 export type JobDef = {
   code: string;
@@ -86,6 +87,16 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "PRACTICE_ADMIN"],
     run: async () => runReminderDueLists(),
+  },
+  {
+    code: "WEEKLY_SUMMARY",
+    name: "Weekly summary",
+    description: "Every Monday, sends each Partner (firm) and each Manager leading a team (their team) a notice linking to last week's rule-based summary (P5-08, Q-25).",
+    cron: "0 7 * * 1",
+    scheduleLabel: "Mondays 07:00 IST",
+    catchUpAfterHours: 24 * 8,
+    roles: ["PARTNER"],
+    run: async () => runWeeklySummaries(),
   },
   {
     code: "MONTHLY_MIS",

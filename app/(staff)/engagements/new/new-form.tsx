@@ -9,15 +9,18 @@ import { Alert, Card, CardContent } from "@/components/ui/card";
 import { SERVICE_LINES, SERVICE_LINE_LABELS, FEE_BASES, FEE_BASIS_LABELS } from "@/server/domain/enums";
 import { todayIst } from "@/server/lib/dates";
 
-export function NewEngagementForm({ clients, templates, defaultClientId }: {
+export function NewEngagementForm({ clients, templates, defaultClientId, estimates = {} }: {
   clients: { id: string; label: string }[];
   templates: { code: string; name: string; stages: string[] }[];
   defaultClientId?: string;
+  estimates?: Record<string, { suggestedHours: number | null; basis: string }>;
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState<ActionResult<{ id: string }>, FormData>(createEngagementAction, { ok: true });
   const [type, setType] = useState(templates[0]?.code ?? "OTHER");
   const [feeBasis, setFeeBasis] = useState<string>("FIXED");
+  const [budget, setBudget] = useState("");
+  const est = estimates[type];
   useEffect(() => {
     if (state.ok && state.data?.id) router.push(`/engagements/${state.data.id}`);
   }, [state, router]);
@@ -44,7 +47,17 @@ export function NewEngagementForm({ clients, templates, defaultClientId }: {
           ) : (
             <Field label="Fee (₹)" error={err("feePaise")}><Input name="fee" inputMode="decimal" /></Field>
           )}
-          <Field label="Budget (hours)" hint="Quarter-hour steps, e.g. 12.5" error={err("budgetMinutes")}><Input name="budgetHours" inputMode="decimal" /></Field>
+          <div>
+            <Field label="Budget (hours)" hint="Quarter-hour steps, e.g. 12.5" error={err("budgetMinutes")}>
+              <Input name="budgetHours" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
+            </Field>
+            {est ? (
+              <p className="mt-1 text-xs text-muted">
+                {est.basis}
+                {est.suggestedHours !== null ? <> · <button type="button" className="text-brand underline" onClick={() => setBudget(String(est.suggestedHours))}>Use {est.suggestedHours} hrs</button></> : null}
+              </p>
+            ) : null}
+          </div>
           <Field label="Start date"><Input type="date" name="startDate" defaultValue={todayIst()} /></Field>
           <Field label="End date"><Input type="date" name="endDate" /></Field>
           <div className="space-y-1 sm:col-span-2">

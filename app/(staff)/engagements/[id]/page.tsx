@@ -12,6 +12,7 @@ import { engagementStatusTone } from "@/components/status";
 import { SERVICE_LINE_LABELS, FEE_BASIS_LABELS, type ServiceLine } from "@/server/domain/enums";
 import { formatInr, formatMinutes } from "@/server/lib/money";
 import { formatDate } from "@/server/lib/dates";
+import { budgetEstimate } from "@/server/services/analytics/estimates";
 import { EngagementActions, RemoveAssignment } from "./actions-ui";
 
 export const metadata = { title: "Engagement" };
@@ -22,6 +23,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
   const e = await load(() => getEngagement(actor, id));
   const canManage = await assertEngagementAccess(actor, "engagement.manage", id).then(() => true, () => false);
   const people = canManage ? await listUserOptions(actor, ["PARTNER", "MANAGER", "STAFF", "ARTICLE"]) : [];
+  const estimate = canManage ? await budgetEstimate(actor, { engagementType: e.engagementType, clientId: e.client.id, excludeEngagementId: e.id }) : null;
   const active = e.assignments.filter((a) => !a.toDate);
   const stages = e.stageTemplateVersion?.stages ?? [];
   return (
@@ -35,6 +37,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
           id={e.id}
           canSeeFees={e.canSeeFees && can(actor, "billing.approve")}
           current={{ name: e.name, status: e.status, budgetHours: e.budgetMinutes / 60, endDate: e.endDate ?? "", eqrRequired: e.eqrRequired, feeBasis: e.feeBasis, fee: e.feePaise / 100, rate: e.ratePaisePerHour / 100, chargeable: e.chargeable }}
+          estimate={estimate ? { suggestedHours: estimate.suggestedHours, basis: estimate.basis } : null}
           people={people.map((p) => ({ id: p.id, name: `${p.displayName} (${p.role.toLowerCase()}${p.isSenior ? ", senior" : ""})` }))}
         />
       ) : null}

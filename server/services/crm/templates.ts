@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, transaction } from "../../lib/db";
+import { pastActuals } from "../analytics/estimates";
 import { parse, parsePartial } from "../../lib/validate";
 import { DomainError, forbidden, notFound } from "../../lib/errors";
 import { authorize } from "../../permissions/guards";
@@ -113,24 +114,12 @@ export function engagementSpecFor(serviceLine: string, name: string, knownType?:
 }
 
 /**
- * Budget suggestion from past actuals (spec 10.2 / 8): the average logged hours of similar engagements
- * (same engagement type) that are completed, or that started in an earlier financial year. Falls back to
- * the template's effort placeholder. Rounded to whole hours.
+ * Budget suggestion from past actuals (spec 10.2 / 8): the median logged hours of similar engagements (same
+ * engagement type, completed or started in an earlier financial year; see analytics/estimates, P5-08). Falls back
+ * to the template's effort placeholder. Rounded to whole hours.
  */
 export async function suggestBudgetMinutes(engagementType: string, fallbackMinutes = 0, today = todayIst()) {
-  const fyStart = isoFromParts(fyStartYear(today), 4, 1);
-  const similar = await db().engagement.findMany({
-    where: { engagementType, OR: [{ status: { in: ["COMPLETED", "ARCHIVED"] } }, { startDate: { lt: fyStart } }], NOT: { name: { endsWith: "(recurring)" } } },
-    select: { id: true },
-    take: 500,
-  });
-  if (similar.length) {
-    const sums = await db().workEntry.groupBy({ by: ["engagementId"], where: { engagementId: { in: similar.map((s) => s.id) }, deletedAt: null }, _sum: { minutes: true } });
-    const logged = sums.map((s) => s._sum.minutes ?? 0).filter((m) => m > 0);
-    if (logged.length) {
-      const avg = logged.reduce((a, b) => a + b, 0) / logged.length;
-      return { minutes: Math.max(60, Math.round(avg / 60) * 60), basis: `Average of ${logged.length} past ${logged.length === 1 ? "engagement" : "engagements"}`, samples: logged.length };
-    }
-  }
+  const a = await pastActuals(engagementType, { today });
+  if (a.samples) return { minutes: Math.max(60, Math.round(a.median / 60) * 60), basis: `Median of ${a.samples} past ${a.samples === 1 ? "engagement" : "engagements"}`, samples: a.samples };
   return { minutes: fallbackMinutes, basis: fallbackMinutes ? "Template estimate (no past actuals yet)" : "No past actuals yet", samples: 0 };
 }

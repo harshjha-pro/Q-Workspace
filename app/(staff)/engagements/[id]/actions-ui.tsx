@@ -9,7 +9,7 @@ import { updateEngagementAction, assignAction, endAssignmentAction } from "../ac
 
 type Current = { name: string; status: string; budgetHours: number; endDate: string; eqrRequired: boolean; feeBasis: string; fee: number; rate: number; chargeable: boolean };
 
-export function EngagementActions({ id, current, people, canSeeFees }: { id: string; current: Current; people: { id: string; name: string }[]; canSeeFees: boolean }) {
+export function EngagementActions({ id, current, people, canSeeFees, estimate }: { id: string; current: Current; people: { id: string; name: string }[]; canSeeFees: boolean; estimate?: { suggestedHours: number | null; basis: string } | null }) {
   return (
     <div className="flex flex-wrap gap-2">
       <FormDialog trigger="Edit" title="Edit engagement" action={updateEngagementAction.bind(null, id)}>
@@ -21,6 +21,7 @@ export function EngagementActions({ id, current, people, canSeeFees }: { id: str
               <Field label="Budget (hours)" error={err("budgetMinutes")}><Input name="budgetHours" defaultValue={current.budgetHours || ""} inputMode="decimal" /></Field>
               <Field label="End date"><Input type="date" name="endDate" defaultValue={current.endDate} /></Field>
             </div>
+            {estimate ? <p className="text-xs text-muted">Estimate from past actuals: {estimate.suggestedHours === null ? "none yet" : `${estimate.suggestedHours} hrs`} · {estimate.basis}</p> : null}
             {canSeeFees ? (
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Fee basis"><Select name="feeBasis" defaultValue={current.feeBasis}>{FEE_BASES.map((f) => <option key={f} value={f}>{FEE_BASIS_LABELS[f]}</option>)}</Select></Field>

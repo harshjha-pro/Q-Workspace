@@ -14,6 +14,7 @@ export default async function AnalyticsHome() {
     { href: "/analytics/compliance", title: "Compliance", text: "Filings due, on time and late, client delays and late-fee exposure.", show: practice },
     { href: "/analytics/engagements", title: "Engagements", text: "Budget against effort for every active engagement.", show: practice },
     { href: "/analytics/timeline", title: "Timeline board", text: "What is due over the coming weeks by client, engagement or person, with drill-down.", show: practice },
+    { href: "/analytics/weekly", title: "Weekly summary", text: "Last week and the week ahead in plain lines: filings, overdue work, budgets, reviews, leave.", show: can(actor, "analytics.team") },
     { href: "/analytics/firm", title: "Firm", text: "Headline numbers for the whole firm with a 12-month trend.", show: can(actor, "analytics.firm") },
     { href: "/analytics/profitability", title: "Profitability and cash", text: "Realization, unbilled work, receivables, DSO, client concentration and cost rates.", show: can(actor, "analytics.firm") },
     { href: "/analytics/capacity", title: "Capacity forecast", text: "Available hours against forecast work for the coming weeks or months, overload flags and suggested rebalancing.", show: can(actor, "analytics.firm") },

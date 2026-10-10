@@ -51,7 +51,7 @@ export async function engagementDashboard(actor: Actor, engagementId: string) {
   for (const x of entries) months.set(x.date.slice(0, 7), (months.get(x.date.slice(0, 7)) ?? 0) + x.minutes);
 
   return {
-    engagement: { id: e.id, code: e.code, name: e.name, client: e.client, status: e.status, serviceLine: e.serviceLine, startDate: e.startDate },
+    engagement: { id: e.id, code: e.code, name: e.name, client: e.client, status: e.status, serviceLine: e.serviceLine, engagementType: e.engagementType, startDate: e.startDate },
     budget: { budgetHours: hrs(e.budgetMinutes), usedHours: hrs(used), remainingHours: hrs(e.budgetMinutes - used), percent, ...(await bandOf(percent)) },
     byStage: [...byStage.entries()].map(([stage, min]) => ({ stage, hours: hrs(min) })).sort((a, b) => b.hours - a.hours),
     byPerson,

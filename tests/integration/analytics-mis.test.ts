@@ -31,7 +31,7 @@ describe("monthly Partner MIS (P5-07)", () => {
     const pdf = await readStoredFile(docs.find((d) => d.name.endsWith(".pdf"))!.versions[0]!.storagePath);
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await readStoredFile(docs.find((d) => d.name.endsWith(".xlsx"))!.versions[0]!.storagePath));
+    await wb.xlsx.load((await readStoredFile(docs.find((d) => d.name.endsWith(".xlsx"))!.versions[0]!.storagePath)) as unknown as ArrayBuffer);
     expect(wb.worksheets.map((s) => s.name)).toEqual(expect.arrayContaining(["Summary", "Compliance by type", "Realization", "Unbilled work", "Concentration", "CRM", "People"]));
     const summary = wb.getWorksheet("Summary")!;
     const rows = summary.getSheetValues().slice(2).map((v) => (v as unknown[]).slice(1, 4));
