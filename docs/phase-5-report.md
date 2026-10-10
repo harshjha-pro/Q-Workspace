@@ -64,8 +64,8 @@ Run `npm run analytics:reconcile` once after importing history.
 | Reconciliation | 6 periods on a generated dataset (fixed seed): every number matches direct SQL. Shown to catch planted bugs (a wrong late-filing rule; reversed receipts counted). On the demo data: 247/247 checks match for this month, last month, FY to date and last FY |
 | Compliance engine coverage | **100%**, unchanged |
 | Playwright e2e (new) | Partner opens every analytics page, drills into the timeline, downloads the MIS PDF and reads the weekly summary. A Manager sees the team views and is refused the firm pages. Staff see only My dashboard; HR sees only People. Desktop and mobile: **6 passed** |
-| Playwright e2e (full suite, fresh demo reset) | running at the time of writing; result added on completion |
-| Typecheck / lint | clean / clean (2 existing warnings) |
+| Playwright e2e (full suite, fresh demo reset) | **48 passed**, 12 skipped (desktop-only or mobile-only tests): every menu page for every role, all Phase 2–5 flows |
+| Typecheck / lint / production build | clean / clean (2 existing warnings) / passes |
 | `npm audit --omit=dev` | **0 vulnerabilities** |
 
 ## 4. Problems found and fixed while building
@@ -81,7 +81,13 @@ Run `npm run analytics:reconcile` once after importing history.
      realistic spread.
    - Only about 25 engagements were invoiced. Billing now covers about three quarters.
    - There was no history before this year. Last year's completed engagements, invoices and cost rates were added.
-7. **Small things:** "1 invoices" / "1 days" plurals; GSTR-1 monthly and quarterly sharing one name in the
+7. **The full e2e run caught two problems:**
+   - The new Analytics → People and Engagements menu entries had the same names as existing entries, which broke the
+     HR menu test. Analytics entries now read Compliance dashboard, Engagement budgets, Firm dashboard, CRM dashboard
+     and People dashboard.
+   - The leave-clash test assumed task titles in the clash list are unique. With today's dates, two clients'
+     "TCS 27EQ Q2" tasks fall inside the leave, so the test now counts them.
+8. **Small things:** "1 invoices" / "1 days" plurals; GSTR-1 monthly and quarterly sharing one name in the
    capacity table; a forced page break leaving a near-empty MIS page.
 
 ## 5. Decisions
