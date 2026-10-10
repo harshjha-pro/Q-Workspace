@@ -47,7 +47,7 @@ export async function receivablesAgeing(actor: Actor, today = todayIst()) {
 }
 
 /** Last issued invoice date per engagement (invoice-level or line-level link). */
-async function lastInvoiceDates(engagementIds: string[]) {
+export async function lastInvoiceDates(engagementIds: string[]) {
   const invs = await db().invoice.findMany({
     where: { status: { in: ISSUED_STATUSES }, OR: [{ engagementId: { in: engagementIds } }, { lines: { some: { engagementId: { in: engagementIds } } } }] },
     select: { date: true, engagementId: true, lines: { select: { engagementId: true } } },

@@ -15,6 +15,7 @@ export default async function AnalyticsHome() {
     { href: "/analytics/engagements", title: "Engagements", text: "Budget against effort for every active engagement.", show: practice },
     { href: "/analytics/timeline", title: "Timeline board", text: "What is due over the coming weeks by client, engagement or person, with drill-down.", show: practice },
     { href: "/analytics/firm", title: "Firm", text: "Headline numbers for the whole firm with a 12-month trend.", show: can(actor, "analytics.firm") },
+    { href: "/analytics/profitability", title: "Profitability and cash", text: "Realization, unbilled work, receivables, DSO, client concentration and cost rates.", show: can(actor, "analytics.firm") },
   ].filter((i) => i.show);
   return (
     <div className="space-y-4">

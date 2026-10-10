@@ -65,6 +65,7 @@ const NAV: NavDef[] = [
   { href: "/analytics/engagements", label: "Engagements", section: "Analytics", anyOf: ["analytics.team", "analytics.operational"] },
   { href: "/analytics/timeline", label: "Timeline", section: "Analytics", anyOf: ["analytics.team", "analytics.operational"] },
   { href: "/analytics/firm", label: "Firm", section: "Analytics", cap: "analytics.firm" },
+  { href: "/analytics/profitability", label: "Profitability", section: "Analytics", cap: "analytics.firm" },
   { href: "/admin/compliance", label: "Due-date master", section: "Admin", cap: "dueDateMaster.manage" },
   { href: "/qc", label: "Quality control", section: "Admin", anyOf: ["qc.manage", "qc.declare"] },
   { href: "/admin/retention", label: "Retention & purge", section: "Admin", cap: "settings.manage" },
