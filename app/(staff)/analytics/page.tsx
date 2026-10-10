@@ -19,6 +19,7 @@ export default async function AnalyticsHome() {
     { href: "/analytics/capacity", title: "Capacity forecast", text: "Available hours against forecast work for the coming weeks or months, overload flags and suggested rebalancing.", show: can(actor, "analytics.firm") },
     { href: "/analytics/crm", title: "CRM", text: "Lead conversion and sources, proposal pipeline, renewals, client feedback and growth.", show: can(actor, "analytics.firm") },
     { href: "/analytics/people", title: "People", text: "Headcount, attrition, tenure, leave, recruitment, appraisals, articleship and CPE (no client data).", show: can(actor, "analytics.hr") },
+    { href: "/analytics/mis", title: "Partner MIS", text: "Monthly PDF and Excel report, built on the 5th; download or rebuild a month.", show: can(actor, "analytics.firm") },
   ].filter((i) => i.show);
   return (
     <div className="space-y-4">

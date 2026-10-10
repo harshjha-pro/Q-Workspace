@@ -12,6 +12,7 @@ import { runCpeShortfall } from "../services/hr/growth";
 import { runLeaveAccrual } from "../services/attendance/leave-policies";
 import { runUnansweredMessageReminders } from "../services/messages/service";
 import { runReminderDueLists } from "../services/reminders/due-lists";
+import { runMonthlyMis } from "../services/analytics/mis";
 
 export type JobDef = {
   code: string;
@@ -85,6 +86,16 @@ export const JOBS: JobDef[] = [
     catchUpAfterHours: 26,
     roles: ["PARTNER", "PRACTICE_ADMIN"],
     run: async () => runReminderDueLists(),
+  },
+  {
+    code: "MONTHLY_MIS",
+    name: "Monthly Partner MIS",
+    description: "On the 5th, builds last month's Partner MIS (PDF + Excel), files it under firm documents (Partner only) and notifies the Partners. Skips a month already built (P5-07).",
+    cron: "0 6 5 * *",
+    scheduleLabel: "5th of each month, 06:00 IST",
+    catchUpAfterHours: 24 * 32,
+    roles: ["PARTNER"],
+    run: async () => runMonthlyMis(),
   },
   {
     code: "MESSAGES_UNANSWERED",
