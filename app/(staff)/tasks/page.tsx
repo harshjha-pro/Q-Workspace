@@ -18,7 +18,7 @@ import { NewTaskDialog } from "./new-task-dialog";
 
 export const metadata = { title: "Tasks" };
 
-type SP = { mine?: string; status?: string; serviceLine?: string; assigneeId?: string; clientId?: string; q?: string; closed?: string };
+type SP = { mine?: string; status?: string; serviceLine?: string; assigneeId?: string; clientId?: string; q?: string; closed?: string; overdue?: string };
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireStaff();
@@ -35,7 +35,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const [tasks, clients, people, engagements] = await Promise.all([
     load(() => listTasks(actor, {
       mine, status: sp.status || undefined, serviceLine: sp.serviceLine || undefined, assigneeId: sp.assigneeId || undefined,
-      clientId: sp.clientId || undefined, q: sp.q || undefined, includeClosed: sp.closed === "1",
+      clientId: sp.clientId || undefined, q: sp.q || undefined, includeClosed: sp.closed === "1", overdueOn: sp.overdue === "1" ? today : undefined,
     })),
     canSeeClients ? listClients(actor, { take: 1000 }) : Promise.resolve([]),
     wide ? listUserOptions(actor, ["PARTNER", "MANAGER", "STAFF", "ARTICLE"]) : Promise.resolve([]),
@@ -122,6 +122,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         ) : sp.clientId ? <input type="hidden" name="clientId" value={sp.clientId} /> : null}
         <div className="flex flex-wrap items-end justify-between gap-2 sm:col-span-2 lg:col-span-6">
           <Checkbox name="closed" value="1" defaultChecked={sp.closed === "1"} label="Include filed and not applicable" />
+          <Checkbox name="overdue" value="1" defaultChecked={sp.overdue === "1"} label="Overdue only" />
           <div className="flex gap-2">
             <Link href={wide ? `/tasks?mine=${mine ? "1" : "0"}` : "/tasks"} className="inline-flex h-9 items-center px-3 text-sm text-muted hover:underline">Reset</Link>
             <Button type="submit" variant="secondary">Apply</Button>

@@ -47,6 +47,8 @@ export type TaskFilter = {
   q?: string;
   includeClosed?: boolean;
   dueTo?: string;
+  /** Open tasks past their due date as on this day (dashboard drill-down). */
+  overdueOn?: string;
   take?: number;
 };
 
@@ -63,6 +65,7 @@ export async function listTasks(actor: Actor, f: TaskFilter = {}) {
       f.serviceLine ? { engagement: { serviceLine: f.serviceLine } } : {},
       f.q ? { OR: [{ title: { contains: f.q } }, { client: { searchName: { contains: f.q.toLowerCase() } } }] } : {},
       f.dueTo ? { OR: [{ effectiveDueDate: { lte: f.dueTo } }, { effectiveDueDate: null }] } : {},
+      f.overdueOn ? { status: { in: OPEN }, effectiveDueDate: { lt: f.overdueOn } } : {},
     ],
   };
   return db().task.findMany({

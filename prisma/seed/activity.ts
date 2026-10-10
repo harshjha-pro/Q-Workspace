@@ -116,7 +116,7 @@ export async function seedActivity() {
   const start = addDays(today, -182) > "2026-04-01" ? addDays(today, -182) : "2026-04-01";
   const days = (await workingDays(start, today)).filter((d) => d <= today);
   const categories = await db().internalCategory.findMany({ where: { active: true } });
-  const assignments = await db().engagementAssignment.findMany({ where: { toDate: null }, include: { engagement: { select: { id: true, clientId: true, serviceLine: true, chargeable: true, status: true, stageTemplateVersionId: true } } } });
+  const assignments = await db().engagementAssignment.findMany({ where: { toDate: null }, include: { engagement: { select: { id: true, clientId: true, serviceLine: true, chargeable: true, status: true, stageTemplateVersionId: true, budgetMinutes: true } } } });
   const engagementsOf = new Map<string, typeof assignments>();
   for (const a of assignments) if (a.engagement.status === "ACTIVE") engagementsOf.set(a.userId, [...(engagementsOf.get(a.userId) ?? []), a]);
   const openTasks = await db().task.findMany({ where: { engagementId: { not: null } }, select: { id: true, engagementId: true, periodStart: true, effectiveDueDate: true, filedDate: true, stageIndex: true, stageTemplateVersion: { select: { stages: { select: { index: true, name: true }, orderBy: { index: "asc" } } } } } });
@@ -145,7 +145,10 @@ export async function seedActivity() {
           entries.push({ userId: u.id, date, internalCategoryId: c.id, minutes, description: c.name, chargeable: c.chargeable, location: u.defaultLocation, source: "WEB", createdById: u.id, locked: date < weekStart(today) });
           continue;
         }
-        const a = pick(mine);
+        // Bigger engagements get proportionally more of the day (weighted by budget).
+        const totalWeight = mine.reduce((t, x) => t + x.engagement.budgetMinutes + 600, 0);
+        let roll = rand() * totalWeight;
+        const a = mine.find((x) => (roll -= x.engagement.budgetMinutes + 600) < 0) ?? mine[mine.length - 1]!;
         const e = a.engagement;
         const candidates = (tasksOf.get(e.id) ?? []).filter((t) => (!t.periodStart || t.periodStart <= date) && (!t.effectiveDueDate || addDays(t.effectiveDueDate, 15) >= date) && (!t.filedDate || t.filedDate >= date));
         const task = candidates.length && rand() < 0.75 ? pick(candidates) : null;
@@ -161,6 +164,21 @@ export async function seedActivity() {
     }
   }
   for (let i = 0; i < entries.length; i += 1000) await db().workEntry.createMany({ data: entries.slice(i, i + 1000) });
+
+  // Budgets that fit the demo's staffing: the seeded budgets are placeholders, far below the time 21 people log.
+  // Each active engagement gets a budget for which its effort so far is a chosen share: about 70% on track
+  // (35–80%), 10% approaching (85–99%), 5% reached (100–109%) and 15% over (110–150%), matching budget bands.
+  const used = new Map<string, number>();
+  for (const x of entries) if (x.engagementId) used.set(x.engagementId, (used.get(x.engagementId) ?? 0) + x.minutes);
+  const active = await db().engagement.findMany({ where: { status: "ACTIVE", budgetMinutes: { gt: 0 } }, select: { id: true } });
+  for (const eng of active) {
+    const u = used.get(eng.id) ?? 0;
+    if (!u) continue;
+    const r = rand();
+    const share = r < 0.7 ? 0.35 + rand() * 0.45 : r < 0.8 ? 0.85 + rand() * 0.14 : r < 0.85 ? 1.0 + rand() * 0.09 : 1.1 + rand() * 0.4;
+    await db().engagement.update({ where: { id: eng.id }, data: { budgetMinutes: Math.max(60, Math.round(u / share / 15) * 15) } });
+  }
+
   for (const u of workers) {
     const seen = new Map<string, { clientId: string; engagementId: string; taskId: string; n: number }>();
     for (const e of entries.filter((x) => x.userId === u.id && x.clientId).slice(-60)) {

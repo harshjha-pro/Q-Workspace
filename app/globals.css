@@ -25,6 +25,18 @@
   --color-st-na: #9ca3af;
   --color-st-overdue: #dc2626;
   --color-st-risk: #d97706;
+
+  /* Data-viz roles (D-87): categorical slots validated on the white card surface (CVD and normal-vision
+     separation pass; slot 3 is below 3:1, so charts always carry labels and a table view). Status colours are
+     reserved for state and always ship with a text label. */
+  --color-viz-1: #2a78d6;
+  --color-viz-2: #eb6834;
+  --color-viz-3: #1baf7a;
+  --color-viz-grid: #e5e7eb;
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
 }
 
 html,
