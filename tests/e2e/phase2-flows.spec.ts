@@ -60,10 +60,12 @@ test("leave approval shows due-date clashes and lets the manager reassign (spec 
   await expect(card.getByText(/tasks? due during this leave/)).toBeVisible();
   const first = card.getByRole("combobox", { name: /^Reassign .* to$/ }).first();
   const name = (await first.getAttribute("aria-label"))!;
+  // Two clients can have tasks with the same title in the clash list, so count rather than expect none.
+  const before = await card.getByRole("combobox", { name, exact: true }).count();
   await first.selectOption({ label: "Rohan Iyer" });
   await card.getByRole("button", { name: "Reassign" }).first().click();
   // The reassigned task no longer clashes with Priya's leave.
-  await expect(card.getByRole("combobox", { name, exact: true })).toHaveCount(0, { timeout: 15_000 });
+  await expect(card.getByRole("combobox", { name, exact: true })).toHaveCount(before - 1, { timeout: 15_000 });
   await card.getByRole("button", { name: "Approve" }).click();
   await expect(page.locator("div").filter({ hasText: "Priya Nair" }).filter({ has: page.getByRole("button", { name: "Approve" }) })).toHaveCount(0, { timeout: 15_000 });
 });
