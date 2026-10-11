@@ -75,7 +75,7 @@ export async function personalDashboard(actor: Actor, opts: { period?: string; t
       hours: hrs(totalMinutes),
       clientHours: hrs(totalMinutes - [...byCategory.values()].reduce((a, c) => a + c.minutes, 0)),
       chargeableHours: hrs(chargeableMinutes),
-      weekHours: hrs(daily.filter((d) => d.date >= weekStart(today)).reduce((a, d) => a + d.hours * 60, 0)),
+      weekHours: hrs(last14.filter((d) => d.date >= weekStart(today)).reduce((a, d) => a + (d._sum.minutes ?? 0), 0)),
       topClients,
       categories: [...byCategory.values()].sort((a, b) => b.minutes - a.minutes).map((c) => ({ name: c.name, hours: hrs(c.minutes) })),
       daily,

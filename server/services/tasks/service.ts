@@ -65,7 +65,8 @@ export async function listTasks(actor: Actor, f: TaskFilter = {}) {
       f.serviceLine ? { engagement: { serviceLine: f.serviceLine } } : {},
       f.q ? { OR: [{ title: { contains: f.q } }, { client: { searchName: { contains: f.q.toLowerCase() } } }] } : {},
       f.dueTo ? { OR: [{ effectiveDueDate: { lte: f.dueTo } }, { effectiveDueDate: null }] } : {},
-      f.overdueOn ? { status: { in: OPEN }, effectiveDueDate: { lt: f.overdueOn } } : {},
+      // Same definition as the dashboards' overdue counts: clients' live tasks only (not superseded, not the firm's own).
+      f.overdueOn ? { status: { in: OPEN }, effectiveDueDate: { lt: f.overdueOn }, supersededByTaskId: null, client: { isFirm: false } } : {},
     ],
   };
   return db().task.findMany({

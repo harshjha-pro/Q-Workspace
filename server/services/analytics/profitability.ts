@@ -118,9 +118,13 @@ export async function profitabilityDashboard(actor: Actor, opts: { period?: stri
     if (w.date < r.oldest) r.oldest = w.date;
     wipByEng.set(e.id, r);
   }
-  // A fixed fee never billed at all is unbilled at its full fee, whatever the hours.
+  // A fixed fee never billed at all is unbilled at its full fee, whatever the hours, even before any hours are
+  // logged (as Billing's unbilled-work alert counts it); it ages from the engagement start.
   for (const e of chargeable) {
-    if (e.feeBasis === "FIXED" && e.feePaise > 0 && !last.has(e.id) && wipByEng.has(e.id)) wipByEng.get(e.id)!.valuePaise = e.feePaise;
+    if (e.feeBasis !== "FIXED" || e.feePaise <= 0 || last.has(e.id) || (e.startDate ?? today) > today) continue;
+    const r = wipByEng.get(e.id) ?? { minutes: 0, costPaise: 0, valuePaise: 0, oldest: e.startDate ?? today };
+    r.valuePaise = e.feePaise;
+    wipByEng.set(e.id, r);
   }
   const wipRows = [...wipByEng.entries()].map(([id, r]) => {
     const e = eng.get(id)!;

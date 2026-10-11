@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { budgetLevel } from "../../lib/budget-band";
 import { db, transaction, type Tx } from "../../lib/db";
 import { officeHolidayStates } from "../holidays";
 import { parse } from "../../lib/validate";
@@ -113,9 +114,8 @@ export async function budgetFor(engagementId: string): Promise<BudgetInfo | null
   const e = await db().engagement.findUnique({ where: { id: engagementId } });
   if (!e || !e.budgetMinutes) return null;
   const used = (await db().workEntry.aggregate({ where: { engagementId, deletedAt: null }, _sum: { minutes: true } }))._sum.minutes ?? 0;
-  const [a, b, c] = await getSetting<number[]>("budget.bands", [85, 100, 110]);
   const pct = Math.round((used / e.budgetMinutes) * 100);
-  const [signal, health] = pct >= c! ? ["Significant Overrun", "Over Budget"] : pct >= b! ? ["Budget Reached", "Over Budget"] : pct >= a! ? ["Approaching Budget", "At Risk"] : ["Normal", "On Track"];
+  const [signal, health] = ([["Normal", "On Track"], ["Approaching Budget", "At Risk"], ["Budget Reached", "Over Budget"], ["Significant Overrun", "Over Budget"]] as const)[budgetLevel(pct, await getSetting<number[]>("budget.bands", [85, 100, 110]))];
   return { budgetMinutes: e.budgetMinutes, usedMinutes: used, remainingMinutes: e.budgetMinutes - used, percent: pct, signal, health };
 }
 

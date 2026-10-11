@@ -106,7 +106,7 @@ export async function weeklySummary(actor: Actor, opts: { week?: string; today?:
       key: "budgets",
       tone: over ? "bad" : "warn",
       text: `${plural(crossed.length, "engagement")} moved into a higher budget band: ${crossed.slice(0, 3).map((c) => `${c.code} (${c.signal.toLowerCase()})`).join(", ")}${crossed.length > 3 ? ` and ${crossed.length - 3} more` : ""}.`,
-      link: crossed.length === 1 ? `/analytics/engagements/${crossed[0]!.id}` : "/analytics/engagements?health=Over",
+      link: crossed.length === 1 ? `/analytics/engagements/${crossed[0]!.id}` : `/analytics/engagements?health=${over ? "Over" : "AtRisk"}`,
     });
   }
 

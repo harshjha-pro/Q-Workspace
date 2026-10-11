@@ -57,7 +57,7 @@ export async function reconcileAnalytics(opts: { period?: string; today?: string
   check("Compliance", "Overdue in period", await one(`SELECT COUNT(*) ${dueBase} AND t.effectiveDueDate BETWEEN ? AND ? AND t.status NOT IN ${CLOSED} AND t.effectiveDueDate < ?`, from, to, today), h.overdue);
   check("Compliance", "Not yet due in period", await one(`SELECT COUNT(*) ${dueBase} AND t.effectiveDueDate BETWEEN ? AND ? AND t.status NOT IN ${CLOSED} AND t.effectiveDueDate >= ?`, from, to, today), h.upcoming);
   check("Compliance", "Overdue now", await one(`SELECT COUNT(*) ${dueBase} AND t.status NOT IN ${CLOSED} AND t.effectiveDueDate < ?`, today), h.overdueNow);
-  check("Compliance", "Waiting on client", await one(`SELECT COUNT(*) FROM "Task" t JOIN "Client" c ON c.id = t.clientId WHERE c.isFirm = 0 AND t.status NOT IN ${CLOSED} AND t.pendingFromClient = 1`), h.waitingOnClient);
+  check("Compliance", "Waiting on client", await one(`SELECT COUNT(*) FROM "Task" t JOIN "Client" c ON c.id = t.clientId WHERE c.isFirm = 0 AND t.supersededByTaskId IS NULL AND t.status NOT IN ${CLOSED} AND t.pendingFromClient = 1`), h.waitingOnClient);
   const byType = await rows(`SELECT COALESCE(t.complianceTypeCode, 'ONE_OFF') AS k, COUNT(*) AS n ${dueBase} AND t.effectiveDueDate BETWEEN ? AND ? GROUP BY k`, from, to);
   check("Compliance", "By type adds up to due", due, comp.byType.reduce((a, r) => a + r.due, 0));
   for (const r of comp.byType.filter((x) => x.code !== "OTHER")) check("Compliance", `Due, ${r.code}`, Number(byType.find((x) => x.k === r.code)?.n ?? 0), r.due);

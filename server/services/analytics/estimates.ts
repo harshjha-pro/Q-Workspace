@@ -20,15 +20,18 @@ const q = (sorted: number[], p: number) => {
 };
 const quarter = (m: number) => Math.round(m / 15) * 15;
 
-export async function pastActuals(engagementType: string, opts: { excludeEngagementId?: string; today?: string } = {}) {
+export async function pastActuals(engagementType: string, opts: { excludeEngagementId?: string; today?: string; clientId?: string } = {}) {
   const fyStart = isoFromParts(fyStartYear(opts.today ?? todayIst()), 4, 1);
   const similar = await db().engagement.findMany({
     where: {
       engagementType,
+      ...(opts.clientId ? { clientId: opts.clientId } : {}),
       OR: [{ status: { in: ["COMPLETED", "ARCHIVED"] } }, { startDate: { lt: fyStart } }],
       NOT: [{ name: { endsWith: "(recurring)" } }, ...(opts.excludeEngagementId ? [{ id: opts.excludeEngagementId }] : [])],
     },
     select: { id: true, code: true, name: true, clientId: true, budgetMinutes: true, startDate: true, createdAt: true },
+    // The most recent 500: today's way of working, and a bounded query for large firms.
+    orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
     take: 500,
   });
   const sums = await db().workEntry.groupBy({ by: ["engagementId"], where: { engagementId: { in: similar.map((s) => s.id) }, deletedAt: null }, _sum: { minutes: true } });
@@ -38,23 +41,25 @@ export async function pastActuals(engagementType: string, opts: { excludeEngagem
   return { rows, samples: rows.length, median: q(sorted, 0.5), p25: q(sorted, 0.25), p75: q(sorted, 0.75) };
 }
 
-export async function budgetEstimate(actor: Actor, opts: { engagementType: string; clientId?: string; excludeEngagementId?: string; today?: string }) {
+export async function budgetEstimate(actor: Actor, opts: { engagementType: string; clientId?: string; excludeEngagementId?: string; today?: string; withStages?: boolean }) {
   // Planning data for whoever sets budgets (Partners, Managers); aggregate hours only, no names outside the client.
   if (actor.kind === "PORTAL" || (actor.kind === "USER" && !can(actor, "engagement.manage"))) throw forbidden();
   const a = await pastActuals(opts.engagementType, opts);
-  const same = opts.clientId
-    ? a.rows.filter((r) => r.clientId === opts.clientId).sort((x, y) => (y.startDate ?? y.createdAt.toISOString()).localeCompare(x.startDate ?? x.createdAt.toISOString()))[0]
-    : undefined;
-  // Share of effort by stage across the similar engagements (median share per stage).
-  const stageRows = a.samples ? await db().workEntry.groupBy({ by: ["engagementId", "stageName"], where: { engagementId: { in: a.rows.map((r) => r.id) }, deletedAt: null }, _sum: { minutes: true } }) : [];
+  // The client's own last engagement of the type, looked up directly (it may be older than the 500 most recent).
+  const same = opts.clientId ? (await pastActuals(opts.engagementType, { ...opts, clientId: opts.clientId })).rows[0] : undefined;
+  // Usual split by stage: the median share per stage across the similar engagements (0 where a stage had no hours).
+  const stageRows = a.samples && opts.withStages !== false ? await db().workEntry.groupBy({ by: ["engagementId", "stageName"], where: { engagementId: { in: a.rows.map((r) => r.id) }, deletedAt: null }, _sum: { minutes: true } }) : [];
   const total = new Map(a.rows.map((r) => [r.id, r.minutes]));
-  const shares = new Map<string, number[]>();
+  const shareBy = new Map<string, Map<string, number>>();
   for (const s of stageRows) {
     const k = s.stageName || "Not set";
-    shares.set(k, [...(shares.get(k) ?? []), (s._sum.minutes ?? 0) / (total.get(s.engagementId!) || 1)]);
+    const m = shareBy.get(k) ?? new Map<string, number>();
+    m.set(s.engagementId!, (m.get(s.engagementId!) ?? 0) + (s._sum.minutes ?? 0) / (total.get(s.engagementId!) || 1));
+    shareBy.set(k, m);
   }
-  const byStage = [...shares.entries()]
-    .map(([stage, xs]) => ({ stage, sharePct: Math.round((xs.reduce((x, y) => x + y, 0) / a.samples) * 1000) / 10 }))
+  const byStage = [...shareBy.entries()]
+    .map(([stage, m]) => ({ stage, sharePct: Math.round(q(a.rows.map((r) => m.get(r.id) ?? 0).sort((x, y) => x - y).map((x) => x * 1000), 0.5)) / 10 }))
+    .filter((s) => s.sharePct > 0)
     .sort((x, y) => y.sharePct - x.sharePct)
     .slice(0, 6);
   const suggested = same ? quarter(same.minutes) : a.samples ? quarter(a.median) : null;
@@ -75,10 +80,6 @@ export async function budgetEstimate(actor: Actor, opts: { engagementType: strin
 
 /** Type-level estimates for every engagement type (the new-engagement form shows the one picked). */
 export async function estimatesByType(actor: Actor, types: string[]) {
-  const out: Record<string, { suggestedHours: number | null; basis: string }> = {};
-  for (const t of types) {
-    const e = await budgetEstimate(actor, { engagementType: t });
-    out[t] = { suggestedHours: e.suggestedHours, basis: e.basis };
-  }
-  return out;
+  const all = await Promise.all(types.map((t) => budgetEstimate(actor, { engagementType: t, withStages: false })));
+  return Object.fromEntries(types.map((t, i) => [t, { suggestedHours: all[i]!.suggestedHours, basis: all[i]!.basis }]));
 }

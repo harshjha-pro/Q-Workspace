@@ -44,7 +44,7 @@ export async function complianceDashboard(actor: Actor, opts: { period?: string;
       where: { ...inClients(scope), supersededByTaskId: null, status: { notIn: CLOSED }, effectiveDueDate: { lt: today }, client: { isFirm: false } },
       select: { id: true, title: true, periodLabel: true, effectiveDueDate: true, filedDate: true, taxDuePaise: true, complianceTypeCode: true, clientId: true, client: { select: { name: true } } },
     }),
-    db().task.findMany({ where: { ...inClients(scope), status: { notIn: CLOSED }, pendingFromClient: true, client: { isFirm: false } }, select: { pendingSince: true } }),
+    db().task.findMany({ where: { ...inClients(scope), supersededByTaskId: null, status: { notIn: CLOSED }, pendingFromClient: true, client: { isFirm: false } }, select: { pendingSince: true } }),
     db().complianceType.findMany({ select: { code: true, shortName: true, name: true } }),
     ratesByType(),
     db().task.findMany({ where: dueInWhere(scope, trendFrom, today), select: { status: true, filedDate: true, effectiveDueDate: true } }),

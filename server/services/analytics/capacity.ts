@@ -163,9 +163,11 @@ export async function capacityForecast(actor: Actor, opts: { grain?: string; tod
         // Work of Staff and Articles goes to Staff and Articles; Managers and Partners only take each other's.
         const senior = (x: string) => ["PARTNER", "MANAGER"].includes(role.get(x)!);
         const pool = [...(l.teamId ? (teamOf.get(l.teamId) ?? new Set<string>()) : new Set<string>())].filter((c) => c !== u && capacity.has(c) && senior(c) === senior(u));
+        // The whole remaining task moves, so the teammate needs room in every period it spans, not just this one.
+        const roomIn = (c: string, i: number) => (capacity.get(c)![i]! * near) / 100 - work2.get(c)![i]!;
         const fits = pool
-          .map((c) => ({ c, spare: (capacity.get(c)![b]! * near) / 100 - work2.get(c)![b]! }))
-          .filter((x) => x.spare >= l.per[b]!)
+          .filter((c) => l.per.every((m, i) => m <= 0 || roomIn(c, i) >= m))
+          .map((c) => ({ c, spare: roomIn(c, b) }))
           .sort((x, y) => y.spare - x.spare);
         if (!fits.length) continue;
         const to = fits[0]!.c;

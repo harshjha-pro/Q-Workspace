@@ -1,4 +1,5 @@
 import { db } from "../../lib/db";
+import { budgetLevel } from "../../lib/budget-band";
 import { can } from "../../permissions/guards";
 import { assertEngagementAccess } from "../../permissions/scopes";
 import type { Actor } from "../../permissions/actor";
@@ -16,14 +17,14 @@ const CLOSED = ["FILED", "FILED_LATE", "NOT_APPLICABLE"];
 
 /** Budget band classifier from the `budget.bands` setting, read once (lists classify thousands of engagements). */
 export async function budgetBander() {
-  const [a, b, c] = await getSetting<number[]>("budget.bands", [85, 100, 110]);
-  return (percent: number | null) => {
-    if (percent === null) return { signal: "No budget", health: "None" as const };
-    if (percent >= c!) return { signal: "Significant overrun", health: "Over" as const };
-    if (percent >= b!) return { signal: "Budget reached", health: "Over" as const };
-    if (percent >= a!) return { signal: "Approaching budget", health: "AtRisk" as const };
-    return { signal: "On track", health: "OnTrack" as const };
-  };
+  const bands = await getSetting<number[]>("budget.bands", [85, 100, 110]);
+  const words = [
+    { signal: "On track", health: "OnTrack" as const },
+    { signal: "Approaching budget", health: "AtRisk" as const },
+    { signal: "Budget reached", health: "Over" as const },
+    { signal: "Significant overrun", health: "Over" as const },
+  ];
+  return (percent: number | null) => (percent === null ? { signal: "No budget", health: "None" as const } : words[budgetLevel(percent, bands)]!);
 }
 
 export async function bandOf(percent: number | null) {
