@@ -103,6 +103,7 @@ with a locally generated certificate), Q-27 (backups encrypted with a key in .en
 | Q-43 | **Partner MIS** contents: is the monthly pack right? It covers compliance, effort, billing, profitability, budgets, CRM and people, plus balances on the build date. Should anything be added (e.g. per-Partner pages) or removed? | As built (D-92). Contents can change without data changes |
 | Q-44 | **Capacity forecast**: which people count as capacity? Should Partners' hours be included, and should Articles count at full hours during exam-study months? | Partners, Managers, Staff and Articles, all at `capacity.hoursPerDay`, less approved leave (exam leave included) |
 | Q-45 | **Weekly summary**: anything the Partners or Managers want added to the Monday lines (e.g. new clients, notices received, DSC expiries)? | The lines in D-93 |
+| Q-46 | **Attendance on a Sunday or holiday:** if someone checks in at a client site on a week off, should the day count as Present (worked), or stay a Week off with the client-site note? Pay is the same either way; it changes the attendance sheet and any comp-off practice | Stays a Week off, with the check-in kept on the day (as built in Phase 3) |
 
 Phase 4 also built on these earlier proposals, which still stand until you confirm them: **Q-07** (portal 2FA optional, with a firm setting to make it mandatory), **Q-23** (a logged-in portal click accepts an engagement letter; the signed copy is optional) and **Q-36** (firm bank and UPI details, now also shown in the portal).
 
