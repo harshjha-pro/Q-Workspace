@@ -57,7 +57,7 @@ The review found ten problems, and all ten were fixed with regression tests (D-9
 
 ## 4. Tests that depended on the day
 
-Three test files failed only on Sunday evenings:
+Three test files, and one browser flow, failed only on Sunday evenings:
 - the Monday–Saturday week locks at 16:00 on Sunday (Q-12);
 - a leave date two weeks out fell on a Sunday;
 - a client-site check-in on a Sunday stays a week off.
@@ -70,7 +70,7 @@ The product behaves as specified in each case. The tests now pass on any day. Th
 |---|---|
 | Vitest (54 files) | **473 passed** |
 | Reconciliation on the demo data | 247/247 checks match (four periods) |
-| Playwright, full suite on a fresh demo | running at the time of writing; result added on completion |
+| Playwright, full suite on a fresh demo | **47 passed**, 12 skipped (desktop-only or mobile-only), 1 failed: the phone work-entry flow, run on a Sunday after the 16:00 lock. The e2e setup now keeps the current week open, as for the unit tests, and that flow passes on rerun |
 | Typecheck / lint / production build | clean / clean (2 existing warnings) / passes |
 
 ## 6. Before go-live (unchanged)
