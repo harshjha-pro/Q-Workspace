@@ -1,13 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { resetDb } from "../helpers/db";
-import { buildWorld, actorOf } from "../helpers/factory";
+import { buildWorld, actorOf, keepCurrentWeekOpen } from "../helpers/factory";
 import { db } from "@/server/lib/db";
-import { addDays, todayIst, weekStart } from "@/server/lib/dates";
+import { addDays, dayOfWeek, todayIst, weekStart } from "@/server/lib/dates";
 import {
   createEntries, updateEntry, deleteEntry, copyEntries, weekGrid, recentPairs, missingDays, missingBanner, teamMissing,
   requestCorrection, decideCorrection, isLocked, extendLock, startTimer, stopTimer, syncOffline, budgetFor,
 } from "@/server/services/work/service";
-import { applyLeave, decideLeave, leaveConflicts, cancelLeave, listLeave, leaveDays } from "@/server/services/leave/service";
+import { applyLeave, decideLeave, leaveConflicts, cancelLeave, listLeave, leaveDays, workingDays } from "@/server/services/leave/service";
 
 let w: Awaited<ReturnType<typeof buildWorld>>;
 const today = todayIst();
@@ -16,6 +16,7 @@ const lastWeek = addDays(weekStart(today), -3); // always in a week whose Sunday
 beforeAll(async () => {
   await resetDb();
   w = await buildWorld();
+  await keepCurrentWeekOpen();
   await db().engagement.update({ where: { id: w.e1.id }, data: { budgetMinutes: 600 } });
 });
 
@@ -73,7 +74,7 @@ describe("weekly lock and corrections (P2-07)", () => {
     expect(await isLocked(w.s2.id, lastWeek)).toBe(true);
     await createEntries(actorOf(w.s1), { dates: [lastWeek], engagementId: w.e1.id, minutes: 45 });
     await expect(extendLock(actorOf(w.m1), lastWeek, today)).rejects.toThrow();
-    await db().weeklyLock.deleteMany({});
+    await db().weeklyLock.deleteMany({ where: { scope: "USER" } });
   });
 
   it("locked entries change only through an approved correction, never self-approved", async () => {
@@ -131,7 +132,11 @@ describe("copy, grid, missing days, timer (P2-02, P2-03, P2-08, P2-42)", () => {
 });
 
 describe("leave (spec 11.3)", () => {
-  const from = addDays(today, 14);
+  // A working day about two weeks out (today + 14 can fall on a Sunday or holiday), with working days after it.
+  let from = "";
+  beforeAll(async () => {
+    from = (await workingDays(addDays(today, 14), addDays(today, 40))).find((d) => dayOfWeek(d) >= 1 && dayOfWeek(d) <= 3)!;
+  });
   it("applies, shows conflicts to the approver and is decided by the manager only", async () => {
     const req = await applyLeave(actorOf(w.s1), { leaveType: "PERSONAL", reason: "PERSONAL", fromDate: from, toDate: addDays(from, 2), halfDayEnd: true });
     expect(req.halfDays).toBeGreaterThan(0);

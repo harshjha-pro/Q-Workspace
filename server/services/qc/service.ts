@@ -11,7 +11,7 @@ import { getSettingNumber } from "../settings/service";
 import { todayIst } from "../../lib/dates";
 import { notifyUsers } from "../notifications/service";
 import { signOff } from "../review/service";
-import { auditFileCompleteness, isAuditEngagement } from "../dms/folders";
+import { auditFileCompleteness, auditFilePercents, isAuditEngagement } from "../dms/folders";
 
 /**
  * Quality control (spec 13.2, P3-27): SQC 1 / SQM checklists per audit engagement, independence
@@ -277,6 +277,7 @@ export async function qcOverview(actor: Actor, opts: { includeClosed?: boolean }
     db().signOff.findMany({ where: { engagementId: { in: ids }, level: "EQR" }, select: { engagementId: true } }),
     getSettingNumber("eqr.feeThresholdPaise", 50_000_00),
   ]);
+  const auditFile = await auditFilePercents(ids);
   const people = new Map((await db().user.findMany({ where: { id: { in: [...new Set(engagements.flatMap((e) => e.assignments.filter((a) => a.role === "EQR").map((a) => a.userId)))] } }, select: { id: true, displayName: true } })).map((u) => [u.id, u.displayName]));
   const out = [];
   for (const e of engagements) {
@@ -290,7 +291,7 @@ export async function qcOverview(actor: Actor, opts: { includeClosed?: boolean }
       checklist: c ? { id: c.id, status: c.status, answered: c.items.filter((i) => i.response).length, total: c.items.length } : null,
       independence: { declared: d.length, team: team.size, conflicts: d.filter((x) => x.hasConflict).length },
       eqr: { required: eqr, reviewer: reviewer ? (people.get(reviewer.userId) ?? "") : null, done: eqrSignoffs.some((s) => s.engagementId === e.id) },
-      auditFile: (await auditFileCompleteness(e.id)).percent,
+      auditFile: auditFile.get(e.id) ?? 0,
     });
   }
   return out;

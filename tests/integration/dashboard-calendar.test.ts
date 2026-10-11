@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { resetDb } from "../helpers/db";
-import { buildWorld, actorOf } from "../helpers/factory";
+import { buildWorld, actorOf, keepCurrentWeekOpen } from "../helpers/factory";
 import { db } from "@/server/lib/db";
 import { addDays, todayIst } from "@/server/lib/dates";
 import { homeData, thisWeek, groupView, complianceStrip } from "@/server/services/dashboard/service";
@@ -16,6 +16,7 @@ const today = todayIst();
 beforeAll(async () => {
   await resetDb();
   w = await buildWorld();
+  await keepCurrentWeekOpen();
   const group = await db().clientGroup.create({ data: { code: "GR-T1", name: "Test group" } });
   await db().client.update({ where: { id: w.c1.id }, data: { groupId: group.id } });
   const version = await db().stageTemplateVersion.findFirstOrThrow({ where: { template: { code: "GST_RETURN" }, status: "ACTIVE" } });

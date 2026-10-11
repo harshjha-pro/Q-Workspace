@@ -15,14 +15,27 @@ export async function costRatesFor(userIds: string[], date: string): Promise<Map
   return out;
 }
 
+/**
+ * Cost-rate lookup for (user, date) from one read of users and rates; null when the person has no designation or
+ * no rate covers the day. Lists of thousands of entries cost in memory instead of a query per person-month.
+ */
+export async function costLookup() {
+  const [users, rates] = await Promise.all([
+    db().user.findMany({ select: { id: true, designationId: true } }),
+    db().costRate.findMany({ orderBy: { effectiveFrom: "desc" } }),
+  ]);
+  const desig = new Map(users.map((u) => [u.id, u.designationId]));
+  const byDesig = new Map<string, { ratePaisePerHour: number; effectiveFrom: string; effectiveTo: string | null }[]>();
+  for (const r of rates) byDesig.set(r.designationId, [...(byDesig.get(r.designationId) ?? []), r]);
+  return (userId: string, date: string): number | null => {
+    const d = desig.get(userId);
+    const r = d ? byDesig.get(d)?.find((x) => x.effectiveFrom <= date && (!x.effectiveTo || x.effectiveTo >= date)) : undefined;
+    return r ? r.ratePaisePerHour : null;
+  };
+}
+
 /** Cost of a set of work entries (minutes × the person's rate on that day). */
 export async function costOfEntries(entries: { userId: string; date: string; minutes: number }[]): Promise<number> {
-  let total = 0;
-  const cache = new Map<string, Map<string, number>>();
-  for (const e of entries) {
-    const key = e.date.slice(0, 7);
-    if (!cache.has(key)) cache.set(key, await costRatesFor([...new Set(entries.map((x) => x.userId))], e.date));
-    total += Math.round(((cache.get(key)!.get(e.userId) ?? 0) * e.minutes) / 60);
-  }
-  return total;
+  const rateOf = await costLookup();
+  return entries.reduce((total, e) => total + Math.round(((rateOf(e.userId, e.date) ?? 0) * e.minutes) / 60), 0);
 }

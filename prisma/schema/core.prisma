@@ -768,6 +768,7 @@ model WorkEntry {
   @@index([userId, date])
   @@index([clientId])
   @@index([engagementId])
+  @@index([date])
   @@index([taskId])
 }
 

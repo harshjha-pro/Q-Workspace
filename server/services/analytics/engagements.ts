@@ -14,13 +14,20 @@ import { hrs, inClients, pct, practiceScope } from "./common";
  */
 const CLOSED = ["FILED", "FILED_LATE", "NOT_APPLICABLE"];
 
-export async function bandOf(percent: number | null) {
-  if (percent === null) return { signal: "No budget", health: "None" as const };
+/** Budget band classifier from the `budget.bands` setting, read once (lists classify thousands of engagements). */
+export async function budgetBander() {
   const [a, b, c] = await getSetting<number[]>("budget.bands", [85, 100, 110]);
-  if (percent >= c!) return { signal: "Significant overrun", health: "Over" as const };
-  if (percent >= b!) return { signal: "Budget reached", health: "Over" as const };
-  if (percent >= a!) return { signal: "Approaching budget", health: "AtRisk" as const };
-  return { signal: "On track", health: "OnTrack" as const };
+  return (percent: number | null) => {
+    if (percent === null) return { signal: "No budget", health: "None" as const };
+    if (percent >= c!) return { signal: "Significant overrun", health: "Over" as const };
+    if (percent >= b!) return { signal: "Budget reached", health: "Over" as const };
+    if (percent >= a!) return { signal: "Approaching budget", health: "AtRisk" as const };
+    return { signal: "On track", health: "OnTrack" as const };
+  };
+}
+
+export async function bandOf(percent: number | null) {
+  return (await budgetBander())(percent);
 }
 
 export async function engagementDashboard(actor: Actor, engagementId: string) {
@@ -83,13 +90,13 @@ export async function engagementPortfolio(actor: Actor, f: { serviceLine?: strin
   const used = new Map(sums.map((s) => [s.engagementId!, s._sum.minutes ?? 0]));
   const od = new Map(overdue.map((s) => [s.engagementId!, s._count._all]));
   const billing = can(actor, "billing.view") ? await billingStatusMap(ids) : null;
+  const band = await budgetBander();
   const rows = [];
   for (const e of engagements) {
     const u = used.get(e.id) ?? 0;
     const percent = e.budgetMinutes ? Math.round((u / e.budgetMinutes) * 100) : null;
-    const band = await bandOf(percent);
     rows.push({
-      id: e.id, code: e.code, name: e.name, client: e.client.name, serviceLine: e.serviceLine, budgetHours: hrs(e.budgetMinutes), usedHours: hrs(u), percent, ...band,
+      id: e.id, code: e.code, name: e.name, client: e.client.name, serviceLine: e.serviceLine, budgetHours: hrs(e.budgetMinutes), usedHours: hrs(u), percent, ...band(percent),
       overdueTasks: od.get(e.id) ?? 0, billingLabel: billing ? (billing.get(e.id)?.label ?? null) : null,
     });
   }

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { resetDb } from "../helpers/db";
 import { buildWorld, actorOf, makeClient } from "../helpers/factory";
 import { db } from "@/server/lib/db";
-import { addDays, todayIst } from "@/server/lib/dates";
+import { dayOfWeek, addDays, todayIst } from "@/server/lib/dates";
 import { seedGoldenRates, fillMonth } from "../payroll-golden/helpers";
 import { attendanceSheet, checkIn, requestRegularisation, decideRegularisation, listRegularisations } from "@/server/services/attendance/service";
 import { createPolicy, runLeaveAccrual, listBalances, verifyPolicy, adjustBalance, entitlementToDate } from "@/server/services/attendance/leave-policies";
@@ -67,7 +67,9 @@ describe("attendance derivation (spec 11.2, P3-17)", () => {
   it("client-site check-in marks today present", async () => {
     await checkIn(actorOf(w.a1), { note: "At client, Malviya Nagar" });
     const [row] = await attendanceSheet(actorOf(w.a1), todayIst().slice(0, 7), { me: true });
-    expect(row!.days.find((d) => d.date === todayIst())).toMatchObject({ kind: "PRESENT", location: "CLIENT_SITE", source: "CHECK_IN" });
+    // On a Sunday (week off) the check-in is kept with the day but the day stays a week off, not a working day.
+    const kind = dayOfWeek(todayIst()) === 0 ? "WEEK_OFF" : "PRESENT";
+    expect(row!.days.find((d) => d.date === todayIst())).toMatchObject({ kind, location: "CLIENT_SITE", source: "CHECK_IN" });
   });
 });
 

@@ -5,7 +5,7 @@ import { forbidden, ruleViolation } from "../../lib/errors";
 import type { Actor } from "../../permissions/actor";
 import { writeAudit, logSensitiveView } from "../../audit";
 import { diffDays, formatDate, todayIst, toIstDate } from "../../lib/dates";
-import { costOfEntries } from "../costs";
+import { costLookup } from "../costs";
 import { approvedTemplateBody } from "../../documents/library";
 import { renderMerge } from "../../documents/merge";
 import { rs } from "../../documents/pdf";
@@ -103,7 +103,7 @@ export async function unbilledAlerts(actor: Actor, today = todayIst()) {
 
 /**
  * Realization (spec 7.1): fees billed (taxable fee lines of issued invoices) ÷ internal cost of hours
- * (costOfEntries, Q-22), per engagement and per client. Partners and Practice Admin only.
+ * (cost rate per designation on the entry's day, Q-22), per engagement and per client. Partners and Practice Admin only.
  */
 export async function realization(actor: Actor) {
   authorizeBilling(actor, "billing.view");
@@ -112,26 +112,22 @@ export async function realization(actor: Actor) {
   const billed = new Map<string, number>();
   for (const l of lines) billed.set(l.engagementId!, (billed.get(l.engagementId!) ?? 0) + l.amountPaise);
   const entries = await db().workEntry.findMany({ where: { engagementId: { not: null }, deletedAt: null }, select: { engagementId: true, userId: true, date: true, minutes: true } });
-  // Aggregate per engagement × person × month (cost rates are looked up per month by costOfEntries).
-  const agg = new Map<string, Map<string, { userId: string; date: string; minutes: number }>>();
+  // Cost each entry at the person's rate on its day, in memory (one read of the rates, not a query per person-month).
+  const rateOf = await costLookup();
+  const agg = new Map<string, { cost: number; minutes: number }>();
   for (const w of entries) {
-    const m = agg.get(w.engagementId!) ?? new Map();
-    const k = `${w.userId}|${w.date.slice(0, 7)}`;
-    const cur = m.get(k);
-    if (cur) {
-      cur.minutes += w.minutes;
-      if (w.date < cur.date) cur.date = w.date;
-    } else m.set(k, { userId: w.userId, date: w.date, minutes: w.minutes });
-    agg.set(w.engagementId!, m);
+    const r = agg.get(w.engagementId!) ?? { cost: 0, minutes: 0 };
+    r.cost += Math.round(((rateOf(w.userId, w.date) ?? 0) * w.minutes) / 60);
+    r.minutes += w.minutes;
+    agg.set(w.engagementId!, r);
   }
   const engIds = [...new Set([...billed.keys(), ...agg.keys()])];
   const engs = await db().engagement.findMany({ where: { id: { in: engIds } }, select: { id: true, code: true, name: true, clientId: true } });
   const clients = new Map((await db().client.findMany({ where: { id: { in: [...new Set(engs.map((e) => e.clientId))] } }, select: { id: true, name: true } })).map((c) => [c.id, c.name]));
   const perEngagement = [];
   for (const e of engs) {
-    const parts = [...(agg.get(e.id)?.values() ?? [])];
-    const cost = parts.length ? await costOfEntries(parts) : 0;
-    const minutes = parts.reduce((t, p) => t + p.minutes, 0);
+    const cost = agg.get(e.id)?.cost ?? 0;
+    const minutes = agg.get(e.id)?.minutes ?? 0;
     const b = billed.get(e.id) ?? 0;
     perEngagement.push({ engagementId: e.id, code: e.code, name: e.name, clientId: e.clientId, clientName: clients.get(e.clientId) ?? "", billedPaise: b, costPaise: cost, minutes, ratio: cost > 0 ? b / cost : null });
   }

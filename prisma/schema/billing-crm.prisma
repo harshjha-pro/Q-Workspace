@@ -82,6 +82,8 @@ model Invoice {
 
   @@index([clientId])
   @@index([status])
+  @@index([engagementId])
+  @@index([date])
 }
 
 model InvoiceLine {
@@ -102,6 +104,8 @@ model InvoiceLine {
   updatedById    String?
 
   invoice Invoice @relation(fields: [invoiceId], references: [id])
+  @@index([invoiceId])
+  @@index([engagementId])
 }
 
 model Receipt {
@@ -139,6 +143,8 @@ model ReceiptAllocation {
 
   receipt Receipt @relation(fields: [receiptId], references: [id])
   invoice Invoice @relation(fields: [invoiceId], references: [id])
+  @@index([invoiceId])
+  @@index([receiptId])
 }
 
 model WriteOff {

@@ -87,11 +87,10 @@ export async function capacityForecast(actor: Actor, opts: { grain?: string; tod
 
   // --- Estimates from past actuals --------------------------------------------------------------------
   const since = addDays(today, -Math.round(historyMonths * 30.4));
-  const history = await db().task.findMany({
-    where: { status: { in: ["FILED", "FILED_LATE"] }, complianceTypeCode: { not: null }, filedDate: { gte: since }, supersededByTaskId: null },
-    select: { id: true, complianceTypeCode: true },
-  });
-  const histMinutes = new Map((await db().workEntry.groupBy({ by: ["taskId"], where: { taskId: { in: history.map((t) => t.id) }, deletedAt: null }, _sum: { minutes: true } })).map((g) => [g.taskId!, g._sum.minutes ?? 0]));
+  // Filter through the task relation rather than an id list: years of filed tasks can outgrow a statement's parameters.
+  const filed = { status: { in: ["FILED", "FILED_LATE"] }, complianceTypeCode: { not: null }, filedDate: { gte: since }, supersededByTaskId: null };
+  const history = await db().task.findMany({ where: filed, select: { id: true, complianceTypeCode: true } });
+  const histMinutes = new Map((await db().workEntry.groupBy({ by: ["taskId"], where: { task: filed, deletedAt: null }, _sum: { minutes: true } })).map((g) => [g.taskId!, g._sum.minutes ?? 0]));
   const samples = new Map<string, number[]>();
   for (const t of history) {
     const m = histMinutes.get(t.id) ?? 0;

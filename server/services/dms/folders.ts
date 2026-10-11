@@ -120,6 +120,24 @@ export async function auditFileCompleteness(engagementId: string): Promise<Audit
   return { applicable: true, percent, sections };
 }
 
+/**
+ * Completeness % for many audit engagements at once (QC overview), read-only: sections not created yet count as
+ * their defaults (required, incomplete), exactly as ensureAuditSections would create them.
+ */
+export async function auditFilePercents(engagementIds: string[]): Promise<Map<string, number>> {
+  const rows = await db().auditFileSection.findMany({ where: { engagementId: { in: engagementIds } }, select: { engagementId: true, code: true, required: true, complete: true } });
+  const by = new Map<string, typeof rows>();
+  for (const r of rows) by.set(r.engagementId, [...(by.get(r.engagementId) ?? []), r]);
+  const out = new Map<string, number>();
+  for (const id of engagementIds) {
+    const have = by.get(id) ?? [];
+    const missing = AUDIT_SECTIONS.filter((s) => !have.some((h) => h.code === s.code)).length;
+    const required = have.filter((h) => h.required).length + missing;
+    out.set(id, required ? Math.round((have.filter((h) => h.required && h.complete).length / required) * 100) : 100);
+  }
+  return out;
+}
+
 /** Tick / untick a section, or mark it not required. Manager (team) or Partner. */
 export async function updateAuditSection(actor: Actor, sectionId: string, input: { complete?: boolean; required?: boolean }) {
   const s = await db().auditFileSection.findUnique({ where: { id: sectionId } });

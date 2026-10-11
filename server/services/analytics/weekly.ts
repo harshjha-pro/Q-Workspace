@@ -10,7 +10,7 @@ import { ISSUED_STATUSES } from "../billing/common";
 import { formatInr } from "../../lib/money";
 import { hrs, inClients, inUsers, practiceScope } from "./common";
 import { isLate } from "./compliance";
-import { bandOf } from "./engagements";
+import { budgetBander } from "./engagements";
 
 /**
  * Weekly summary (P5-08, Q-25): a rule-based, plain-language page for last week (Monday–Sunday) and the week ahead.
@@ -93,10 +93,11 @@ export async function weeklySummary(actor: Actor, opts: { week?: string; today?:
   const b0 = new Map(before.map((r) => [r.engagementId!, r._sum.minutes ?? 0]));
   const b1 = new Map(after.map((r) => [r.engagementId!, r._sum.minutes ?? 0]));
   const crossed: { code: string; name: string; id: string; signal: string; over: boolean }[] = [];
+  const bandOf = await budgetBander();
   for (const e of engagements) {
     const p0 = Math.round(((b0.get(e.id) ?? 0) / e.budgetMinutes) * 100);
     const p1 = Math.round(((b1.get(e.id) ?? 0) / e.budgetMinutes) * 100);
-    const [x, y] = await Promise.all([bandOf(p0), bandOf(p1)]);
+    const [x, y] = [bandOf(p0), bandOf(p1)];
     if (x.signal !== y.signal && p1 > p0 && y.health !== "OnTrack") crossed.push({ id: e.id, code: e.code, name: e.name, signal: y.signal, over: y.health === "Over" });
   }
   if (crossed.length) {

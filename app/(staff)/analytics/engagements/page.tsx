@@ -12,6 +12,9 @@ import { hoursText, pctText } from "../_ui";
 
 export const metadata = { title: "Engagement dashboard" };
 
+/** Rows rendered at once: large firms have thousands of engagements; the list is sorted by budget use. */
+const SHOW = 200;
+
 const TONE = { Over: "red", AtRisk: "amber", OnTrack: "green", None: "neutral" } as const;
 const FILTERS = [["", "All"], ["Over", "Over budget"], ["AtRisk", "Approaching"], ["OnTrack", "On track"], ["None", "No budget"]] as const;
 
@@ -36,7 +39,7 @@ export default async function EngagementPortfolioPage({ searchParams }: { search
           <THead><tr><TH>Engagement</TH><TH>Service line</TH><TH className="text-right">Budget</TH><TH className="text-right">Logged</TH><TH className="text-right">Used</TH><TH>Status</TH><TH className="text-right">Overdue tasks</TH>{d.rows.some((r) => r.billingLabel !== null) ? <TH>Billing</TH> : null}</tr></THead>
           <TBody>
             {d.rows.length === 0 ? <TR><TD colSpan={8} className="text-sm text-muted">No engagements here.</TD></TR> : null}
-            {d.rows.map((r) => (
+            {d.rows.slice(0, SHOW).map((r) => (
               <TR key={r.id}>
                 <TD><Link className="font-medium hover:underline" href={`/analytics/engagements/${r.id}`}>{r.name}</Link><div className="text-xs text-muted">{r.code} · {r.client}</div></TD>
                 <TD className="text-sm">{SERVICE_LINE_LABELS[r.serviceLine as ServiceLine] ?? r.serviceLine}</TD>
@@ -50,6 +53,7 @@ export default async function EngagementPortfolioPage({ searchParams }: { search
             ))}
           </TBody>
         </Table>
+        {d.rows.length > SHOW ? <p className="p-2 text-xs text-muted">Showing the {SHOW} highest budget use of {d.rows.length}. Pick a status above to narrow the list.</p> : null}
       </Card>
     </div>
   );

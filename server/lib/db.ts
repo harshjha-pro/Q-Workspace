@@ -7,8 +7,19 @@ export { Prisma };
 
 const g = globalThis as unknown as { __qepexPrisma?: PrismaClient; __qepexPragmas?: Promise<void> };
 
+/**
+ * SQLite as bundled with libsql accepts 32,766 bound parameters per statement, but the libsql adapter does not
+ * report it, so Prisma assumes the old 999 and refuses an `in` list of 1,000+ ids (P2029), e.g. the
+ * engagement portfolio of a firm with over a thousand engagements. Reporting the real limit lets those queries
+ * run, and Prisma splits anything larger itself (D-95).
+ */
+const SQLITE_MAX_BIND_VALUES = 32_766;
+
 export function createPrisma(url: string) {
-  return new PrismaClient({ adapter: new PrismaLibSql({ url }) });
+  const factory = new PrismaLibSql({ url });
+  const connect = factory.connect.bind(factory);
+  factory.connect = async () => Object.assign(await connect(), { getConnectionInfo: () => ({ supportsRelationJoins: false, maxBindValues: SQLITE_MAX_BIND_VALUES }) });
+  return new PrismaClient({ adapter: factory });
 }
 
 /** The shared client. A function (not a constant) so backup-restore can swap the file and reconnect. */

@@ -80,3 +80,17 @@ export async function buildWorld() {
   const portal: PortalActor = { kind: "PORTAL", portalUserId: portalUser.id, role: "PORTAL", clientIds: [c1.id], displayName: "CFO" };
   return { partner, m1, m2, s1, senior, a1, s2, pa, hr, t1, t2, c1, c2, e1, e2, portal };
 }
+
+/**
+ * Tests that log work "today" run against the real clock. From Sunday 16:00 IST the current week is locked
+ * (Q-12), so on a Sunday evening they would fail. This applies the Partner's lock extension (spec 5.6) to the
+ * current week when it is already locked, exactly as the firm would to let people finish the week.
+ */
+export async function keepCurrentWeekOpen() {
+  const { todayIst, weekStart, addDays } = await import("@/server/lib/dates");
+  const { lockMomentFor } = await import("@/server/services/work/service");
+  const today = todayIst();
+  const lockAt = await lockMomentFor(today);
+  if (new Date() < lockAt) return;
+  await db().weeklyLock.create({ data: { weekStart: weekStart(today), scope: "FIRM", lockAt, extendedUntil: new Date(`${addDays(today, 1)}T23:59:59+05:30`) } });
+}

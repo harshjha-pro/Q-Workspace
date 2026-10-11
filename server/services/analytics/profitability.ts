@@ -6,6 +6,7 @@ import { SERVICE_LINE_LABELS, type ServiceLine } from "../../domain/enums";
 import { ISSUED_STATUSES, OPEN_STATUSES, outstandingOf } from "../billing/common";
 import { BUCKETS, bucketIndex } from "../billing/ageing";
 import { lastInvoiceDates } from "../billing/reports";
+import { costLookup } from "../costs";
 import { assertFirmAnalytics, hrs, pct, resolvePeriod } from "./common";
 
 /**
@@ -18,23 +19,6 @@ import { assertFirmAnalytics, hrs, pct, resolvePeriod } from "./common";
  *   concentration = each client's share of fees billed over the last 12 months.
  * Cost rates are salary-level data, so every view is logged as sensitive.
  */
-type RateRow = { designationId: string; ratePaisePerHour: number; effectiveFrom: string; effectiveTo: string | null };
-
-/** Cost-rate lookup for (user, date); null when the person has no designation or no rate covers the day. */
-async function costLookup() {
-  const [users, rates] = await Promise.all([
-    db().user.findMany({ select: { id: true, designationId: true } }),
-    db().costRate.findMany({ orderBy: { effectiveFrom: "desc" } }),
-  ]);
-  const desig = new Map(users.map((u) => [u.id, u.designationId]));
-  const byDesig = new Map<string, RateRow[]>();
-  for (const r of rates) byDesig.set(r.designationId, [...(byDesig.get(r.designationId) ?? []), r]);
-  return (userId: string, date: string): number | null => {
-    const d = desig.get(userId);
-    const r = d ? byDesig.get(d)?.find((x) => x.effectiveFrom <= date && (!x.effectiveTo || x.effectiveTo >= date)) : undefined;
-    return r ? r.ratePaisePerHour : null;
-  };
-}
 const costOf = (rate: number | null, minutes: number) => (rate === null ? 0 : Math.round((rate * minutes) / 60));
 const lineOf = (s: string | null | undefined) => (s ? (SERVICE_LINE_LABELS[s as ServiceLine] ?? s) : "Not linked to an engagement");
 

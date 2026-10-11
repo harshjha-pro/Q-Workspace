@@ -5,7 +5,7 @@ import type { Actor } from "../../permissions/actor";
 import { addDays, diffDays, isIsoDate, todayIst, weekStart } from "../../lib/dates";
 import { displayState, type DisplayState, type TaskStatus } from "../../compliance-engine";
 import { inClients, practiceScope } from "./common";
-import { bandOf } from "./engagements";
+import { budgetBander } from "./engagements";
 
 /**
  * Timeline board (P5-02): who and what is due over the next weeks, in three views over the same week columns.
@@ -107,9 +107,10 @@ export async function timelineBoard(actor: Actor, opts: Opts = {}) {
     ]);
     const used = new Map(sums.map((s) => [s.engagementId!, s._sum.minutes ?? 0]));
     const byEng = new Map<string, TimelineRow>();
+    const bandOf = await budgetBander();
     for (const e of engagements) {
       const percent = e.budgetMinutes ? Math.round(((used.get(e.id) ?? 0) / e.budgetMinutes) * 100) : null;
-      const band = await bandOf(percent);
+      const band = bandOf(percent);
       // The span is clipped to the window; an engagement with no end date runs to the window's end.
       const inWindow = (!e.startDate || e.startDate <= w.to) && (!e.endDate || e.endDate >= w.from);
       const span = inWindow ? { from: Math.max(1, colOf(e.startDate && e.startDate > w.from ? e.startDate : w.from, w)), to: e.endDate && e.endDate < w.to ? colOf(e.endDate, w) : w.weeks, ...band } : undefined;

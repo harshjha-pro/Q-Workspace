@@ -392,8 +392,11 @@ export async function billingStatusMap(engagementIds: string[]) {
     where: { status: { in: ISSUED_STATUSES }, OR: [{ engagementId: { in: engagementIds } }, { lines: { some: { engagementId: { in: engagementIds } } } }] },
     select: { status: true, totalPaise: true, receivedPaise: true, writtenOffPaise: true, date: true, engagementId: true, lines: { select: { engagementId: true } } },
   });
+  // Group once (an invoice can bill several engagements through its lines) instead of scanning per engagement.
+  const byEng = new Map<string, typeof invs>();
+  for (const i of invs) for (const e of new Set([i.engagementId, ...i.lines.map((l) => l.engagementId)])) if (e) byEng.set(e, [...(byEng.get(e) ?? []), i]);
   const out = new Map<string, ReturnType<typeof rollUp>>();
-  for (const id of engagementIds) out.set(id, rollUp(invs.filter((i) => i.engagementId === id || i.lines.some((l) => l.engagementId === id))));
+  for (const id of engagementIds) out.set(id, rollUp(byEng.get(id) ?? []));
   return out;
 }
 
