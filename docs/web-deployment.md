@@ -49,8 +49,7 @@ The demo is generated locally against MariaDB, using the same keys as Vercel, so
 read. It is then imported:
 
 1. phpMyAdmin (hPanel → Databases → phpMyAdmin) → select the database → **Import** the `.sql` dump.
-2. Demo files: with `DEMO_FILE_IMPORT=true` set, POST each stored file to `/api/setup/demo-files` with
-   `Authorization: Bearer CRON_SECRET` and `x-storage-path`. Then delete `DEMO_FILE_IMPORT` and the route.
+2. Demo files: set `DEMO_FILE_IMPORT=true` and deploy; the build copies `prisma/seed/web-demo-files` to Blob storage. Then delete `DEMO_FILE_IMPORT`.
 
 ## Before real firm use
 

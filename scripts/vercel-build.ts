@@ -43,4 +43,25 @@ const run = (cmd: string, env: NodeJS.ProcessEnv = process.env) => execSync(cmd,
 run("npx tsx scripts/mysql-schema.ts --check");
 const env = { ...process.env, DATABASE_URL: url.href, MYSQL_URL: url.href };
 run("npx prisma migrate deploy --config prisma.mysql.config.ts", env);
-run("npx next build", env);
+importDemoFiles().then(() => run("npx next build", env), (e) => fail(`Demo file import failed: ${e instanceof Error ? e.message : e}`));
+
+/**
+ * One-time demo setup (D-99): the demo firm's documents (made-up data, prisma/seed/web-demo-files) are copied into
+ * the private Blob store while DEMO_MODE and DEMO_FILE_IMPORT are both "true". Remove DEMO_FILE_IMPORT afterwards.
+ */
+async function importDemoFiles() {
+  if (process.env.DEMO_MODE !== "true" || process.env.DEMO_FILE_IMPORT !== "true") return;
+  if (!process.env.BLOB_READ_WRITE_TOKEN) fail("DEMO_FILE_IMPORT is on but the Blob store is not connected (BLOB_READ_WRITE_TOKEN).");
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const { put } = await import("@vercel/blob");
+  const root = path.resolve("prisma/seed/web-demo-files");
+  const files = (await fs.readdir(root, { recursive: true, withFileTypes: true })).filter((d) => d.isFile());
+  const types: Record<string, string> = { pdf: "application/pdf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", zip: "application/zip", png: "image/png", jpg: "image/jpeg", csv: "text/csv", txt: "text/plain" };
+  for (const d of files) {
+    const abs = path.join(d.parentPath, d.name);
+    const rel = path.relative(root, abs).split(path.sep).join("/");
+    await put(rel, await fs.readFile(abs), { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: types[path.extname(rel).slice(1).toLowerCase()] ?? "application/octet-stream" });
+  }
+  console.log(`Demo files copied to Blob storage: ${files.length}`);
+}

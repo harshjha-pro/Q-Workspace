@@ -62,7 +62,7 @@ describe("authorization review (D-86)", () => {
       for (const m of src.matchAll(/export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE)\s*\(/g)) {
         const body = bodyFrom(src, m.index!);
         // Vercel Cron (web deployment, D-99) has no user session: it must check the shared CRON_SECRET instead.
-        const cronSecret = (rel(file).startsWith("app/api/cron/") || rel(file) === "app/api/setup/demo-files/route.ts") && /\bauthorised\s*\(req\)/.test(body);
+        const cronSecret = rel(file).startsWith("app/api/cron/") && /\bauthorised\s*\(req\)/.test(body);
         if (!cronSecret && !/\bgetSession\s*\(|\brequireStaff\s*\(|\brequirePortal\s*\(/.test(body) && !wrapperCall.test(body)) problems.push(`${rel(file)} ${m[1]}: no session check`);
         // A secret-authenticated machine call carries no browser cookies, so cross-site requests cannot ride on it.
         if (m[1] !== "GET" && !cronSecret && !/\bcrossSiteRefused\s*\(/.test(body)) problems.push(`${rel(file)} ${m[1]}: no cross-site check`);
