@@ -28,7 +28,7 @@ Project → Settings → Environment Variables (Production and Preview):
 
 | Name | Value |
 |---|---|
-| `DATABASE_URL` | `mysql://USER:PASSWORD@HOST:3306/DATABASE`. Percent-encode special characters in the password (`@` → `%40`, `#` → `%23`, `/` → `%2F`) |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (optional `DB_PORT`, default 3306) | The Hostinger MySQL details as separate settings (no encoding needed). Alternatively one `DATABASE_URL` = `mysql://USER:PASSWORD@HOST:3306/DATABASE`; the separate settings win when both are set |
 | `VAULT_KEY`, `PII_KEY`, `BACKUP_KEY` | 32-byte base64 keys. **Keep a copy offline.** Losing them makes encrypted fields unreadable |
 | `AUTH_SECRET` | Random secret that signs logins |
 | `CRON_SECRET` | Random secret; Vercel Cron sends it automatically |

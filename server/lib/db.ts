@@ -3,7 +3,7 @@ import { PrismaClient as MysqlPrismaClient } from "@/generated/prisma-mysql/clie
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { env } from "./env";
-import { cleanDatabaseUrl } from "./database-url";
+import { resolveDatabaseUrl } from "./database-url";
 
 export type Tx = Prisma.TransactionClient;
 export { Prisma };
@@ -25,7 +25,7 @@ const SQLITE_MAX_BIND_VALUES = 32_766;
  */
 export type Dialect = "sqlite" | "mysql";
 export const dialectOf = (url: string): Dialect => (/^(mysql|mariadb):\/\//i.test(url) ? "mysql" : "sqlite");
-const databaseUrl = () => cleanDatabaseUrl(process.env.DATABASE_URL ?? env().DATABASE_URL);
+const databaseUrl = () => resolveDatabaseUrl() ?? env().DATABASE_URL;
 export const dialect = (): Dialect => dialectOf(databaseUrl());
 
 function createMysql(url: string): PrismaClient {

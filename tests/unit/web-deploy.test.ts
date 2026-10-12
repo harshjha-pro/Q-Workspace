@@ -37,3 +37,16 @@ describe("database by URL", () => {
     expect(() => execSync("npx tsx scripts/mysql-schema.ts --check", { stdio: "pipe" })).not.toThrow();
   });
 });
+
+describe("resolveDatabaseUrl (D-99)", () => {
+  it("builds the URL from separate settings, encoding the password", async () => {
+    const { resolveDatabaseUrl } = await import("@/server/lib/database-url");
+    const url = new URL(resolveDatabaseUrl({ DB_HOST: " https://srv1.hstgr.io/ ", DB_USER: "u1_q", DB_PASSWORD: "P@ss#/1", DB_NAME: "u1_db", DATABASE_URL: "https://wrong" })!);
+    expect([url.hostname, url.port, decodeURIComponent(url.password), url.pathname]).toEqual(["srv1.hstgr.io", "3306", "P@ss#/1", "/u1_db"]);
+  });
+  it("cleans a pasted DATABASE_URL", async () => {
+    const { resolveDatabaseUrl } = await import("@/server/lib/database-url");
+    expect(resolveDatabaseUrl({ DATABASE_URL: ' DATABASE_URL="mysql://u:p@h:3306/d" ' })).toBe("mysql://u:p@h:3306/d");
+    expect(resolveDatabaseUrl({})).toBeUndefined();
+  });
+});

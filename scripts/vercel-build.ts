@@ -3,20 +3,23 @@
  * Hostinger database (migrate deploy — never a reset), then build Next.js.
  */
 import { execSync } from "node:child_process";
-import { cleanDatabaseUrl } from "../server/lib/database-url";
+import { resolveDatabaseUrl } from "../server/lib/database-url";
 
 function fail(msg: string): never {
   console.error(`\n${msg}\n`);
   process.exit(1);
 }
 
-const raw = cleanDatabaseUrl(process.env.DATABASE_URL ?? "");
+const raw = resolveDatabaseUrl() ?? "";
+const fromParts = !!(process.env.DB_HOST || process.env.DB_USER || process.env.DB_NAME);
 if (!raw) {
   const nearMiss = Object.keys(process.env).find((k) => k !== "DATABASE_URL" && k.toUpperCase() === "DATABASE_URL");
   fail(nearMiss
     ? `Found "${nearMiss}" but the name must be exactly DATABASE_URL (capital letters). Add it again under that name in Vercel → Project → Settings → Environment Variables.`
-    : "DATABASE_URL is not set. In Vercel → Project → Settings → Environment Variables, set\n  DATABASE_URL = mysql://USER:PASSWORD@HOST:3306/DATABASE\nwith the Hostinger MySQL details (hPanel → Databases → MySQL Databases), and allow remote access (hPanel → Remote MySQL).");
+    : "No database settings. In Vercel → Project → Settings → Environment Variables add DB_HOST, DB_USER, DB_PASSWORD and DB_NAME (Hostinger hPanel → Databases → MySQL Databases), or one DATABASE_URL.\nAllow remote access in hPanel → Databases → Remote MySQL (Any Host).");
 }
+if (fromParts && !(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME))
+  fail(`Missing ${["DB_HOST", "DB_USER", "DB_NAME"].filter((k) => !process.env[k]?.trim()).join(", ")} in Vercel → Settings → Environment Variables.`);
 if (!/^(mysql|mariadb):\/\//i.test(raw)) {
   // Describe the shape without printing the value (it holds the password).
   const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(raw)?.[1];
