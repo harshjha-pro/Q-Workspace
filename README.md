@@ -277,3 +277,4 @@ storage/ backups/ logs/ certs/   Local data (git-ignored)
 - [`docs/security-checklist.md`](docs/security-checklist.md): internal security checklist (in place of an external test, Q-15)
 - [`docs/service-boundaries.md`](docs/service-boundaries.md): where future connectors would plug in
 - [`docs/go-live.md`](docs/go-live.md): going live with real data
+- [`docs/web-deployment.md`](docs/web-deployment.md): running it as a web app (Vercel + Hostinger MySQL)
