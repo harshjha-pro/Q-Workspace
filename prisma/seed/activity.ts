@@ -198,7 +198,7 @@ export async function seedActivity() {
   }
 
   // Open tasks nobody picked up go to the client's Manager, except a few left for "Allocations pending".
-  const unassigned = await db().task.findMany({ where: { status: { notIn: CLOSED }, assignments: { none: { toDate: null } } }, include: { client: { select: { managerId: true, partnerId: true } } }, orderBy: { effectiveDueDate: "asc" } });
+  const unassigned = await db().task.findMany({ where: { status: { notIn: CLOSED }, assignments: { none: { toDate: null } } }, include: { client: { select: { managerId: true, partnerId: true } } }, orderBy: [{ effectiveDueDate: "asc" }, { id: "asc" }] });
   for (const t of unassigned.slice(4)) {
     const owner = t.client.managerId ?? t.client.partnerId ?? P("rohan.iyer").id;
     await db().taskAssignment.create({ data: { taskId: t.id, userId: owner, role: "ASSIGNEE", fromDate: start, createdById: "system" } });
@@ -208,7 +208,8 @@ export async function seedActivity() {
   const soon = await db().task.findMany({
     where: { status: { in: ["UPCOMING", "IN_PROGRESS"] }, effectiveDueDate: { gte: today, lte: addDays(today, 30) }, engagementId: { not: null } },
     include: { assignments: { where: { toDate: null } }, stageTemplateVersion: { include: { stages: true } } },
-    orderBy: { effectiveDueDate: "asc" },
+    // Ties broken by id so SQLite and MySQL pick the same tasks (D-98).
+    orderBy: [{ effectiveDueDate: "asc" }, { id: "asc" }],
   });
   const makerOf = (t: (typeof soon)[number]) => byId.get(t.assignments.find((a) => a.role === "MAKER" || a.role === "ASSIGNEE")?.userId ?? "");
   let pending = 0;

@@ -34,7 +34,7 @@ export async function seedPortalDemo() {
   const accounts = await import("../../../server/services/portal/accounts");
   const portalActions = await import("../../../server/services/portal/actions");
   const messages = await import("../../../server/services/messages/service");
-  const { updateChecklistItem } = await import("../../../server/services/pending/service");
+  const { updateChecklistItem, setPending } = await import("../../../server/services/pending/service");
   const { fileGeneratedDocument } = await import("../../../server/services/dms/service");
   const { runReminderDueLists } = await import("../../../server/services/reminders/due-lists");
   const { resolveSession } = await import("../../../server/services/auth/sessions");
@@ -127,6 +127,28 @@ export async function seedPortalDemo() {
       await portalActions.requestClientApproval(asker, task.id, { title: `Approve the draft: ${task.title}`, note: "Please check the figures before we file.", documentId: doc.id });
       const second = await portalActions.requestClientApproval(asker, task.id, { title: `Confirm turnover figure for ${task.periodLabel || "the period"}`, note: "" });
       await portalActions.decideClientApproval(me, second.id, { decision: "APPROVED", comment: "Confirmed." }, { ip: "192.168.1.50" });
+    }
+  }
+
+  // Every demo portal client has at least one open document request to answer (the demo and its e2e flows rely
+  // on it). The activity seed picks pending tasks by due date, so make sure explicitly, the way staff would.
+  for (const clientId of [...used].sort()) {
+    if (await db().checklistItem.count({ where: { clientId, status: "REQUESTED", taskId: { not: null } } })) continue;
+    const open = await db().task.findMany({
+      where: { clientId, status: { in: ["UPCOMING", "IN_PROGRESS"] } },
+      include: { assignments: { where: { toDate: null } } },
+      orderBy: [{ effectiveDueDate: "asc" }, { id: "asc" }],
+    });
+    for (const t of open) {
+      const maker = await staff(t.assignments.find((a) => a.role === "MAKER" || a.role === "ASSIGNEE")?.userId ?? null);
+      const items = await db().checklistItem.findMany({ where: { taskId: t.id }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }], take: 2 });
+      if (!maker || !items.length) continue;
+      try {
+        await setPending(maker, t.id, { what: "Bank statements for the quarter", itemIds: items.map((i) => i.id) });
+        break;
+      } catch {
+        /* a task the maker cannot change (e.g. with the checker) — try the next */
+      }
     }
   }
 

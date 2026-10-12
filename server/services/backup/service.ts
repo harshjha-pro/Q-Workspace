@@ -9,6 +9,18 @@ import { notFound, ruleViolation, forbidden } from "../../lib/errors";
 import { backupDir, createBackupFile, currentSchemaVersion, restoreBackupIntoLive, readManifest, safeName, sha256OfFile, verifyBackup, type BackupKind } from "./archive";
 import { getSettingNumber } from "../settings/service";
 import { logger } from "../../lib/logger";
+import { dialect } from "../../lib/db";
+import { blobStorageEnabled } from "../../lib/storage";
+
+/**
+ * Web deployment (D-98, D-99): the data lives in the host's MySQL and Vercel Blob, which the hosts back up
+ * (Hostinger daily MySQL backups; Blob is replicated). The in-app backup copies a local SQLite file and folder,
+ * so it applies to the office install only.
+ */
+export const backupsManagedByHost = () => dialect() === "mysql" || blobStorageEnabled();
+function officeOnly() {
+  if (backupsManagedByHost()) throw ruleViolation("In the web version, backups are made by the database host (Hostinger) and Vercel Blob, not inside the app.");
+}
 
 async function record(fileName: string, kind: BackupKind, createdById: string | null) {
   const m = readManifest(fileName);
@@ -21,6 +33,7 @@ async function record(fileName: string, kind: BackupKind, createdById: string | 
 /** "Back up now" — Partner or Practice Admin. */
 export async function backupNow(actor: Actor) {
   authorize(actor, "backup.restore.request");
+  officeOnly();
   const name = await createBackupFile("MANUAL");
   const rec = await record(name, "MANUAL", idOf(actor));
   await transaction((tx) => writeAudit(tx, actor, { entityType: "BackupRecord", entityId: rec.id, action: "BACKUP", after: { fileName: name } }));
@@ -29,6 +42,7 @@ export async function backupNow(actor: Actor) {
 
 /** Nightly job: automatic backup + keep only the newest N automatic ones. */
 export async function automaticBackup() {
+  if (backupsManagedByHost()) return { skipped: "backups are made by the database host in the web version" };
   const name = await createBackupFile("AUTO");
   const rec = await record(name, "AUTO", null);
   const keep = await getSettingNumber("backup.keepAuto", 14);
@@ -60,6 +74,7 @@ export async function backupFileForDownload(actor: Actor, backupId: string) {
 /** Bring in a backup zip from another machine; validated before it can be restored. */
 export async function uploadBackup(actor: Actor, originalName: string, data: Buffer) {
   authorize(actor, "backup.download");
+  officeOnly();
   fs.mkdirSync(backupDir(), { recursive: true });
   const name = `uploaded-${Date.now()}-${safeName(/\.(zip|qbk)$/.test(originalName) ? originalName : `${originalName}.zip`)}`;
   fs.writeFileSync(path.join(backupDir(), name), data);
@@ -76,6 +91,7 @@ export async function uploadBackup(actor: Actor, originalName: string, data: Buf
 
 export async function requestRestore(actor: Actor, backupId: string, note: string) {
   authorize(actor, "backup.restore.request");
+  officeOnly();
   const rec = await db().backupRecord.findUnique({ where: { id: backupId } });
   if (!rec || rec.status === "MISSING") throw notFound("Backup");
   verifyBackup(rec.fileName);
@@ -94,6 +110,7 @@ export async function requestRestore(actor: Actor, backupId: string, note: strin
  */
 export async function approveAndRestore(actor: Actor, backupId: string) {
   authorize(actor, "backup.restore.approve");
+  officeOnly();
   const rec = await db().backupRecord.findUnique({ where: { id: backupId } });
   if (!rec) throw notFound("Backup");
   if (rec.status !== "RESTORE_REQUESTED") throw ruleViolation("Request the restore first.");

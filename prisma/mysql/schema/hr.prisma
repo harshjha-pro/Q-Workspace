@@ -1,0 +1,784 @@
+// ---------------------------------------------------------------------------
+// HRMS (spec 11). Salary, bank, Aadhaar and employee PAN are encrypted with PII_KEY.
+// ---------------------------------------------------------------------------
+
+model EmployeeProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  employeeCode     String   @unique // internal, never typed by the user at login (3.9)
+  employeeCategory String   @default("STAFF") @db.Text // PARTNER | STAFF | ARTICLE | ADMIN | SUPPORT
+  dateOfBirth      String? @db.Text
+  gender           String? @db.Text
+  personalEmail    String? @db.Text
+  personalMobile   String? @db.Text
+  address          String   @default("") @db.Text
+  emergencyName    String   @default("") @db.Text
+  emergencyPhone   String   @default("") @db.Text
+  bankNameEnc      String? @db.Text
+  bankAccountEnc   String? @db.Text
+  bankIfscEnc      String? @db.Text
+  panEnc           String? @db.Text
+  aadhaarEnc       String? @db.Text
+  aadhaarLast4     String? @db.Text // display only, masked
+  uan              String? @db.Text
+  esiNumber        String? @db.Text
+  qualifications   String   @default("") @db.Text
+  membershipBody   String? @db.Text // ICAI | ICSI | ICMAI
+  membershipNo     String? @db.Text
+  joiningDate      String? @db.Text
+  confirmationDate String? @db.Text
+  exitDate         String? @db.Text
+  workStateCode    String? @db.Text // drives Professional Tax slab
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+
+  user      User               @relation(fields: [userId], references: [id])
+  documents EmployeeDocument[]
+}
+
+model EmployeeDocument {
+  id          String   @id @default(cuid())
+  employeeId  String
+  documentId  String @db.Text
+  kind        String @db.Text // KYC | CERTIFICATE | OFFER | APPOINTMENT | OTHER
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  employee EmployeeProfile @relation(fields: [employeeId], references: [id])
+}
+
+model Attendance {
+  id          String    @id @default(cuid())
+  userId      String
+  date        String
+  status      String @db.Text // PRESENT | HALF_DAY | ABSENT | LEAVE | HOLIDAY | WEEK_OFF
+  location    String? @db.Text
+  clientId    String? @db.Text
+  source      String    @default("DERIVED") @db.Text // DERIVED | CHECK_IN | REGULARISED
+  checkInAt   DateTime?
+  checkInNote String? @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([userId, date])
+}
+
+model Regularisation {
+  id              String    @id @default(cuid())
+  userId          String
+  date            String @db.Text
+  requestedStatus String @db.Text
+  reason          String @db.Text
+  status          String    @default("PENDING") @db.Text
+  approverId      String? @db.Text
+  decidedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String? @db.Text
+  updatedById     String? @db.Text
+
+  @@index([userId])
+}
+
+model LeavePolicy {
+  id                      String   @id @default(cuid())
+  name                    String @db.Text
+  employeeCategory        String @db.Text
+  leaveType               String @db.Text // PERSONAL | SICK | EXAM_STUDY | OTHER ...
+  quotaHalfDays           Int
+  accrual                 String   @default("ANNUAL") @db.Text // ANNUAL | MONTHLY
+  carryForwardMaxHalfDays Int      @default(0)
+  encashable              Boolean  @default(false)
+  effectiveFrom           String @db.Text
+  source                  String   @default("") @db.Text
+  verifiedById            String? @db.Text
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  createdById             String? @db.Text
+  updatedById             String? @db.Text
+}
+
+model LeaveBalance {
+  id               String   @id @default(cuid())
+  userId           String
+  leaveType        String
+  fy               String
+  openingHalfDays  Int      @default(0)
+  accruedHalfDays  Int      @default(0)
+  takenHalfDays    Int      @default(0)
+  encashedHalfDays Int      @default(0)
+  adjustedHalfDays Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+
+  @@unique([userId, leaveType, fy])
+}
+
+model LeaveRequest {
+  id                  String    @id @default(cuid())
+  userId              String
+  leaveType           String @db.Text
+  reason              String @db.Text // PERSONAL | SICK | HOLIDAY | EXAM_STUDY | OTHER
+  note                String    @default("") @db.Text
+  fromDate            String
+  toDate              String @db.Text
+  halfDayStart        Boolean   @default(false)
+  halfDayEnd          Boolean   @default(false)
+  halfDays            Int
+  status              String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  approverId          String? @db.Text
+  decidedAt           DateTime?
+  decisionNote        String    @default("") @db.Text
+  conflictsReviewedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String? @db.Text
+  updatedById         String? @db.Text
+
+  @@index([userId, fromDate])
+  @@index([status])
+}
+
+model SalaryStructure {
+  id                   String    @id @default(cuid())
+  userId               String
+  effectiveFrom        String
+  kind                 String    @default("SALARY") @db.Text // SALARY | STIPEND
+  componentsEnc        String @db.Text // JSON: basic, hra, allowances[], variable (paise)
+  monthlyGrossPaiseEnc String @db.Text
+  regime               String    @default("NEW") @db.Text // NEW | OLD
+  status               String    @default("DRAFT") @db.Text // DRAFT | APPROVED | SUPERSEDED
+  approvedById         String? @db.Text
+  approvedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  createdById          String? @db.Text
+  updatedById          String? @db.Text
+
+  @@index([userId, effectiveFrom])
+}
+
+model PayrollRun {
+  id           String    @id @default(cuid())
+  month        String // YYYY-MM
+  kind         String    @default("SALARY") // SALARY | STIPEND
+  status       String    @default("DRAFT") @db.Text // DRAFT | REVIEWED | APPROVED | PAID | LOCKED
+  reviewedById String? @db.Text
+  reviewedAt   DateTime?
+  approvedById String? @db.Text
+  approvedAt   DateTime?
+  paidAt       DateTime?
+  lockedAt     DateTime?
+  totalsEnc    String? @db.Text
+  notes        String    @default("") @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  payslips Payslip[]
+
+  @@unique([month, kind])
+}
+
+model Payslip {
+  id            String    @id @default(cuid())
+  runId         String
+  userId        String
+  daysInMonth   Int
+  lopHalfDays   Int       @default(0)
+  linesEnc      String @db.Text // JSON: earnings[], deductions[] (paise)
+  grossPaiseEnc String @db.Text
+  netPaiseEnc   String @db.Text
+  pfPaise       Int       @default(0) // statutory amounts needed for returns data
+  esiPaise      Int       @default(0)
+  ptPaise       Int       @default(0)
+  tdsPaise      Int       @default(0)
+  pdfDocumentId String? @db.Text
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  run PayrollRun @relation(fields: [runId], references: [id])
+
+  @@unique([runId, userId])
+}
+
+model InvestmentDeclaration {
+  id                String    @id @default(cuid())
+  userId            String
+  fy                String
+  regime            String    @default("NEW") @db.Text
+  itemsEnc          String @db.Text
+  status            String    @default("DRAFT") @db.Text // DRAFT | SUBMITTED | PROOFS_SUBMITTED | VERIFIED
+  proofsSubmittedAt DateTime?
+  verifiedById      String? @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  proofs InvestmentProof[]
+
+  @@unique([userId, fy])
+}
+
+model InvestmentProof {
+  id            String   @id @default(cuid())
+  declarationId String
+  section       String @db.Text
+  amountPaise   Int
+  documentId    String @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  declaration InvestmentDeclaration @relation(fields: [declarationId], references: [id])
+}
+
+model Form16 {
+  id            String    @id @default(cuid())
+  userId        String
+  fy            String
+  partADocId    String? @db.Text
+  pdfDocumentId String? @db.Text
+  generatedAt   DateTime?
+  issuedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  @@unique([userId, fy])
+}
+
+// ---- Statutory payroll parameters (admin-editable, effective-dated, verified by a Partner)
+
+model PfRate {
+  id                  String    @id @default(cuid())
+  effectiveFrom       String @db.Text
+  employeeBp          Int
+  employerEpfBp       Int
+  employerEpsBp       Int
+  epsWageCeilingPaise Int
+  pfWageCeilingPaise  Int
+  adminBp             Int       @default(0)
+  edliBp              Int       @default(0)
+  source              String    @default("") @db.Text
+  verifiedById        String? @db.Text
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String? @db.Text
+  updatedById         String? @db.Text
+}
+
+model EsiRate {
+  id               String    @id @default(cuid())
+  effectiveFrom    String @db.Text
+  employeeBp       Int
+  employerBp       Int
+  wageCeilingPaise Int
+  source           String    @default("") @db.Text
+  verifiedById     String? @db.Text
+  verifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+}
+
+model ProfessionalTaxSlab {
+  id                  String    @id @default(cuid())
+  stateCode           String
+  fromPaise           Int
+  toPaise             Int?
+  amountPaise         Int
+  gender              String    @default("ANY") @db.Text
+  overrideMonth       Int? // e.g. February in some states
+  overrideAmountPaise Int?
+  effectiveFrom       String
+  source              String    @default("") @db.Text
+  verifiedById        String? @db.Text
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdById         String? @db.Text
+  updatedById         String? @db.Text
+
+  @@index([stateCode, effectiveFrom])
+}
+
+model IncomeTaxSlab {
+  id           String    @id @default(cuid())
+  fy           String
+  regime       String // NEW | OLD
+  fromPaise    Int
+  toPaise      Int?
+  rateBp       Int
+  source       String    @default("") @db.Text
+  verifiedById String? @db.Text
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  @@index([fy, regime])
+}
+
+/// Standard deduction, rebate limit/amount, cess, surcharge bands etc. (value in paise or bp per key).
+model TaxParameter {
+  id           String    @id @default(cuid())
+  fy           String
+  regime       String    @default("ANY")
+  key          String
+  valueInt     Int
+  unit         String    @default("PAISE") @db.Text // PAISE | BP
+  source       String    @default("") @db.Text
+  verifiedById String? @db.Text
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  @@unique([fy, regime, key])
+}
+
+model StipendMinimum {
+  id             String    @id @default(cuid())
+  institute      String @db.Text // ICAI | ICSI
+  locationClass  String @db.Text
+  yearOfTraining Int
+  amountPaise    Int
+  effectiveFrom  String @db.Text
+  source         String    @default("") @db.Text
+  verifiedById   String? @db.Text
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+}
+
+model CpeRequirement {
+  id                String    @id @default(cuid())
+  institute         String @db.Text
+  memberClass       String @db.Text
+  blockStartYear    Int
+  blockYears        Int
+  structuredMinutes Int
+  totalMinutes      Int
+  perYearMinutes    Int
+  effectiveFrom     String @db.Text
+  source            String    @default("") @db.Text
+  verifiedById      String? @db.Text
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+}
+
+model ConveyanceRate {
+  id            String   @id @default(cuid())
+  mode          String @db.Text // TWO_WHEELER | FOUR_WHEELER | PER_VISIT
+  ratePaise     Int
+  effectiveFrom String @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+}
+
+// ---- Recruitment, onboarding, appraisal, CPE, skills
+
+model Opening {
+  id          String   @id @default(cuid())
+  title       String @db.Text
+  kind        String   @default("STAFF") @db.Text // STAFF | ARTICLE
+  status      String   @default("OPEN") @db.Text
+  ownerId     String? @db.Text
+  openedAt    String @db.Text
+  closedAt    String? @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  candidates Candidate[]
+}
+
+model Candidate {
+  id               String   @id @default(cuid())
+  openingId        String
+  name             String @db.Text
+  email            String? @db.Text
+  phone            String? @db.Text
+  source           String   @default("") @db.Text
+  stage            String   @default("APPLIED") @db.Text // APPLIED | SCREENING | TEST | INTERVIEW | OFFER | JOINED | REJECTED
+  rejectedReason   String? @db.Text
+  resumeDocId      String? @db.Text
+  offerLetterDocId String? @db.Text
+  joinedUserId     String? @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+
+  opening    Opening     @relation(fields: [openingId], references: [id])
+  interviews Interview[]
+}
+
+model Interview {
+  id             String   @id @default(cuid())
+  candidateId    String
+  interviewerId  String @db.Text
+  scheduledAt    String @db.Text
+  scoreJson      String   @default("{}") @db.Text
+  recommendation String? @db.Text
+  notes          String   @default("") @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+}
+
+model EmployeeOnboardingItem {
+  id          String    @id @default(cuid())
+  userId      String
+  code        String
+  label       String @db.Text
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String? @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([userId, code])
+}
+
+model AppraisalCycle {
+  id          String   @id @default(cuid())
+  name        String @db.Text
+  kind        String   @default("ANNUAL") @db.Text // ANNUAL | HALF_YEARLY
+  startDate   String @db.Text
+  endDate     String @db.Text
+  status      String   @default("GOAL_SETTING") @db.Text // GOAL_SETTING | SELF_REVIEW | MANAGER_REVIEW | MODERATION | CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  reviews AppraisalReview[]
+}
+
+model AppraisalReview {
+  id                        String    @id @default(cuid())
+  cycleId                   String
+  userId                    String
+  managerId                 String? @db.Text
+  partnerId                 String? @db.Text
+  selfReview                String    @default("") @db.Text
+  selfSubmittedAt           DateTime?
+  managerReview             String    @default("") @db.Text
+  managerRating             Int?
+  managerSubmittedAt        DateTime?
+  moderatedRating           Int?
+  finalRating               Int?
+  incrementRecommendationBp Int?
+  evidenceSnapshotJson      String    @default("{}") @db.Text
+  status                    String    @default("OPEN") @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  createdById               String? @db.Text
+  updatedById               String? @db.Text
+
+  cycle AppraisalCycle @relation(fields: [cycleId], references: [id])
+  goals Goal[]
+
+  @@unique([cycleId, userId])
+}
+
+model Goal {
+  id             String   @id @default(cuid())
+  reviewId       String
+  title          String @db.Text
+  description    String   @default("") @db.Text
+  weightPct      Int      @default(0)
+  status         String   @default("OPEN") @db.Text
+  selfComment    String   @default("") @db.Text
+  managerComment String   @default("") @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+
+  review AppraisalReview @relation(fields: [reviewId], references: [id])
+}
+
+model CPELog {
+  id               String   @id @default(cuid())
+  userId           String
+  date             String
+  minutes          Int
+  structured       Boolean  @default(true)
+  provider         String   @default("") @db.Text
+  topic            String @db.Text
+  certificateDocId String? @db.Text
+  workEntryId      String? @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+
+  @@index([userId, date])
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  serviceLine String @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+}
+
+model EmployeeSkill {
+  id          String   @id @default(cuid())
+  userId      String
+  skillId     String
+  level       Int      @default(1) // 1..4
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([userId, skillId])
+}
+
+model TrainingSession {
+  id          String   @id @default(cuid())
+  title       String @db.Text
+  date        String @db.Text
+  minutes     Int
+  trainer     String   @default("") @db.Text
+  cpeEligible Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+}
+
+model TrainingAttendance {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  attended    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([sessionId, userId])
+}
+
+model ExpenseClaim {
+  id                String    @id @default(cuid())
+  userId            String
+  date              String @db.Text
+  kind              String @db.Text // CONVEYANCE | TRAVEL | OTHER
+  amountPaise       Int
+  distanceKm        Int?
+  clientId          String? @db.Text
+  workEntryId       String? @db.Text
+  clientRecoverable Boolean   @default(false)
+  description       String    @default("") @db.Text
+  receiptDocId      String? @db.Text
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED | PAID
+  approverId        String? @db.Text
+  decidedAt         DateTime?
+  paidVia           String? @db.Text // PAYROLL | SEPARATE
+  paidAt            DateTime?
+  payrollRunId      String? @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  tag          String   @unique
+  kind         String @db.Text // LAPTOP | PHONE | DONGLE | OTHER
+  description  String   @default("") @db.Text
+  serial       String   @default("") @db.Text
+  purchaseDate String? @db.Text
+  condition    String   @default("GOOD") @db.Text
+  status       String   @default("IN_STOCK") @db.Text // IN_STOCK | ASSIGNED | RETIRED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  assignments AssetAssignment[]
+}
+
+model AssetAssignment {
+  id                String   @id @default(cuid())
+  assetId           String
+  userId            String
+  issuedAt          String @db.Text
+  returnedAt        String? @db.Text
+  conditionOnReturn String? @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@index([userId])
+}
+
+model ExitCase {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  resignationDate       String @db.Text
+  lastWorkingDate       String? @db.Text
+  noticeDays            Int      @default(0)
+  status                String   @default("NOTICE") @db.Text // NOTICE | HANDOVER | FNF | CLOSED
+  ffComputedEnc         String? @db.Text
+  relievingLetterDocId  String? @db.Text
+  experienceLetterDocId String? @db.Text
+  instituteClosureNote  String   @default("") @db.Text
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdById           String? @db.Text
+  updatedById           String? @db.Text
+
+  items ExitChecklistItem[]
+}
+
+model ExitChecklistItem {
+  id          String    @id @default(cuid())
+  exitCaseId  String
+  code        String
+  label       String @db.Text
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String? @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  exitCase ExitCase @relation(fields: [exitCaseId], references: [id])
+
+  @@unique([exitCaseId, code])
+}
+
+model PolicyDocument {
+  id            String   @id @default(cuid())
+  title         String @db.Text
+  kind          String @db.Text // LEAVE | CONDUCT | CONFIDENTIALITY | WFH | OTHER
+  version       Int      @default(1)
+  documentId    String? @db.Text
+  body          String   @default("") @db.Text
+  effectiveFrom String @db.Text
+  requiresAck   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  acknowledgments PolicyAcknowledgment[]
+}
+
+model PolicyAcknowledgment {
+  id             String   @id @default(cuid())
+  policyId       String
+  userId         String
+  acknowledgedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+
+  policy PolicyDocument @relation(fields: [policyId], references: [id])
+
+  @@unique([policyId, userId])
+}
+
+model ArticleshipRecord {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  institute         String   @default("ICAI") @db.Text // ICAI | ICSI
+  registrationNo    String @db.Text
+  principalId       String @db.Text
+  startDate         String @db.Text
+  expectedEndDate   String @db.Text
+  revisedEndDate    String? @db.Text
+  leaveEntitledDays Int      @default(0)
+  stipendYear       Int      @default(1)
+  status            String   @default("ACTIVE") @db.Text // ACTIVE | COMPLETED | TERMINATED | TRANSFERRED
+  completionDate    String? @db.Text
+  terminationDate   String? @db.Text
+  notes             String   @default("") @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  entries ArticleshipNote[]
+}
+
+model ArticleshipNote {
+  id          String   @id @default(cuid())
+  recordId    String
+  authorId    String @db.Text
+  date        String @db.Text
+  kind        String @db.Text // PRINCIPAL_NOTE | FEEDBACK | CLASS | EXAM
+  text        String @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  record ArticleshipRecord @relation(fields: [recordId], references: [id])
+}
+
+model HRLetter {
+  id                String    @id @default(cuid())
+  userId            String
+  kind              String @db.Text // OFFER | APPOINTMENT | CONFIRMATION | INCREMENT | EXPERIENCE | RELIEVING
+  templateVersionId String? @db.Text
+  documentId        String? @db.Text
+  issuedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  @@index([userId])
+}

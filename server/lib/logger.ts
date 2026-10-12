@@ -10,9 +10,8 @@ const g = globalThis as unknown as { __qepexLogger?: pino.Logger };
  */
 export function logger(): pino.Logger {
   if (!g.__qepexLogger) {
-    const dir = process.env.LOG_DIR ?? "./logs";
-    fs.mkdirSync(dir, { recursive: true });
-    const dest = pino.destination({ dest: path.join(dir, "app.log"), sync: false, mkdir: true });
+    // On Vercel the disk is read-only and short-lived: log to stdout, which the Vercel dashboard keeps (D-99).
+    const dest = process.env.VERCEL ? pino.destination(1) : fileDestination();
     g.__qepexLogger = pino(
       {
         level: process.env.LOG_LEVEL ?? "info",
@@ -23,4 +22,10 @@ export function logger(): pino.Logger {
     );
   }
   return g.__qepexLogger;
+}
+
+function fileDestination() {
+  const dir = process.env.LOG_DIR ?? "./logs";
+  fs.mkdirSync(dir, { recursive: true });
+  return pino.destination({ dest: path.join(dir, "app.log"), sync: false, mkdir: true });
 }

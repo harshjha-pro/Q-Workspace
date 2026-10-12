@@ -55,7 +55,8 @@ async function catchUp(job: JobDef) {
 }
 
 export function startScheduler() {
-  if (g.__qepexScheduler || process.env.NODE_ENV === "test" || process.env.DISABLE_SCHEDULER === "true") return;
+  // On Vercel there is no long-running process: Vercel Cron calls /api/cron/<job> instead (D-99).
+  if (g.__qepexScheduler || process.env.NODE_ENV === "test" || process.env.DISABLE_SCHEDULER === "true" || process.env.VERCEL) return;
   g.__qepexScheduler = true;
   for (const job of JOBS) {
     cron.schedule(job.cron, () => void runJob(job.code, "CRON"), { timezone: "Asia/Kolkata" });

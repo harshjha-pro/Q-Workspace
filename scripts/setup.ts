@@ -42,15 +42,18 @@ function dbFilePath() {
   return path.resolve(url.replace(/^file:/, ""));
 }
 
+const isMysql = () => /^(mysql|mariadb):\/\//i.test(process.env.DATABASE_URL ?? "");
+
 async function main() {
   ensureEnv();
   loadEnv();
-  for (const dir of [path.dirname(dbFilePath()), process.env.STORAGE_DIR ?? "./storage", process.env.BACKUP_DIR ?? "./backups", process.env.LOG_DIR ?? "./logs"]) {
+  for (const dir of [...(isMysql() ? [] : [path.dirname(dbFilePath())]), process.env.STORAGE_DIR ?? "./storage", process.env.BACKUP_DIR ?? "./backups", process.env.LOG_DIR ?? "./logs"]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
+  // A MySQL database (web deployment, D-98) is backed up by its host; only the SQLite file is copied here.
   const dbFile = dbFilePath();
-  if (fs.existsSync(dbFile) && fs.statSync(dbFile).size > 0) {
+  if (!isMysql() && fs.existsSync(dbFile) && fs.statSync(dbFile).size > 0) {
     const { createBackupFile } = await import("../server/services/backup/archive");
     const file = await createBackupFile("PRE_MIGRATION");
     console.log(`• Backed up existing database to ${file}`);
@@ -68,7 +71,7 @@ async function main() {
   }
 
   console.log("• Applying migrations (prisma migrate deploy)…");
-  execSync("npx prisma migrate deploy", { stdio: "inherit", env: process.env });
+  execSync(isMysql() ? "npx prisma migrate deploy --config prisma.mysql.config.ts" : "npx prisma migrate deploy", { stdio: "inherit", env: { ...process.env, MYSQL_URL: process.env.DATABASE_URL } });
 
   const { createPrisma } = await import("../server/lib/db");
   const db = createPrisma(process.env.DATABASE_URL ?? "file:./prisma/data/qepex.db");

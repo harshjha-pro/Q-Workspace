@@ -1,4 +1,4 @@
-import { db } from "../../lib/db";
+import { db, dialect } from "../../lib/db";
 import { systemActor, type StaffActor } from "../../permissions/actor";
 import { addDays, todayIst, weekStart } from "../../lib/dates";
 import { getSetting } from "../settings/service";
@@ -27,8 +27,9 @@ const CLOSED = "('FILED','FILED_LATE','NOT_APPLICABLE')";
 const ISSUED = "('RAISED','PARTLY_RECEIVED','FULLY_RECEIVED','WRITTEN_OFF')";
 const OPEN_INV = "('RAISED','PARTLY_RECEIVED')";
 
+/** The SQL is written once in SQLite/ANSI style; MySQL quotes identifiers with backticks (D-98). */
 async function rows(sql: string, ...params: unknown[]): Promise<Record<string, unknown>[]> {
-  return db().$queryRawUnsafe(sql, ...params);
+  return db().$queryRawUnsafe(dialect() === "mysql" ? sql.replace(/"(\w+)"/g, "`$1`") : sql, ...params);
 }
 async function one(sql: string, ...params: unknown[]): Promise<number> {
   const r = await rows(sql, ...params);
@@ -75,12 +76,12 @@ export async function reconcileAnalytics(opts: { period?: string; today?: string
   check("Firm", "Invoiced", await one(`SELECT COALESCE(SUM(i.totalPaise), 0) ${invBase} AND i.status IN ${ISSUED} AND i.date BETWEEN ? AND ?`, from, to), firm.billing.invoicedPaise);
   check("Firm", "Invoices", await one(`SELECT COUNT(*) ${invBase} AND i.status IN ${ISSUED} AND i.date BETWEEN ? AND ?`, from, to), firm.billing.invoiceCount);
   check("Firm", "Collected", await one(`SELECT COALESCE(SUM(r.amountPaise), 0) FROM "Receipt" r JOIN "Client" c ON c.id = r.clientId WHERE c.isFirm = 0 AND r.reversedAt IS NULL AND r.date BETWEEN ? AND ?`, from, to), firm.billing.collectedPaise);
-  const receivable = await one(`SELECT COALESCE(SUM(MAX(0, i.totalPaise - i.receivedPaise - i.writtenOffPaise)), 0) ${invBase} AND i.status IN ${OPEN_INV}`);
+  const receivable = await one(`SELECT COALESCE(SUM(CASE WHEN i.totalPaise - i.receivedPaise - i.writtenOffPaise > 0 THEN i.totalPaise - i.receivedPaise - i.writtenOffPaise ELSE 0 END), 0) ${invBase} AND i.status IN ${OPEN_INV}`);
   check("Firm", "Receivable", receivable, firm.billing.receivablePaise);
-  check("Firm", "Receivable over 90 days", await one(`SELECT COALESCE(SUM(MAX(0, i.totalPaise - i.receivedPaise - i.writtenOffPaise)), 0) ${invBase} AND i.status IN ${OPEN_INV} AND i.date < ?`, addDays(today, -90)), firm.billing.over90Paise);
+  check("Firm", "Receivable over 90 days", await one(`SELECT COALESCE(SUM(CASE WHEN i.totalPaise - i.receivedPaise - i.writtenOffPaise > 0 THEN i.totalPaise - i.receivedPaise - i.writtenOffPaise ELSE 0 END), 0) ${invBase} AND i.status IN ${OPEN_INV} AND i.date < ?`, addDays(today, -90)), firm.billing.over90Paise);
   check("Firm", "Active clients", await one(`SELECT COUNT(*) FROM "Client" WHERE isFirm = 0 AND status = 'ACTIVE'`), firm.clients.active);
   // Across modules: the Billing module's ageing (all clients) against the same SQL without the firm filter.
-  check("Billing", "Receivables ageing total", await one(`SELECT COALESCE(SUM(MAX(0, totalPaise - receivedPaise - writtenOffPaise)), 0) FROM "Invoice" WHERE status IN ${OPEN_INV}`), (await receivablesAgeing(actor, today)).totalPaise);
+  check("Billing", "Receivables ageing total", await one(`SELECT COALESCE(SUM(CASE WHEN totalPaise - receivedPaise - writtenOffPaise > 0 THEN totalPaise - receivedPaise - writtenOffPaise ELSE 0 END), 0) FROM "Invoice" WHERE status IN ${OPEN_INV}`), (await receivablesAgeing(actor, today)).totalPaise);
 
   // --- Profitability ---------------------------------------------------------------------------------------
   const prof = await profitabilityDashboard(actor, { period: period.key, today });

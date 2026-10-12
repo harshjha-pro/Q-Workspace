@@ -148,7 +148,7 @@ export const JOBS: JobDef[] = [
     roles: ["PARTNER", "PRACTICE_ADMIN"],
     run: async () => {
       const rec = await automaticBackup();
-      return { fileName: rec.fileName, sizeBytes: rec.sizeBytes };
+      return "skipped" in rec ? rec : { fileName: rec.fileName, sizeBytes: rec.sizeBytes };
     },
   },
   {

@@ -79,6 +79,6 @@ describe("backup and restore (P1-14, P2-36)", () => {
 
   it("automatic backups are recorded", async () => {
     const rec = await automaticBackup();
-    expect(rec.kind).toBe("AUTO");
+    expect("kind" in rec && rec.kind).toBe("AUTO");
   });
 });

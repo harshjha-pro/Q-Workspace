@@ -147,7 +147,7 @@ export async function raisePoint(actor: Actor, taskId: string, text: string) {
 
 export async function waitingForMyReview(actor: Actor) {
   if (actor.kind !== "USER") return [];
-  return db().reviewRequest.findMany({ where: { checkerId: actor.userId, status: "PENDING" }, include: { points: true }, orderBy: { submittedAt: "asc" } });
+  return db().reviewRequest.findMany({ where: { checkerId: actor.userId, status: "PENDING" }, include: { points: true }, orderBy: [{ submittedAt: "asc" }, { id: "asc" }] });
 }
 
 /**

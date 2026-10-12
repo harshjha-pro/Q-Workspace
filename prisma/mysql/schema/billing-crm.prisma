@@ -1,0 +1,456 @@
+// ---------------------------------------------------------------------------
+// Billing (spec 7.1), disbursements (13.5)
+// ---------------------------------------------------------------------------
+
+/// Single row: the firm's own details printed on invoices (bank / UPI as text — no gateway).
+model FirmProfile {
+  id          String   @id @default(cuid())
+  name        String @db.Text
+  address     String   @default("") @db.Text
+  stateCode   String   @default("") @db.Text
+  gstin       String   @default("") @db.Text
+  pan         String   @default("") @db.Text
+  email       String   @default("") @db.Text
+  phone       String   @default("") @db.Text
+  bankName    String   @default("") @db.Text
+  bankAccount String   @default("") @db.Text
+  bankIfsc    String   @default("") @db.Text
+  upiId       String   @default("") @db.Text
+  invoiceNote String   @default("") @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+}
+
+model InvoiceSeries {
+  id          String   @id @default(cuid())
+  fy          String // FY2026-27
+  prefix      String // QI/26-27/
+  nextNumber  Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([fy, prefix])
+}
+
+model Invoice {
+  id                 String    @id @default(cuid())
+  number             String?   @unique // assigned when raised
+  seriesId           String? @db.Text
+  clientId           String
+  engagementId       String?
+  date               String
+  dueDate            String? @db.Text
+  status             String    @default("DRAFT") // DRAFT | RAISED | PARTLY_RECEIVED | FULLY_RECEIVED | WRITTEN_OFF | CANCELLED
+  placeOfSupply      String    @default("") @db.Text
+  taxablePaise       Int       @default(0)
+  cgstPaise          Int       @default(0)
+  sgstPaise          Int       @default(0)
+  igstPaise          Int       @default(0)
+  reimbursementPaise Int       @default(0)
+  totalPaise         Int       @default(0)
+  receivedPaise      Int       @default(0)
+  writtenOffPaise    Int       @default(0)
+  irn                String? @db.Text // entered manually (no IRP connection)
+  // Phase 4 (Q-39): promoted from JSON in notes
+  recipientGstin String? @db.Text
+  ackNo          String? @db.Text
+  ackDate        String? @db.Text
+  cancelReason   String? @db.Text
+  retainerPeriod String? @db.Text
+  periodFrom     String? @db.Text
+  periodTo       String? @db.Text
+  pdfDocumentId      String? @db.Text
+  isRetainerDraft    Boolean   @default(false)
+  approvedById       String? @db.Text
+  approvedAt         DateTime?
+  raisedById         String? @db.Text
+  raisedAt           DateTime?
+  cancelledAt        DateTime?
+  notes              String    @default("") @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdById        String? @db.Text
+  updatedById        String? @db.Text
+
+  lines       InvoiceLine[]
+  allocations ReceiptAllocation[]
+  writeOffs   WriteOff[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([engagementId])
+  @@index([date])
+}
+
+model InvoiceLine {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  kind           String   @default("FEE") @db.Text // FEE | REIMBURSEMENT
+  description    String @db.Text
+  sac            String   @default("") @db.Text
+  quantityMilli  Int      @default(1000)
+  ratePaise      Int
+  amountPaise    Int
+  gstRateBp      Int      @default(0)
+  engagementId   String?
+  disbursementId String? @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  @@index([invoiceId])
+  @@index([engagementId])
+}
+
+model Receipt {
+  id          String   @id @default(cuid())
+  clientId    String
+  date        String @db.Text
+  amountPaise Int
+  mode        String @db.Text // UPI | NEFT | RTGS | IMPS | CHEQUE | CASH
+  reference   String   @default("") @db.Text
+  // Phase 4 (Q-39): promoted from JSON in notes
+  tdsPaise       Int       @default(0)
+  reversedAt     String? @db.Text
+  reversedReason String? @db.Text
+  reversedById   String? @db.Text
+  notes       String   @default("") @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  allocations ReceiptAllocation[]
+
+  @@index([clientId])
+}
+
+model ReceiptAllocation {
+  id          String   @id @default(cuid())
+  receiptId   String
+  invoiceId   String
+  amountPaise Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  receipt Receipt @relation(fields: [receiptId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  @@index([invoiceId])
+  @@index([receiptId])
+}
+
+model WriteOff {
+  id            String    @id @default(cuid())
+  invoiceId     String
+  amountPaise   Int
+  reason        String @db.Text
+  status        String    @default("PENDING") @db.Text // PENDING | APPROVED | REJECTED
+  requestedById String @db.Text
+  approvedById  String? @db.Text
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model Disbursement {
+  id                String   @id @default(cuid())
+  clientId          String
+  engagementId      String? @db.Text
+  date              String @db.Text
+  amountPaise       Int
+  kind              String @db.Text // GOVT_FEE | ROC_FEE | CHALLAN | STAMP_DUTY | TRAVEL | OTHER
+  description       String   @default("") @db.Text
+  paidBy            String   @default("FIRM") @db.Text
+  receiptDocumentId String? @db.Text
+  status            String   @default("UNRECOVERED") // UNRECOVERED | ADDED_TO_INVOICE | RECOVERED
+  invoiceLineId     String? @db.Text
+  expenseClaimId    String? @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  @@index([clientId, status])
+}
+
+// ---------------------------------------------------------------------------
+// CRM (spec 10)
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id               String    @id @default(cuid())
+  name             String @db.Text
+  searchName       String    @default("") @db.Text
+  entityType       String    @default("OTHER") @db.Text
+  contactName      String    @default("") @db.Text
+  email            String? @db.Text
+  phone            String? @db.Text
+  pan              String? @db.Text
+  gstin            String? @db.Text
+  servicesCsv      String    @default("") @db.Text
+  estFeePaise      Int       @default(0)
+  source           String    @default("OTHER") @db.Text // REFERRAL | EXISTING_CLIENT | WEBSITE | EVENT | OTHER
+  referrerClientId String? @db.Text
+  referrerName     String    @default("") @db.Text
+  ownerId          String?
+  stage            String    @default("NEW") // NEW | CONTACTED | MEETING | PROPOSAL_SENT | WON | LOST | ON_HOLD
+  lostReason       String? @db.Text
+  nextFollowUp     String? @db.Text
+  clientId         String? @db.Text // set when won
+  wonAt            DateTime?
+  notes            String    @default("") @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdById      String? @db.Text
+  updatedById      String? @db.Text
+
+  activities Activity[]
+  proposals  Proposal[]
+
+  @@index([stage])
+  @@index([ownerId])
+}
+
+/// Activity / communication log for leads and clients (10.1, 10.5).
+model Activity {
+  id           String   @id @default(cuid())
+  leadId       String?
+  clientId     String?
+  engagementId String? @db.Text
+  kind         String @db.Text // CALL | MEETING | EMAIL | WHATSAPP | NOTE
+  date         String @db.Text
+  notes        String   @default("") @db.Text
+  byUserId     String @db.Text
+  nextFollowUp String? @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  lead Lead? @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+  @@index([clientId])
+}
+
+model ServiceTemplate {
+  id              String   @id @default(cuid())
+  serviceLine     String @db.Text
+  name            String @db.Text
+  scope           String   @default("") @db.Text
+  deliverables    String   @default("") @db.Text
+  timelines       String   @default("") @db.Text
+  feeBasis        String   @default("FIXED") @db.Text
+  engagementType  String? @db.Text // Phase 4 (Q-39): stage template code for engagements created from it
+  budgetMinutes   Int     @default(0)
+  defaultFeePaise Int      @default(0)
+  oopTerms        String   @default("") @db.Text
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String? @db.Text
+  updatedById     String? @db.Text
+}
+
+model Proposal {
+  id            String    @id @default(cuid())
+  leadId        String?
+  clientId      String? @db.Text
+  version       Int       @default(1)
+  serviceTemplateId String? @db.Text // Phase 4 (Q-39)
+  parentId      String? @db.Text
+  title         String @db.Text
+  status        String    @default("DRAFT") // DRAFT | APPROVED | SENT | ACCEPTED | REJECTED | EXPIRED
+  serviceLine   String @db.Text
+  scope         String    @default("") @db.Text
+  deliverables  String    @default("") @db.Text
+  timelines     String    @default("") @db.Text
+  feeBasis      String    @default("FIXED") @db.Text
+  feePaise      Int       @default(0)
+  ratePaise     Int       @default(0)
+  budgetMinutes Int       @default(0)
+  oopTerms      String    @default("") @db.Text
+  gstRateBp     Int       @default(0)
+  validUntil    String? @db.Text
+  approvedById  String? @db.Text
+  approvedAt    DateTime?
+  sentAt        DateTime?
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String? @db.Text
+  updatedById   String? @db.Text
+
+  lead Lead? @relation(fields: [leadId], references: [id])
+
+  @@index([status])
+}
+
+model EngagementLetter {
+  id                     String    @id @default(cuid())
+  proposalId             String? @db.Text
+  clientId               String
+  leadId                 String? @db.Text // Phase 4 (Q-39): the lead a letter was generated for
+  templateVersionId      String? @db.Text
+  body                   String @db.Text
+  status                 String    @default("DRAFT") @db.Text // DRAFT | ISSUED | ACCEPTED | SIGNED_UPLOADED | WITHDRAWN
+  issuedAt               DateTime?
+  acceptedByPortalUserId String? @db.Text
+  acceptedAt             DateTime?
+  acceptedIp             String? @db.Text
+  signedCopyDocumentId   String? @db.Text
+  pdfDocumentId          String? @db.Text
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  createdById            String? @db.Text
+  updatedById            String? @db.Text
+
+  @@index([clientId])
+}
+
+model OnboardingChecklist {
+  id          String    @id @default(cuid())
+  clientId    String    @unique
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  items OnboardingItem[]
+}
+
+model OnboardingItem {
+  id          String    @id @default(cuid())
+  checklistId String
+  code        String // KYC_PAN | KYC_ADDRESS | KYC_CONSTITUTION | KYC_SIGNATORY | MASTER_DATA | CONFLICT_CHECK | PREV_AUDITOR_NOC | FLAGS_CONFIRMED | PORTAL_INVITE | CREDENTIALS
+  label       String @db.Text
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  doneById    String? @db.Text
+  documentId  String? @db.Text
+  note        String    @default("") @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  checklist OnboardingChecklist @relation(fields: [checklistId], references: [id])
+
+  @@unique([checklistId, code])
+}
+
+model ConflictCheck {
+  id              String    @id @default(cuid())
+  clientId        String? @db.Text
+  leadId          String? @db.Text
+  checkedById     String @db.Text
+  matchesText     String    @default("") @db.Text
+  partnerDecision String? @db.Text // CLEARED | CLEARED_WITH_SAFEGUARDS | DECLINED
+  decidedById     String? @db.Text
+  decidedAt       DateTime?
+  notes           String    @default("") @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String? @db.Text
+  updatedById     String? @db.Text
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  clientId    String
+  ruleCode    String
+  serviceLine String @db.Text
+  description String @db.Text
+  status      String   @default("OPEN") @db.Text // OPEN | CONVERTED | DISMISSED
+  leadId      String? @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  @@unique([clientId, ruleCode])
+}
+
+model Renewal {
+  id                String    @id @default(cuid())
+  engagementId      String
+  periodKey         String
+  dueDate           String @db.Text
+  status            String    @default("DUE") @db.Text // DUE | PROPOSED | APPROVED | LETTER_ISSUED | DECLINED
+  lastFeePaise      Int       @default(0)
+  lastMinutes       Int       @default(0)
+  suggestedFeePaise Int       @default(0)
+  approvedFeePaise  Int?
+  approvedById      String? @db.Text
+  approvedAt        DateTime?
+  letterId          String? @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdById       String? @db.Text
+  updatedById       String? @db.Text
+
+  @@unique([engagementId, periodKey])
+}
+
+model Feedback {
+  id           String    @id @default(cuid())
+  engagementId String @db.Text
+  clientId     String
+  portalUserId String? @db.Text
+  rating       Int?
+  comment      String    @default("") @db.Text
+  requestedAt  DateTime  @default(now())
+  receivedAt   DateTime?
+  alertedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String? @db.Text
+  updatedById  String? @db.Text
+
+  @@index([clientId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String @db.Text
+  messageText String @db.Text
+  segmentJson String   @default("{}") @db.Text
+  status      String   @default("DRAFT") @db.Text // DRAFT | READY | DONE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String? @db.Text
+  updatedById String? @db.Text
+
+  recipients CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id             String    @id @default(cuid())
+  campaignId     String
+  clientId       String @db.Text
+  contactId      String? @db.Text
+  channel        String    @default("WHATSAPP") @db.Text
+  markedSentAt   DateTime?
+  markedSentById String? @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdById    String? @db.Text
+  updatedById    String? @db.Text
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@index([campaignId])
+}

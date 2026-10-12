@@ -1,6 +1,6 @@
 import { requireStaff } from "@/server/context";
 import { requireCap } from "@/lib/page";
-import { listBackups } from "@/server/services/backup/service";
+import { backupsManagedByHost, listBackups } from "@/server/services/backup/service";
 import { can } from "@/server/permissions/guards";
 import { PageHeader, Card, Alert } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,19 @@ export default async function BackupsPage() {
   requireCap(actor, "backup.restore.request");
   const rows = await listBackups(actor);
   const isPartner = can(actor, "backup.restore.approve");
+  if (backupsManagedByHost()) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Backup & restore" subtitle="Web version" />
+        <Alert tone="info">
+          In the web version the data lives in the firm&apos;s MySQL database on Hostinger and its files in Vercel Blob (private).
+          Back up the database from Hostinger hPanel (Databases → Backups: daily backups, and a manual backup before any big change)
+          and keep the encryption keys from the Vercel project settings safe: without them, encrypted fields in a backup cannot be read.
+          Restores are done from hPanel by a Partner.
+        </Alert>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <PageHeader title="Backup & restore" subtitle="A backup holds the database and every uploaded file. Automatic backup runs nightly at 23:30 IST."

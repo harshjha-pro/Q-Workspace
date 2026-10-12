@@ -36,8 +36,9 @@ test("maker → checker → filing (P2-12, P2-13)", async ({ page }, info) => {
   const taskUrl = page.url();
   const maker = (await page.getByText(/^Maker:/).first().locator("..").innerText()).replace(/^Maker:\s*/, "").split("\n")[0]!;
   expect(maker).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
-  await page.getByRole("button", { name: "Approve" }).first().click();
-  await page.getByRole("dialog").getByRole("button", { name: "Approve" }).click();
+  // Exact: "Ask client to approve" also contains "approve".
+  await page.getByRole("button", { name: "Approve", exact: true }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.getByText("approved", { exact: true }).first()).toBeVisible();
 

@@ -1,6 +1,6 @@
 import { createClient } from "@libsql/client";
 import fs from "node:fs";
-import { db } from "../../lib/db";
+import { db, dialect } from "../../lib/db";
 import { isDemoMode } from "../../lib/env";
 import { authorize } from "../../permissions/guards";
 import type { Actor } from "../../permissions/actor";
@@ -16,6 +16,25 @@ import { seedDemo } from "../../../prisma/seed/demo";
 export async function resetDemoData(actor?: Actor) {
   if (actor) authorize(actor, "demo.reset");
   if (!isDemoMode()) throw ruleViolation("Reset is available only in demo mode.");
+  if (dialect() === "mysql") await wipeMysql();
+  else await wipeSqlite();
+  fs.rmSync(process.env.STORAGE_DIR ?? "./storage", { recursive: true, force: true });
+  fs.mkdirSync(process.env.STORAGE_DIR ?? "./storage", { recursive: true });
+  await seedReference(db());
+  await seedDemo(db());
+}
+
+/** MySQL/MariaDB (web, D-98): delete every row with foreign-key checks off on one connection. */
+async function wipeMysql() {
+  await db().$transaction(async (tx) => {
+    const tables = await tx.$queryRawUnsafe<{ t: string }[]>("SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations'");
+    await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
+    for (const { t } of tables) await tx.$executeRawUnsafe(`DELETE FROM \`${t}\``);
+    await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
+  }, { timeout: 120_000 });
+}
+
+async function wipeSqlite() {
   const c = createClient({ url: `file:${dbFile()}` });
   try {
     await c.execute("PRAGMA busy_timeout=10000");
@@ -26,8 +45,4 @@ export async function resetDemoData(actor?: Actor) {
   } finally {
     c.close();
   }
-  fs.rmSync(process.env.STORAGE_DIR ?? "./storage", { recursive: true, force: true });
-  fs.mkdirSync(process.env.STORAGE_DIR ?? "./storage", { recursive: true });
-  await seedReference(db());
-  await seedDemo(db());
 }

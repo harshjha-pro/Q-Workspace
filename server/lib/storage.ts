@@ -4,7 +4,9 @@ import { randomBytes, createHash } from "node:crypto";
 import { DomainError } from "./errors";
 
 /**
- * Local-disk file storage under STORAGE_DIR (replaces object storage + virus scan, brief §4).
+ * File storage. Office install: local disk under STORAGE_DIR (replaces object storage + virus scan, brief §4).
+ * Web deployment (D-99): Vercel Blob in PRIVATE mode when BLOB_READ_WRITE_TOKEN is set — serverless functions have
+ * no lasting disk; private blobs are readable only with the store token, never by a public URL.
  * Layout: <client code or area>/<engagement code or sub-area>/<random>.<ext>
  * Files are never served from /public; downloads go through an authorised route handler.
  */
@@ -60,10 +62,15 @@ export async function storeFile(
   if (data.length > maxBytes) throw new DomainError("VALIDATION", `File is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.`);
   if (type.magic && !type.magic(data)) throw new DomainError("VALIDATION", `The file content does not look like a .${ext} file.`);
 
-  const rel = path.join(...segments.map(safe), `${randomBytes(12).toString("hex")}.${ext}`);
-  const abs = resolveInside(rel);
-  await fs.mkdir(path.dirname(abs), { recursive: true });
-  await fs.writeFile(abs, data, { flag: "wx" });
+  const rel = path.posix.join(...segments.map(safe), `${randomBytes(12).toString("hex")}.${ext}`);
+  if (blobStorageEnabled()) {
+    const { put } = await import("@vercel/blob");
+    await put(rel, data, { access: "private", addRandomSuffix: false, allowOverwrite: false, contentType: type.mime });
+  } else {
+    const abs = resolveInside(rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, data, { flag: "wx" });
+  }
   return { storagePath: rel, sizeBytes: data.length, sha256: createHash("sha256").update(data).digest("hex"), mimeType: type.mime, ext };
 }
 
@@ -75,10 +82,25 @@ export function resolveInside(rel: string): string {
   return abs;
 }
 
+/** Vercel Blob when its token is configured (web deployment), local disk otherwise. */
+export const blobStorageEnabled = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+
 export async function readStoredFile(rel: string): Promise<Buffer> {
+  if (blobStorageEnabled()) {
+    if (rel.includes("..")) throw new DomainError("FORBIDDEN", "Invalid file path.");
+    const { get } = await import("@vercel/blob");
+    const r = await get(rel.split(path.sep).join("/"), { access: "private", useCache: false });
+    if (!r || r.statusCode !== 200) throw new DomainError("NOT_FOUND", "File not found in storage.");
+    return Buffer.from(await new Response(r.stream).arrayBuffer());
+  }
   return fs.readFile(resolveInside(rel));
 }
 
 export async function deleteStoredFile(rel: string): Promise<void> {
+  if (blobStorageEnabled()) {
+    const { del } = await import("@vercel/blob");
+    await del(rel.split(path.sep).join("/"));
+    return;
+  }
   await fs.rm(resolveInside(rel), { force: true });
 }
