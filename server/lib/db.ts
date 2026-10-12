@@ -3,6 +3,7 @@ import { PrismaClient as MysqlPrismaClient } from "@/generated/prisma-mysql/clie
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { env } from "./env";
+import { cleanDatabaseUrl } from "./database-url";
 
 export type Tx = Prisma.TransactionClient;
 export { Prisma };
@@ -24,7 +25,8 @@ const SQLITE_MAX_BIND_VALUES = 32_766;
  */
 export type Dialect = "sqlite" | "mysql";
 export const dialectOf = (url: string): Dialect => (/^(mysql|mariadb):\/\//i.test(url) ? "mysql" : "sqlite");
-export const dialect = (): Dialect => dialectOf(process.env.DATABASE_URL ?? env().DATABASE_URL);
+const databaseUrl = () => cleanDatabaseUrl(process.env.DATABASE_URL ?? env().DATABASE_URL);
+export const dialect = (): Dialect => dialectOf(databaseUrl());
 
 function createMysql(url: string): PrismaClient {
   const u = new URL(url);
@@ -55,7 +57,7 @@ export function createPrisma(url: string) {
 export function db(): PrismaClient {
   if (!g.__qepexPrisma) {
     // Read DATABASE_URL at connect time (tests point each file at its own copy).
-    const url = process.env.DATABASE_URL ?? env().DATABASE_URL;
+    const url = databaseUrl();
     g.__qepexPrisma = createPrisma(url);
     // WAL lets the many readers on the LAN work while one write is in progress (SQLite only).
     if (dialectOf(url) === "sqlite") g.__qepexPragmas = g.__qepexPrisma
