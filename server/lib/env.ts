@@ -19,3 +19,9 @@ export function env() {
 }
 
 export const isDemoMode = () => env().DEMO_MODE === "true";
+
+/**
+ * Demo only (D-100, owner's request): sign in with username + password alone. Needs both DEMO_MODE=true and
+ * DEMO_SKIP_2FA=true, so turning demo mode off for real use restores two-factor login automatically.
+ */
+export const twoFactorSkipped = () => isDemoMode() && process.env.DEMO_SKIP_2FA === "true";

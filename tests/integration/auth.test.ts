@@ -59,6 +59,22 @@ describe("TOTP 2FA", () => {
     expect((await resolveSession((ok as { sessionId: string }).sessionId))?.needsTotpEnrolment).toBe(false);
   });
 
+  it("DEMO_SKIP_2FA works only together with DEMO_MODE (D-100)", async () => {
+    const m = await makeUser("PARTNER");
+    const { secret } = await beginTotpEnrolment(actorOf(m));
+    await confirmTotpEnrolment(actorOf(m), await currentTotp(secret));
+    const { isDemoMode } = await import("@/server/lib/env");
+    expect((await staffLogin({ username: m.username, password: TEST_PASSWORD })).status).toBe("NEED_TOTP");
+    process.env.DEMO_SKIP_2FA = "true";
+    try {
+      const r = await staffLogin({ username: m.username, password: TEST_PASSWORD });
+      expect(r.status).toBe(isDemoMode() ? "OK" : "NEED_TOTP");
+      if (r.status === "OK") expect((await resolveSession(r.sessionId))?.needsTotpEnrolment).toBe(false);
+    } finally {
+      delete process.env.DEMO_SKIP_2FA;
+    }
+  });
+
   it("the TOTP secret is stored encrypted", async () => {
     const p = await makeUser("PARTNER");
     const { secret } = await beginTotpEnrolment(actorOf(p));

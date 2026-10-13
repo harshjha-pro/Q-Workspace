@@ -36,6 +36,7 @@ Project → Settings → Environment Variables (Production and Preview):
 | `BLOB_READ_WRITE_TOKEN` | Added automatically when the Blob store is connected to the project |
 | `DB_POOL_SIZE` | `3` (raise only if Hostinger allows more connections per user) |
 | `DEMO_MODE` | `true` for the demo firm only; `false` before any real data |
+| `DEMO_SKIP_2FA` | `true` lets the demo sign in without two-factor codes (only while `DEMO_MODE=true`, D-100). Remove before real use |
 
 ## 3. Deploy
 

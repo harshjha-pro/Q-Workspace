@@ -5,6 +5,7 @@ import { decrypt } from "../../lib/crypto";
 import { createSession } from "./sessions";
 import { getSettingNumber } from "../settings/service";
 import { writeAudit } from "../../audit";
+import { twoFactorSkipped } from "../../lib/env";
 
 export type LoginResult =
   | { status: "OK"; sessionId: string; userId: string }
@@ -39,7 +40,7 @@ export async function staffLogin(
     await record(false, "BAD_PASSWORD");
     return { status: "INVALID" };
   }
-  if (user.totpEnabled && user.totpSecretEnc) {
+  if (user.totpEnabled && user.totpSecretEnc && !twoFactorSkipped()) {
     if (!input.totp) return { status: "NEED_TOTP" };
     const ok = await verifyTotp(decrypt(user.totpSecretEnc, "VAULT"), input.totp);
     if (!ok) {
@@ -103,7 +104,7 @@ export async function portalLogin(
     await record(false, "BAD_PASSWORD");
     return { status: "INVALID" };
   }
-  if (user.totpEnabled && user.totpSecretEnc) {
+  if (user.totpEnabled && user.totpSecretEnc && !twoFactorSkipped()) {
     if (!input.totp) return { status: "NEED_TOTP" };
     if (!(await verifyTotp(decrypt(user.totpSecretEnc, "VAULT"), input.totp))) {
       await registerPortalFailure(user.id, user.failedLogins);

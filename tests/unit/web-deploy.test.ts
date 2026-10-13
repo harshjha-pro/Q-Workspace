@@ -50,3 +50,26 @@ describe("resolveDatabaseUrl (D-99)", () => {
     expect(resolveDatabaseUrl({})).toBeUndefined();
   });
 });
+
+describe("twoFactorSkipped (D-100)", () => {
+  it("needs both DEMO_MODE and DEMO_SKIP_2FA", async () => {
+    const { vi } = await import("vitest");
+    const saved = { m: process.env.DEMO_MODE, s: process.env.DEMO_SKIP_2FA };
+    const check = async (mode: string, skip: string | undefined) => {
+      vi.resetModules();
+      process.env.DEMO_MODE = mode;
+      if (skip === undefined) delete process.env.DEMO_SKIP_2FA; else process.env.DEMO_SKIP_2FA = skip;
+      return (await import("@/server/lib/env")).twoFactorSkipped();
+    };
+    try {
+      expect(await check("true", "true")).toBe(true);
+      expect(await check("false", "true")).toBe(false);
+      expect(await check("true", undefined)).toBe(false);
+      expect(await check("true", "yes")).toBe(false);
+    } finally {
+      if (saved.m === undefined) delete process.env.DEMO_MODE; else process.env.DEMO_MODE = saved.m;
+      if (saved.s === undefined) delete process.env.DEMO_SKIP_2FA; else process.env.DEMO_SKIP_2FA = saved.s;
+      vi.resetModules();
+    }
+  });
+});

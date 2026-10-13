@@ -3,6 +3,7 @@ import { getSetting, getSettingNumber } from "../settings/service";
 import type { Actor } from "../../permissions/actor";
 import type { Role } from "../../domain/enums";
 import { MANDATORY_2FA_ROLES } from "../../domain/enums";
+import { twoFactorSkipped } from "../../lib/env";
 
 const ABSOLUTE_HOURS_DEFAULT = 12;
 
@@ -52,7 +53,7 @@ export async function resolveSession(sessionId: string, now = new Date()): Promi
     const role = s.user.role as Exclude<Role, "PORTAL">;
     return {
       actor: { kind: "USER", userId: s.user.id, role, isSenior: s.user.isSenior, displayName: s.user.displayName, sessionId: s.id, ip: s.ip ?? undefined },
-      needsTotpEnrolment: MANDATORY_2FA_ROLES.includes(role) && !s.user.totpEnabled,
+      needsTotpEnrolment: MANDATORY_2FA_ROLES.includes(role) && !s.user.totpEnabled && !twoFactorSkipped(),
       mustChangePassword: s.user.mustChangePassword,
     };
   }
@@ -69,7 +70,7 @@ export async function resolveSession(sessionId: string, now = new Date()): Promi
         sessionId: s.id,
         ip: s.ip ?? undefined,
       },
-      needsTotpEnrolment: mandatory && !s.portalUser.totpEnabled,
+      needsTotpEnrolment: mandatory && !s.portalUser.totpEnabled && !twoFactorSkipped(),
       mustChangePassword: false,
     };
   }
