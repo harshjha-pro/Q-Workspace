@@ -7,7 +7,7 @@ import { useCurrentUser, useDB, useDocumentTitle, useLoading, useSession } from 
 import { actorIds, sanitize } from '@/services/domain/common';
 import { repo } from '@/services/store';
 import { PropertyCard } from '@/components/cards';
-import { CallButton, DirectionsButton, EnquiryButton, FilterBar, LoadMore, LOCALITY_OPTIONS, ReportButton, SaveButton, SectionCard, ShareButton, usePaged } from '@/components/shared';
+import { CallButton, DirectionsButton, EnquiryButton, LoadMore, SearchFilterRow, LOCALITY_OPTIONS, ReportButton, SaveButton, SectionCard, ShareButton, usePaged } from '@/components/shared';
 import { Badge, Button, DemoBadge, EmptyState, ImagePlaceholder, KeyValue, LinkButton, Notice, PageHeader, SkeletonList, Stat, StatusPill, VerificationBadge } from '@/components/ui/primitives';
 import { Tabs, useUI } from '@/components/ui/overlay';
 import { Checkbox, FilePicker, Select, TextArea, TextField, Toggle } from '@/components/ui/form';
@@ -18,37 +18,53 @@ import { EnquiryInbox } from '@/components/inbox';
 
 const STUDENT_CATS = ['PG', 'Hostel', 'Student room', 'Shared accommodation'];
 
+const PROPERTY_TABS = [{ id: 'rent', label: 'Rent' }, { id: 'sale', label: 'Sale' }, { id: 'pg', label: 'PG / Hostel' }, { id: 'commercial', label: 'Commercial' }, { id: 'plots', label: 'Plots & Land' }] as const;
+type PropTab = (typeof PROPERTY_TABS)[number]['id'];
+const COMMERCIAL = ['Commercial', 'Shop', 'Office', 'Industrial'];
+
 export function PropertyPage() {
   useDocumentTitle('Property & rentals');
   const [params] = useSearchParams();
   const loading = useLoading();
   const all = useDB((s) => s.properties.filter((p) => p.status === 'active'));
-  const init = () => ({ q: '', values: { type: params.get('type') ?? '', category: '', locality: '', budget: '', beds: '', furnishing: '' } as Record<string, string>, sort: 'newest', verified: false, available: false });
+  const [tab, setTab] = useState<PropTab>(params.get('type') === 'sale' ? 'sale' : 'rent');
+  const init = () => ({ q: '', values: { category: '', locality: '', budget: '', beds: '', furnishing: '' } as Record<string, string>, sort: 'newest', verified: false, available: false });
   const [f, setF] = useState(init);
   const list = useMemo(() => {
-    let l = all.filter((p) => (!f.values.type || p.listingType === f.values.type) && (!f.values.category || p.category === f.values.category) && (!f.values.locality || p.localityId === f.values.locality) && (!f.values.furnishing || p.furnishing === f.values.furnishing));
-    if (f.q) l = l.filter((p) => `${p.title} ${p.description} ${p.amenities.join(' ')}`.toLowerCase().includes(f.q.toLowerCase()));
+    let l = all.filter((p) => {
+      if (tab === 'rent') return p.listingType === 'rent' && !p.student && !COMMERCIAL.includes(p.category);
+      if (tab === 'sale') return p.listingType === 'sale' && !['Plot', 'Agricultural land'].includes(p.category);
+      if (tab === 'pg') return !!p.student;
+      if (tab === 'commercial') return COMMERCIAL.includes(p.category);
+      return ['Plot', 'Agricultural land'].includes(p.category);
+    });
+    l = l.filter((p) => (!f.values.category || p.category === f.values.category) && (!f.values.locality || p.localityId === f.values.locality) && (!f.values.furnishing || p.furnishing === f.values.furnishing));
+    if (f.q) l = l.filter((p) => `${p.title} ${p.description} ${p.amenities.join(' ')} ${p.category} ${localityName(p.localityId)}`.toLowerCase().includes(f.q.toLowerCase()));
     if (f.values.budget) l = l.filter((p) => p.price <= Number(f.values.budget));
     if (f.values.beds) l = l.filter((p) => (p.bedrooms ?? 0) >= Number(f.values.beds));
     if (f.verified) l = l.filter((p) => p.verification === 'verified');
     if (f.available) l = l.filter((p) => p.available);
     return [...l].sort((a, b) => f.sort === 'price_asc' ? a.price - b.price : f.sort === 'price_desc' ? b.price - a.price : b.createdAt.localeCompare(a.createdAt));
-  }, [all, f]);
+  }, [all, f, tab]);
   const { visible, hasMore, more } = usePaged(list, 9);
+  const active = Object.values(f.values).filter(Boolean).length + Number(f.verified) + Number(f.available) + Number(f.sort !== 'newest');
+  const setV = (k: string, v: string) => setF({ ...f, values: { ...f.values, [k]: v } });
   return (
-    <div className="grid gap-5">
-      <PageHeader title="Property & rentals" subtitle="Homes, shops, offices, plots, PGs and student rooms."
-        actions={<><LinkButton variant="secondary" to="/property/students" icon={<GraduationCap className="size-4" aria-hidden />}>Student stays</LinkButton><LinkButton to="/property/new" icon={<Plus className="size-4" aria-hidden />}>List property</LinkButton></>} />
-      <FilterBar q={f.q} onQ={(q) => setF({ ...f, q })} placeholder="Search by title, amenity…" count={list.length}
-        filters={[{ key: 'type', label: 'Buy/Rent', options: [{ value: 'rent', label: 'Rent' }, { value: 'sale', label: 'Buy' }] }, { key: 'category', label: 'Type', options: PROPERTY_CATEGORIES }, { key: 'locality', label: 'Locality', options: LOCALITY_OPTIONS },
-          { key: 'budget', label: 'Budget', options: [{ value: '5000', label: 'Up to ₹5,000' }, { value: '10000', label: 'Up to ₹10,000' }, { value: '25000', label: 'Up to ₹25,000' }, { value: '3000000', label: 'Up to ₹30 L' }, { value: '7500000', label: 'Up to ₹75 L' }] },
-          { key: 'beds', label: 'Bedrooms', options: [{ value: '1', label: '1+' }, { value: '2', label: '2+' }, { value: '3', label: '3+' }] }, { key: 'furnishing', label: 'Furnishing', options: [{ value: 'furnished', label: 'Furnished' }, { value: 'semi', label: 'Semi-furnished' }, { value: 'unfurnished', label: 'Unfurnished' }] }]}
-        values={f.values} onChange={(k, v) => setF({ ...f, values: { ...f.values, [k]: v } })}
-        sorts={[{ value: 'newest', label: 'Newest' }, { value: 'price_asc', label: 'Price: low–high' }, { value: 'price_desc', label: 'Price: high–low' }]} sort={f.sort} onSort={(sort) => setF({ ...f, sort })}
-        toggles={[{ key: 'v', label: 'Verified', on: f.verified, set: (v) => setF({ ...f, verified: v }) }, { key: 'a', label: 'Available now', on: f.available, set: (v) => setF({ ...f, available: v }) }]}
-        onReset={() => setF({ ...init(), values: { type: '', category: '', locality: '', budget: '', beds: '', furnishing: '' } })} />
+    <div className="grid gap-4">
+      <PageHeader title="Property" hideActionsOnMobile actions={<><LinkButton variant="secondary" size="sm" to="/property/students" icon={<GraduationCap className="size-4" aria-hidden />}>Student stays</LinkButton><LinkButton size="sm" to="/property/new" icon={<Plus className="size-4" aria-hidden />}>List property</LinkButton></>} />
+      <Tabs label="Property type" value={tab} onChange={setTab} tabs={PROPERTY_TABS.map((t) => ({ id: t.id, label: t.label }))} />
+      <SearchFilterRow q={f.q} onQ={(q) => setF({ ...f, q })} placeholder="Search locality, property type..." activeFilters={active} count={list.length} onReset={() => setF(init())}>
+        <Select label="Property type" value={f.values.category} placeholder="Any type" onChange={(e) => setV('category', e.target.value)} options={PROPERTY_CATEGORIES} />
+        <Select label="Locality" value={f.values.locality} placeholder="All localities" onChange={(e) => setV('locality', e.target.value)} options={LOCALITY_OPTIONS} />
+        <Select label="Budget" value={f.values.budget} placeholder="Any budget" onChange={(e) => setV('budget', e.target.value)} options={[{ value: '5000', label: 'Up to ₹5,000' }, { value: '10000', label: 'Up to ₹10,000' }, { value: '25000', label: 'Up to ₹25,000' }, { value: '3000000', label: 'Up to ₹30 L' }, { value: '7500000', label: 'Up to ₹75 L' }]} />
+        <Select label="Bedrooms" value={f.values.beds} placeholder="Any" onChange={(e) => setV('beds', e.target.value)} options={[{ value: '1', label: '1+' }, { value: '2', label: '2+' }, { value: '3', label: '3+' }]} />
+        <Select label="Furnishing" value={f.values.furnishing} placeholder="Any" onChange={(e) => setV('furnishing', e.target.value)} options={[{ value: 'furnished', label: 'Furnished' }, { value: 'semi', label: 'Semi-furnished' }, { value: 'unfurnished', label: 'Unfurnished' }]} />
+        <Select label="Sort by" value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} options={[{ value: 'newest', label: 'Newest' }, { value: 'price_asc', label: 'Price: low–high' }, { value: 'price_desc', label: 'Price: high–low' }]} />
+        <Toggle label="Verified listings only" checked={f.verified} onChange={(v) => setF({ ...f, verified: v })} />
+        <Toggle label="Available now" checked={f.available} onChange={(v) => setF({ ...f, available: v })} />
+      </SearchFilterRow>
       {loading ? <SkeletonList /> : list.length === 0 ? <EmptyState icon={<House className="size-6" aria-hidden />} title="No properties match" text="Try a wider budget or another locality." action={<LinkButton variant="secondary" to="/property/new">List your property</LinkButton>} /> : (
-        <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.map((p) => <PropertyCard key={p.id} p={p} />)}</div><LoadMore hasMore={hasMore} onMore={more} /></>
+        <><div className="grid gap-3 lg:grid-cols-2">{visible.map((p) => <PropertyCard key={p.id} p={p} />)}</div><LoadMore hasMore={hasMore} onMore={more} /></>
       )}
     </div>
   );
@@ -82,7 +98,7 @@ export function StudentStaysPage() {
               <ImagePlaceholder seed={p.id} className="size-24 shrink-0 rounded-lg" icon={<BedDouble className="size-7" aria-hidden />} label="Room photo placeholder" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap gap-1.5"><Badge tone="navy">{p.category}</Badge>{p.student!.restriction && p.student!.restriction !== 'none' && <Badge tone="violet">{p.student!.restriction === 'women_only' ? 'Women only (as stated by provider)' : 'Men only (as stated by provider)'}</Badge>}<VerificationBadge status={p.verification} compact /></div>
-                <Link to={`/property/${p.id}`} className="mt-0.5 block font-bold hover:text-navy">{p.title}</Link>
+                <Link to={`/property/${p.id}`} className="mt-0.5 block font-bold hover:text-brand">{p.title}</Link>
                 <p className="text-sm text-muted">{localityName(p.localityId)}{p.student!.nearInstitution ? ` · ${p.student!.nearInstitution}` : ''}</p>
                 <p className="text-sm"><span className="font-bold text-navy">{formatINR(p.price)}/mo</span> · Deposit {formatINR(p.student!.deposit)} · {p.student!.meals ? 'Meals' : 'No meals'} · {p.student!.occupancy}</p>
               </div>

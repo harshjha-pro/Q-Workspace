@@ -77,14 +77,14 @@ function Message({ m }: { m: AIMessage }) {
   const mine = m.role === 'user';
   return (
     <div className={cx('flex gap-3', mine && 'flex-row-reverse')}>
-      <span className={cx('grid size-8 shrink-0 place-items-center rounded-full', mine ? 'bg-navy text-white' : 'bg-teal-50 text-teal')} aria-hidden>{mine ? <User className="size-4" /> : <Bot className="size-4" />}</span>
+      <span className={cx('grid size-8 shrink-0 place-items-center rounded-full', mine ? 'bg-brand text-white' : 'bg-teal-50 text-teal')} aria-hidden>{mine ? <User className="size-4" /> : <Bot className="size-4" />}</span>
       <div className={cx('grid max-w-[85%] gap-2', mine && 'justify-items-end')}>
-        <div className={cx('whitespace-pre-line rounded-2xl px-4 py-2.5 text-[15px]', mine ? 'bg-navy text-white' : 'bg-page text-ink')}>
+        <div className={cx('whitespace-pre-line rounded-2xl px-4 py-2.5 text-[15px]', mine ? 'bg-brand text-white' : 'bg-page text-ink')}>
           <span className="sr-only">{mine ? 'You said:' : 'Assistant:'} </span>{m.text}
         </div>
         {m.cards && m.cards.length > 0 && (
           <ul className="grid w-full gap-2">{m.cards.map((c) => (
-            <li key={c.type + c.id}><Link to={c.link} className="card block p-3 hover:border-navy/30"><span className="block font-semibold">{c.title}</span><span className="text-sm text-muted">{c.subtitle}</span></Link></li>
+            <li key={c.type + c.id}><Link to={c.link} className="card block p-3 hover:border-brand/30"><span className="block font-semibold">{c.title}</span><span className="text-sm text-muted">{c.subtitle}</span></Link></li>
           ))}</ul>
         )}
         {m.sources && <p className="text-xs text-muted">Sources: {m.sources.map((s) => <a key={s.link} href={s.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">{s.label}<ExternalLink className="size-3" aria-hidden /></a>)}</p>}

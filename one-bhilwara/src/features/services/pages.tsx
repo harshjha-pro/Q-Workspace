@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarClock, CheckCircle2, CircleAlert, ClipboardList, Hammer, HardHat, Headset, Plus, Sparkles, UserCheck, Users } from 'lucide-react';
+import { CalendarClock, CheckCircle2, CircleAlert, ClipboardList, Hammer, HardHat, Headset, LayoutGrid, MapPin, Plus, Search, Sparkles, UserCheck, Users } from 'lucide-react';
 import type { ConciergeRequest, LabourPost, Provider, ServiceRequest } from '@/types/models';
 import { localityName, SERVICE_CATEGORIES, serviceName } from '@/config/catalog';
 import { useCurrentUser, useDB, useDocumentTitle, useLoading, useNow, useSession } from '@/hooks/useStore';
@@ -9,7 +9,7 @@ import { confirmProvider, isActiveWithin, rankProviders } from '@/services/domai
 import { repo, store } from '@/services/store';
 import { ProviderCard } from '@/components/cards';
 import { CallButton, EnquiryButton, FilterBar, LoadMore, LOCALITY_OPTIONS, ReportButton, ReviewsSection, SaveButton, SectionCard, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
-import { Badge, Button, DemoBadge, EmptyState, ImagePlaceholder, KeyValue, LinkButton, Notice, PageHeader, Rating, SkeletonList, StatusPill, StarInput, VerificationBadge } from '@/components/ui/primitives';
+import { Badge, Button, cx, DemoBadge, EmptyState, SectionHeader, ImagePlaceholder, KeyValue, LinkButton, Notice, PageHeader, Rating, SkeletonList, StatusPill, StarInput, VerificationBadge } from '@/components/ui/primitives';
 import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
 import { Checkbox, FilePicker, RadioCards, Select, TextArea, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/Icon';
@@ -17,26 +17,64 @@ import { formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
 import { nowIso, uid } from '@/utils/ids';
 import NotFound from '@/app/NotFound';
 
+const CIRCLE_TINTS = ['bg-sky-100 text-sky-600', 'bg-amber-100 text-amber-600', 'bg-indigo-100 text-indigo-600', 'bg-fuchsia-100 text-fuchsia-600', 'bg-emerald-100 text-emerald-600', 'bg-rose-100 text-rose-600', 'bg-orange-100 text-orange-600', 'bg-teal-100 text-teal-700'];
+const FEATURED_SERVICES = ['plumber', 'electrician', 'ac', 'cleaning'];
+
 export function ServicesPage() {
   useDocumentTitle('Local services');
+  const nav = useNavigate();
   const seasonal = useDB((s) => s.providers.filter((p) => p.seasonal));
+  const providers = useDB((s) => s.providers);
+  const [area, setArea] = useState('');
+  const [q, setQ] = useState('');
+  const [all, setAll] = useState(false);
+  const top = useMemo(() => providers.filter((p) => p.verification === 'verified' && (!area || p.localityId === area)).sort((a, b) => b.rating - a.rating).slice(0, 4), [providers, area]);
+  const cats = all ? SERVICE_CATEGORIES : FEATURED_SERVICES.map((id) => SERVICE_CATEGORIES.find((c) => c.id === id)!);
+  const shortName: Record<string, string> = { plumber: 'Plumber', electrician: 'Electrician', ac: 'AC Repair', cleaning: 'Cleaning' };
   return (
-    <div className="grid gap-6">
-      <PageHeader title="Local services" subtitle="Find, compare and request trusted local help." actions={<><LinkButton variant="secondary" to="/service-requests" icon={<ClipboardList className="size-4" aria-hidden />}>My requests</LinkButton><LinkButton to="/service-requests/new" icon={<Plus className="size-4" aria-hidden />}>Request a service</LinkButton></>} />
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-        {SERVICE_CATEGORIES.map((c) => (
-          <li key={c.id}><Link to={`/services/${c.id}`} className="card flex h-full flex-col items-center gap-2 p-3 text-center text-xs font-semibold hover:border-navy/30"><span className="grid size-10 place-items-center rounded-full bg-teal-50 text-teal"><Icon name={c.icon} /></span>{c.name}</Link></li>
+    <div className="grid gap-5">
+      <PageHeader title="Local Services" hideActionsOnMobile actions={<LinkButton variant="secondary" size="sm" to="/service-requests" icon={<ClipboardList className="size-4" aria-hidden />}>My requests</LinkButton>} />
+      <form role="search" className="flex items-center gap-2 rounded-2xl border border-line bg-white px-3 shadow-sm" onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(); if (q) p.set('q', q); if (area) p.set('locality', area); nav(`/services/all?${p}`); }}>
+        <MapPin className="size-5 shrink-0 text-brand" aria-hidden />
+        <label htmlFor="svc-area" className="sr-only">Area</label>
+        <select id="svc-area" value={area} onChange={(e) => setArea(e.target.value)} className="min-h-12 max-w-[42%] bg-transparent text-sm font-semibold text-ink outline-none">
+          <option value="">All Areas</option>{LOCALITY_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+        <span className="h-6 w-px bg-line" aria-hidden />
+        <label htmlFor="svc-q" className="sr-only">Search services</label>
+        <input id="svc-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="min-h-12 min-w-0 flex-1 bg-transparent text-[15px] outline-none" />
+        <button type="submit" className="grid size-9 place-items-center rounded-full text-ink hover:bg-page" aria-label="Search"><Search className="size-5" aria-hidden /></button>
+      </form>
+      <ul className={cx('grid gap-y-4', all ? 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8' : 'grid-cols-5')}>
+        {cats.map((c, i) => (
+          <li key={c.id}><Link to={`/services/${c.id}`} className="flex flex-col items-center gap-1.5 text-center text-xs font-medium text-ink">
+            <span className={cx('grid size-14 place-items-center rounded-full', CIRCLE_TINTS[i % CIRCLE_TINTS.length])}><Icon name={c.icon} className="size-6" /></span>{shortName[c.id] ?? c.name}
+          </Link></li>
         ))}
+        <li><button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="flex w-full flex-col items-center gap-1.5 text-center text-xs font-medium text-ink">
+          <span className="grid size-14 place-items-center rounded-full bg-slate-100 text-ink"><LayoutGrid className="size-6" aria-hidden /></span>{all ? 'Less' : 'More'}
+        </button></li>
       </ul>
+
+      <section>
+        <SectionHeader title="Top Rated Service Providers" to={`/services/all${area ? `?locality=${area}` : ''}`} linkLabel="View All" />
+        {top.length === 0 ? <EmptyState title="No verified providers in this area yet" action={<LinkButton to="/service-requests/new">Post a request</LinkButton>} /> : <div className="grid gap-3 lg:grid-cols-2">{top.map((p) => <ProviderCard key={p.id} p={p} />)}</div>}
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4">
+        <div><p className="font-bold text-brand">Need a different service?</p><p className="text-sm text-muted">Post your request and get multiple quotes</p></div>
+        <LinkButton to="/service-requests/new" size="sm">Post Request</LinkButton>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-3">
-        <Link to="/assistance" className="card flex gap-3 p-4 hover:border-navy/30"><Headset className="size-7 shrink-0 text-navy" aria-hidden /><span><span className="block font-bold">One Bhilwara Assistance</span><span className="text-sm text-muted">Let a coordinator arrange it for you.</span></span></Link>
-        <Link to="/labour" className="card flex gap-3 p-4 hover:border-navy/30"><HardHat className="size-7 shrink-0 text-navy" aria-hidden /><span><span className="block font-bold">Contractor & labour connect</span><span className="text-sm text-muted">Post requirements or find work.</span></span></Link>
-        <Link to="/services/all?emergency=1" className="card flex gap-3 p-4 hover:border-navy/30"><CircleAlert className="size-7 shrink-0 text-danger" aria-hidden /><span><span className="block font-bold">Same-day & urgent</span><span className="text-sm text-muted">Providers who take urgent jobs.</span></span></Link>
+        <Link to="/assistance" className="card flex gap-3 p-4 hover:border-brand/30"><Headset className="size-7 shrink-0 text-brand" aria-hidden /><span><span className="block font-bold">One Bhilwara Assistance</span><span className="text-sm text-muted">Let a coordinator arrange it for you.</span></span></Link>
+        <Link to="/labour" className="card flex gap-3 p-4 hover:border-brand/30"><HardHat className="size-7 shrink-0 text-brand" aria-hidden /><span><span className="block font-bold">Contractor & labour connect</span><span className="text-sm text-muted">Post requirements or find work.</span></span></Link>
+        <Link to="/services/all?emergency=1" className="card flex gap-3 p-4 hover:border-brand/30"><CircleAlert className="size-7 shrink-0 text-danger" aria-hidden /><span><span className="block font-bold">Same-day & urgent</span><span className="text-sm text-muted">Providers who take urgent jobs.</span></span></Link>
       </div>
       <section>
-        <div className="mb-3 flex items-center justify-between"><h2 className="flex items-center gap-2 text-lg font-bold text-navy"><Sparkles className="size-5 text-amber" aria-hidden />Festival & seasonal help</h2><Link to="/services/all?seasonal=1" className="text-sm font-semibold text-teal">See all →</Link></div>
-        <p className="mb-3 text-sm text-muted">Diwali cleaning, temporary helpers, event setup, wedding helpers, loading and unloading. Prices are illustrative per-day rates set by each provider, not market rates.</p>
-        <div className="grid gap-3 md:grid-cols-3">{seasonal.slice(0, 6).map((p) => <ProviderCard key={p.id} p={p} />)}</div>
+        <SectionHeader title="Festival & seasonal help" to="/services/all?seasonal=1" linkLabel="View All" icon={<Sparkles className="size-5 text-amber" aria-hidden />} />
+        <p className="mb-3 text-sm text-muted">Diwali cleaning, temporary helpers, event setup, wedding helpers, loading and unloading. Per-day prices are illustrative and set by each provider.</p>
+        <div className="grid gap-3 lg:grid-cols-2">{seasonal.slice(0, 4).map((p) => <ProviderCard key={p.id} p={p} />)}</div>
       </section>
     </div>
   );
@@ -51,11 +89,11 @@ export function ServiceCategoryPage() {
   useDocumentTitle(cat?.name ?? 'All services');
   const providers = useDB((s) => s.providers);
   const { prefs } = useSession();
-  const init = () => ({ q: '', values: { locality: '', rating: '', price: '', category: '' } as Record<string, string>, sort: 'relevance', available: params.get('available') === '1', verified: false, emergency: params.get('emergency') === '1', active: false, seasonal: params.get('seasonal') === '1' });
+  const init = () => ({ q: params.get('q') ?? '', values: { locality: params.get('locality') ?? '', rating: '', price: '', category: '' } as Record<string, string>, sort: 'relevance', available: params.get('available') === '1', verified: false, emergency: params.get('emergency') === '1', active: false, seasonal: params.get('seasonal') === '1' });
   const [f, setF] = useState(init);
   const list = useMemo(() => {
     let l = providers.filter((p) => (category === 'all' ? !f.values.category || p.category === f.values.category : p.category === category) && p.verification !== 'suspended');
-    if (f.q) l = l.filter((p) => `${p.name} ${p.description}`.toLowerCase().includes(f.q.toLowerCase()));
+    if (f.q) l = l.filter((p) => `${p.name} ${p.description} ${serviceName(p.category)}`.toLowerCase().includes(f.q.toLowerCase()));
     if (f.values.locality) l = l.filter((p) => p.localityId === f.values.locality);
     if (f.values.rating) l = l.filter((p) => p.rating >= Number(f.values.rating));
     if (f.values.price) l = l.filter((p) => p.priceFrom !== undefined && p.priceFrom <= Number(f.values.price));
@@ -153,7 +191,7 @@ export function ServiceRequestsPage() {
       {reqs.length === 0 ? <EmptyState title="No requests yet" text="Describe what you need and nearby providers can respond." action={<LinkButton to="/service-requests/new">Request a service</LinkButton>} /> : (
         <ul className="grid gap-3">
           {reqs.map((r) => (
-            <li key={r.id}><Link to={`/service-requests/${r.id}`} className="card flex items-center gap-3 p-4 hover:border-navy/30">
+            <li key={r.id}><Link to={`/service-requests/${r.id}`} className="card flex items-center gap-3 p-4 hover:border-brand/30">
               <span className="min-w-0 flex-1"><span className="block font-semibold">{serviceName(r.category)}</span><span className="block truncate text-sm text-muted">{r.description}</span><span className="text-xs text-muted">{localityName(r.localityId)} · {formatDate(r.preferredDate)} · {r.responses.length} response(s)</span></span>
               <StatusPill status={r.status} />
             </Link></li>

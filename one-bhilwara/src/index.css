@@ -1,24 +1,28 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-navy: #13243a;
+  --color-navy: #0f1d40;
   --color-navy-deep: #0b1728;
   --color-navy-50: #eef2f7;
   --color-navy-100: #dbe3ee;
-  --color-teal: #0f766e;
-  --color-teal-50: #ecfdf8;
-  --color-teal-100: #ccf3e9;
+  --color-teal: #15803d;
+  --color-teal-50: #ecfaf1;
+  --color-teal-100: #cdf1db;
+  --color-brand: #1d5fe0;
+  --color-brand-600: #164bb5;
+  --color-brand-50: #edf3fe;
+  --color-brand-100: #d6e4fd;
   --color-amber: #f59e0b;
   --color-amber-50: #fff8eb;
   --color-amber-700: #b45309;
-  --color-page: #f5f7fa;
+  --color-page: #f6f8fc;
   --color-ink: #182230;
   --color-muted: #667085;
   --color-line: #e4e7ec;
   --color-danger: #b42318;
   --color-danger-50: #fef3f2;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Devanagari', sans-serif;
-  --radius-card: 14px;
+  --radius-card: 16px;
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
 }
 
@@ -35,13 +39,14 @@
 
 @layer components {
   .card { @apply bg-white border border-line rounded-[var(--radius-card)]; box-shadow: var(--shadow-card); }
-  .input { @apply w-full min-h-11 rounded-lg border border-line bg-white px-3 text-[15px] text-ink placeholder:text-muted/80 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15 disabled:bg-page; }
+  .input { @apply w-full min-h-11 rounded-lg border border-line bg-white px-3 text-[15px] text-ink placeholder:text-muted/80 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15 disabled:bg-page; }
   .label { @apply block text-sm font-medium text-ink mb-1.5; }
-  .chip { @apply inline-flex items-center gap-1.5 min-h-9 px-3 rounded-full border border-line bg-white text-sm font-medium text-ink whitespace-nowrap hover:border-navy/40 transition-colors; }
-  .chip[aria-pressed='true'] { @apply bg-navy text-white border-navy; }
+  .chip { @apply inline-flex items-center gap-1.5 min-h-9 px-4 rounded-full border border-line bg-white text-sm font-medium text-ink whitespace-nowrap hover:border-brand/40 transition-colors; }
+  .chip[aria-pressed='true'] { @apply bg-brand text-white border-brand; }
   .scroll-x { @apply flex gap-2 overflow-x-auto pb-1; scrollbar-width: none; }
   .scroll-x::-webkit-scrollbar { display: none; }
   .skeleton { @apply bg-navy-100/60 rounded animate-pulse; }
+  .input-pill { @apply w-full min-h-12 rounded-2xl border border-line bg-white px-4 text-[15px] text-ink placeholder:text-muted/80 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15; }
 }
 
 @media (prefers-reduced-motion: reduce) {

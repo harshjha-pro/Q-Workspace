@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Bell, Bookmark, Briefcase, CalendarDays, Check, CircleCheck, CircleX, Download, FileText, HelpCircle, LogOut, MessageSquare, Phone, Receipt, Settings, Smartphone, Trash2, Wrench } from 'lucide-react';
+import { Bookmark, Briefcase, CalendarDays, Check, CircleCheck, CircleX, Download, FileText, LogOut, MapPin, MessageSquare, Phone, Receipt, Settings, Star, ThumbsUp, Smartphone, Trash2, Wrench } from 'lucide-react';
 import type { Payment, Preferences } from '@/types/models';
 import { EMERGENCY_NUMBERS, HOME_SECTIONS, INTERESTS, JOB_CATEGORIES, LOCALITIES, localityName, NEWS_CATEGORIES, ROLES } from '@/config/catalog';
 import { DEMO_USER_ID } from '@/data/seed';
@@ -16,7 +16,7 @@ import { useRequireAuth } from '@/components/shared';
 import { Avatar, Badge, Button, DemoBadge, EmptyState, LinkButton, Notice, PageHeader, StatusPill } from '@/components/ui/primitives';
 import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
 import { Checkbox, Select, TextArea, TextField, Toggle } from '@/components/ui/form';
-import { formatDate, formatDateTime, formatINR, formatMobile, isValidMobile, timeAgo } from '@/utils/format';
+import { formatDate, formatDateTime, formatINR, isValidMobile, timeAgo } from '@/utils/format';
 import { nowIso, uid } from '@/utils/ids';
 import NotFound from '@/app/NotFound';
 
@@ -29,14 +29,14 @@ const SAVED_LINK: Record<string, (id: string) => string> = {
 };
 const SAVED_LABEL: Record<string, string> = { article: 'News', job: 'Jobs', property: 'Property', classified: 'Marketplace', business: 'Businesses', provider: 'Services', event: 'Events', institution: 'Education', healthcare: 'Healthcare', scheme: 'Schemes', vendor: 'Wedding vendors', professional: 'Professionals' };
 
-type ProfileTab = 'saved' | 'activity' | 'requests' | 'applications' | 'bookings' | 'enquiries' | 'listings' | 'rewards';
+type ProfileTab = 'activity' | 'saved' | 'reviews' | 'requests' | 'applications' | 'bookings' | 'enquiries' | 'listings' | 'rewards';
 
 export function ProfilePage() {
   useDocumentTitle('Profile');
   const user = useCurrentUser();
   const { userId, role } = useSession();
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as ProfileTab) ?? 'saved';
+  const tab = (params.get('tab') as ProfileTab) ?? 'activity';
   const db = useDB((s) => s);
   const { toast, confirm } = useUI();
   if (!user) return <NotFound />;
@@ -60,26 +60,37 @@ export function ProfilePage() {
     ...db.properties.filter((p) => p.ownerId && ids.includes(p.ownerId) && p.status !== 'removed').map((p) => ({ id: p.id, title: p.title, status: p.status, link: `/property/${p.id}`, kind: 'Property' })),
     ...db.businesses.filter((b) => b.ownerId && ids.includes(b.ownerId)).map((b) => ({ id: b.id, title: b.name, status: b.verification, link: `/businesses/${b.id}`, kind: 'Business' }))
   ];
+  const myReviews = db.reviews.filter((r) => r.userId === userId);
+  const following = user.following.length;
   const tabs: { id: ProfileTab; label: string; count?: number; roles?: string[] }[] = [
-    { id: 'saved', label: 'Saved', count: saved.length }, { id: 'activity', label: 'Posts & polls', count: myPosts.length + myComments.length }, { id: 'requests', label: 'Service requests', count: requests.length },
-    { id: 'applications', label: 'Applications', count: apps.length, roles: ['resident', 'jobseeker', 'admin'] }, { id: 'bookings', label: 'Bookings', count: bookings.length }, { id: 'enquiries', label: 'Enquiries', count: enquiries.length },
-    { id: 'listings', label: 'My listings', count: listings.length }, { id: 'rewards', label: 'Rewards' }
+    { id: 'activity', label: 'My Activity' }, { id: 'saved', label: 'Saved', count: saved.length }, { id: 'reviews', label: 'Reviews', count: myReviews.length },
+    { id: 'requests', label: 'Requests', count: requests.length }, { id: 'applications', label: 'Applications', count: apps.length, roles: ['resident', 'jobseeker', 'admin'] },
+    { id: 'bookings', label: 'Bookings', count: bookings.length }, { id: 'enquiries', label: 'Enquiries', count: enquiries.length }, { id: 'listings', label: 'Listings', count: listings.length }, { id: 'rewards', label: 'Rewards' }
   ];
   const groups = Object.entries(saved.reduce<Record<string, typeof saved>>((acc, s) => { (acc[s.type] ??= []).push(s); return acc; }, {}));
+  const commentCount = (postId: string) => db.comments.filter((c) => c.targetType === 'post' && c.targetId === postId).length;
   return (
-    <div className="grid gap-5">
-      <section className="card flex flex-wrap items-center gap-4 p-5">
-        <Avatar name={user.name} size={64} />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-extrabold text-navy">{user.name}</h1>
-          <p className="text-sm text-muted">{localityName(user.localityId)} · {roleLabel} (demo role){user.mobile ? ` · ${formatMobile(user.mobile)}` : ''}</p>
-          <div className="mt-1 flex flex-wrap gap-1.5">{user.demo && <DemoBadge label="Demo account" />}<Badge tone="amber">{pointsTotal(userId)} points</Badge>{user.interests.slice(0, 4).map((i) => <Badge key={i}>{i}</Badge>)}</div>
+    <div className="mx-auto grid max-w-3xl gap-4">
+      <section className="card relative grid gap-4 p-5">
+        <Link to="/settings" className="absolute right-3 top-3 grid size-10 place-items-center rounded-full text-ink hover:bg-page" aria-label="Settings"><Settings className="size-5" aria-hidden /></Link>
+        <div className="flex items-center gap-4">
+          <span className="rounded-full p-1 ring-2 ring-brand/30"><Avatar name={user.name} size={76} /></span>
+          <div className="min-w-0">
+            <h1 className="text-xl font-extrabold text-ink">{user.name}</h1>
+            <p className="flex items-center gap-1 text-sm text-muted"><MapPin className="size-4" aria-hidden />{localityName(user.localityId)}, Bhilwara</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {user.demo ? <DemoBadge label="Demo account" /> : <Badge tone="teal">Member</Badge>}
+              <Badge tone="blue">{roleLabel}</Badge>
+              <Badge tone="amber">{pointsTotal(userId)} pts</Badge>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <LinkButton variant="secondary" to="/settings" icon={<Settings className="size-4" aria-hidden />}>Settings</LinkButton>
-          <LinkButton variant="secondary" to="/notifications" icon={<Bell className="size-4" aria-hidden />}>Notifications</LinkButton>
-          <LinkButton variant="ghost" to="/help" icon={<HelpCircle className="size-4" aria-hidden />}>Help</LinkButton>
-        </div>
+        <dl className="grid grid-cols-3 divide-x divide-line text-center">
+          <div><dt className="text-xs text-muted">Posts</dt><dd className="text-lg font-bold text-ink">{myPosts.length}</dd></div>
+          <div><dt className="text-xs text-muted">Saved</dt><dd className="text-lg font-bold text-ink">{saved.length}</dd></div>
+          <div><dt className="text-xs text-muted">Following</dt><dd className="text-lg font-bold text-ink">{following}</dd></div>
+        </dl>
+        <LinkButton variant="secondary" to="/settings#profile" className="rounded-full border-brand/40 text-brand">Edit Profile</LinkButton>
       </section>
       {(role === 'business' || role === 'employer' || role === 'provider' || role === 'owner' || role === 'admin') && (
         <div className="flex flex-wrap gap-2">
@@ -91,20 +102,33 @@ export function ProfilePage() {
         </div>
       )}
       <Tabs label="Profile sections" value={tab} onChange={(t) => setParams({ tab: t }, { replace: true })} tabs={tabs.filter((t) => !t.roles || t.roles.includes(role))} />
+      {tab === 'activity' && (myPosts.length === 0 && myComments.length === 0 && myVotes.length === 0 ? <EmptyState icon={<MessageSquare className="size-6" aria-hidden />} title="No activity yet" text="Share something with your neighbours." action={<LinkButton to="/community?compose=1">Create a post</LinkButton>} /> : (
+        <div className="grid gap-3">
+          {myPosts.map((p) => (
+            <article key={p.id} className="card p-4">
+              <div className="flex items-center gap-3"><Avatar name={user.name} size={36} /><div><p className="text-sm font-semibold">{user.name}</p><p className="text-xs text-muted">{timeAgo(p.createdAt)} · {localityName(p.localityId)}{p.status === 'pending' ? ' · awaiting moderation' : ''}</p></div></div>
+              <Link to={`/community/${p.id}`} className="mt-2 block text-[15px] text-ink">{p.text}</Link>
+              <div className="mt-3 flex items-center gap-5 text-sm text-muted">
+                <span className="inline-flex items-center gap-1"><ThumbsUp className="size-4" aria-hidden />{Object.values(p.reactions).reduce((a, r) => a + r.length, 0)}</span>
+                <span className="inline-flex items-center gap-1"><MessageSquare className="size-4" aria-hidden />{commentCount(p.id)}</span>
+                <Link to={`/community/${p.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-ink hover:text-brand"><MessageSquare className="size-4" aria-hidden />Comment</Link>
+              </div>
+            </article>
+          ))}
+          {myComments.length > 0 && <section className="card p-4"><h2 className="mb-2 font-bold text-ink">Recent comments</h2>{myComments.slice(0, 5).map((c) => <p key={c.id} className="py-1.5 text-sm">“{c.text.slice(0, 80)}” <span className="text-xs text-muted">· {timeAgo(c.createdAt)}</span></p>)}</section>}
+          {myVotes.length > 0 && <section className="card p-4"><h2 className="mb-2 font-bold text-ink">Polls you voted in</h2>{myVotes.map((v) => { const p = db.polls.find((x) => x.id === v.pollId); return <Link key={v.id} to={`/polls/${v.pollId}`} className="block py-1.5 text-sm hover:text-brand">{p?.question}</Link>; })}</section>}
+        </div>
+      ))}
+      {tab === 'reviews' && (myReviews.length === 0 ? <EmptyState icon={<Star className="size-6" aria-hidden />} title="No reviews yet" text="Reviews you write for businesses and providers appear here." /> : (
+        <ul className="grid gap-2">{myReviews.map((r) => <li key={r.id} className="card p-4"><div className="flex items-center justify-between"><span className="text-sm font-semibold capitalize">{r.targetType}</span><span className="text-sm text-amber-700">{'★'.repeat(r.rating)}</span></div><p className="text-sm">{r.text}</p><p className="text-xs text-muted">{formatDate(r.createdAt)}</p></li>)}</ul>
+      ))}
       {tab === 'saved' && (saved.length === 0 ? <EmptyState icon={<Bookmark className="size-6" aria-hidden />} title="Nothing saved yet" text="Tap Save on news, jobs, property, services and more." action={<LinkButton variant="secondary" to="/discover">Discover</LinkButton>} /> : (
         <div className="grid gap-4 md:grid-cols-2">{groups.map(([type, items]) => (
           <section key={type} className="card p-4"><h2 className="mb-2 font-bold text-navy">{SAVED_LABEL[type] ?? type}</h2>
-            <ul className="divide-y divide-line">{items.map((s) => <li key={s.id} className="flex items-center justify-between gap-2 py-2"><Link to={SAVED_LINK[type]?.(s.id) ?? '/'} className="min-w-0 truncate text-sm font-medium hover:text-navy">{titleOf(type, s.id)}</Link><span className="shrink-0 text-xs text-muted">{timeAgo(s.at)}</span></li>)}</ul>
+            <ul className="divide-y divide-line">{items.map((s) => <li key={s.id} className="flex items-center justify-between gap-2 py-2"><Link to={SAVED_LINK[type]?.(s.id) ?? '/'} className="min-w-0 truncate text-sm font-medium hover:text-brand">{titleOf(type, s.id)}</Link><span className="shrink-0 text-xs text-muted">{timeAgo(s.at)}</span></li>)}</ul>
           </section>
         ))}</div>
       ))}
-      {tab === 'activity' && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <section className="card p-4"><h2 className="mb-2 font-bold text-navy">My posts</h2>{myPosts.length ? myPosts.map((p) => <Link key={p.id} to={`/community/${p.id}`} className="block py-1.5 text-sm hover:text-navy">{p.text.slice(0, 70)} <StatusPill status={p.status} /></Link>) : <p className="text-sm text-muted">No posts yet.</p>}</section>
-          <section className="card p-4"><h2 className="mb-2 font-bold text-navy">My comments</h2>{myComments.length ? myComments.slice(0, 10).map((c) => <p key={c.id} className="py-1.5 text-sm">“{c.text.slice(0, 60)}” <span className="text-xs text-muted">· {timeAgo(c.createdAt)}</span></p>) : <p className="text-sm text-muted">No comments yet.</p>}</section>
-          <section className="card p-4"><h2 className="mb-2 font-bold text-navy">My poll activity</h2>{myVotes.length ? myVotes.map((v) => { const p = db.polls.find((x) => x.id === v.pollId); return <Link key={v.id} to={`/polls/${v.pollId}`} className="block py-1.5 text-sm hover:text-navy">{p?.question}</Link>; }) : <p className="text-sm text-muted">You haven’t voted yet.</p>}</section>
-        </div>
-      )}
       {tab === 'requests' && (requests.length === 0 ? <EmptyState icon={<Wrench className="size-6" aria-hidden />} title="No service requests" action={<LinkButton to="/service-requests/new">Request a service</LinkButton>} /> : (
         <ul className="grid gap-2">{requests.map((r) => <li key={r.id}><Link to={`/service-requests/${r.id}`} className="card flex items-center justify-between gap-2 p-3"><span className="truncate text-sm">{r.description}</span><StatusPill status={r.status} /></Link></li>)}</ul>
       ))}
@@ -343,7 +367,7 @@ export function HelpPage() {
         <TextArea label="Message" value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} />
         <Button type="submit" className="justify-self-start">Send</Button>
       </form>
-      <section className="card p-4"><h2 className="mb-2 font-bold text-navy">Policies</h2><ul className="grid gap-1 text-sm sm:grid-cols-2">{POLICIES.map((p) => <li key={p.slug}><Link className="text-teal underline" to={`/policies/${p.slug}`}>{p.title}</Link></li>)}</ul></section>
+      <section className="card p-4"><h2 className="mb-2 font-bold text-navy">Policies</h2><ul className="grid gap-1 text-sm sm:grid-cols-2">{POLICIES.map((p) => <li key={p.slug}><Link className="text-brand underline" to={`/policies/${p.slug}`}>{p.title}</Link></li>)}</ul></section>
       <section className="card p-4 text-sm text-muted"><h2 className="mb-1 font-bold text-navy">Safety tips</h2><ul className="list-disc pl-5"><li>Never share OTPs or pay advances to strangers.</li><li>Meet in public places for marketplace deals.</li><li>Verify property and vehicle documents in person.</li></ul></section>
     </div>
   );

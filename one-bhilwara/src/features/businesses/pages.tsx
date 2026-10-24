@@ -84,11 +84,11 @@ export function BusinessPage() {
             <SaveButton type="business" id={b.id} /><ShareButton title={b.name} /><ReportButton targetType="business" targetId={b.id} title={b.name} />
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
-            {b.website && <a onClick={track} href={b.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-teal underline"><Globe className="size-4" aria-hidden />Website</a>}
-            {b.instagram && <a onClick={track} href={b.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-teal underline"><Instagram className="size-4" aria-hidden />Instagram</a>}
-            {b.facebook && <a onClick={track} href={b.facebook} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-teal underline"><Facebook className="size-4" aria-hidden />Facebook</a>}
+            {b.website && <a onClick={track} href={b.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand underline"><Globe className="size-4" aria-hidden />Website</a>}
+            {b.instagram && <a onClick={track} href={b.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand underline"><Instagram className="size-4" aria-hidden />Instagram</a>}
+            {b.facebook && <a onClick={track} href={b.facebook} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand underline"><Facebook className="size-4" aria-hidden />Facebook</a>}
           </div>
-          {!b.claimed && <p className="text-sm">Is this your business? <Link to={`/businesses/${b.id}/edit?claim=1`} className="font-semibold text-teal underline">Claim this listing</Link></p>}
+          {!b.claimed && <p className="text-sm">Is this your business? <Link to={`/businesses/${b.id}/edit?claim=1`} className="font-semibold text-brand underline">Claim this listing</Link></p>}
         </div>
       </section>
       <SectionCard title="Products & services"><div className="flex flex-wrap gap-2">{b.products.map((p) => <Badge key={p} tone="navy">{p}</Badge>)}</div></SectionCard>
@@ -139,9 +139,9 @@ export function BusinessDashboardPage() {
           </div>
           <SectionCard title="Engagement (demo data)"><BarList unit="" rows={[{ label: 'Views', value: b.views }, { label: 'Clicks', value: b.clicks }, { label: 'Enquiries', value: b.leads + enquiries.length }]} /><p className="mt-2 text-xs text-muted">Simulated analytics. They don’t represent real reach or results.</p></SectionCard>
           <div className="grid gap-3 md:grid-cols-3">
-            <Link to="/pricing?audience=business" className="card p-4 hover:border-navy/30"><p className="font-bold">Upgrade profile</p><p className="text-sm text-muted">More photos, catalogue, offers & analytics.</p></Link>
-            <Link to="/business-assistance" className="card p-4 hover:border-navy/30"><p className="font-bold">Get design help</p><p className="text-sm text-muted">Logo, posts, website setup.</p></Link>
-            <Link to="/advertise" className="card p-4 hover:border-navy/30"><p className="font-bold">Promote locally</p><p className="text-sm text-muted">Sponsored placements, clearly labelled.</p></Link>
+            <Link to="/pricing?audience=business" className="card p-4 hover:border-brand/30"><p className="font-bold">Upgrade profile</p><p className="text-sm text-muted">More photos, catalogue, offers & analytics.</p></Link>
+            <Link to="/business-assistance" className="card p-4 hover:border-brand/30"><p className="font-bold">Get design help</p><p className="text-sm text-muted">Logo, posts, website setup.</p></Link>
+            <Link to="/advertise" className="card p-4 hover:border-brand/30"><p className="font-bold">Promote locally</p><p className="text-sm text-muted">Sponsored placements, clearly labelled.</p></Link>
           </div>
         </>
       )}
@@ -388,7 +388,7 @@ export function BusinessAssistancePage() {
       <PageHeader title="Business profile & website assistance" subtitle="Optional help to improve your online presence." badge={<DemoBadge label="Demo service" />} />
       <div className="grid gap-3 md:grid-cols-3">
         {PACKAGES.map((p) => (
-          <label key={p.id} className={`card cursor-pointer p-4 ${pkg === p.id ? 'border-navy ring-2 ring-navy/15' : ''}`}>
+          <label key={p.id} className={`card cursor-pointer p-4 ${pkg === p.id ? 'border-brand ring-2 ring-brand/15' : ''}`}>
             <input type="radio" className="sr-only" name="pkg" checked={pkg === p.id} onChange={() => setPkg(p.id)} />
             <p className="font-bold">{p.name}</p><p className="text-xl font-extrabold text-navy">{formatINR(p.price)}</p>
             <ul className="mt-2 list-disc pl-5 text-sm">{p.items.map((i) => <li key={i}>{i}</li>)}</ul>

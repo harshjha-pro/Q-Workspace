@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Camera, Clock, Download, EyeOff, Lock, MessageCircle, Plus, Share2, ThumbsDown, ThumbsUp, Users, Vote } from 'lucide-react';
 import type { Poll, Post } from '@/types/models';
@@ -26,8 +26,11 @@ export function CommunityPage() {
   const loading = useLoading();
   const [kind, setKind] = useState<'all' | Post['kind']>('all');
   const [loc, setLoc] = useState('');
+  const [params, setParams] = useSearchParams();
   const [compose, setCompose] = useState(false);
   const user = useCurrentUser();
+  const guardOpen = useRequireAuth();
+  useEffect(() => { if (params.get('compose') === '1') { setParams({}, { replace: true }); guardOpen(() => setCompose(true)); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const posts = useDB((s) => s.posts.filter((p) => p.status === 'published' || (p.status === 'pending' && p.userId === user?.id)));
   const list = posts.filter((p) => (kind === 'all' || p.kind === kind) && (!loc || p.localityId === loc) && !(user?.blocked ?? []).includes(p.userId));
   const { visible, hasMore, more } = usePaged(list, 8);
@@ -66,7 +69,7 @@ function PostCard({ p, full }: { p: Post; full?: boolean }) {
         <Badge tone="navy">{kindLabel}</Badge>
         {p.status === 'pending' && <Badge tone="blue">Awaiting moderation</Badge>}
       </div>
-      {full ? <p className="mt-3 whitespace-pre-line text-[15px]">{p.text}</p> : <Link to={`/community/${p.id}`} className="mt-3 block text-[15px] hover:text-navy">{p.text}</Link>}
+      {full ? <p className="mt-3 whitespace-pre-line text-[15px]">{p.text}</p> : <Link to={`/community/${p.id}`} className="mt-3 block text-[15px] hover:text-brand">{p.text}</Link>}
       {p.photo && <div className="mt-3 grid h-40 place-items-center rounded-xl bg-navy-50 text-muted"><Camera className="size-8" aria-hidden /><span className="sr-only">Photo placeholder</span></div>}
       <div className="mt-3 flex flex-wrap items-center gap-1">
         {REACTIONS.map(({ id, label, I }) => {
@@ -74,7 +77,7 @@ function PostCard({ p, full }: { p: Post; full?: boolean }) {
           const on = !!userId && users.includes(userId);
           return (
             <button key={id} type="button" aria-pressed={on} onClick={() => guard(() => repo.at('posts').mutate(p.id, (cur) => ({ reactions: { ...cur.reactions, [id]: on ? (cur.reactions[id] ?? []).filter((x) => x !== userId) : [...(cur.reactions[id] ?? []), userId!] } })))}
-              className={cx('inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-sm font-medium', on ? 'bg-navy text-white' : 'bg-page text-ink hover:bg-navy-50')}>
+              className={cx('inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-sm font-medium', on ? 'bg-brand text-white' : 'bg-page text-ink hover:bg-brand-50')}>
               <I className="size-4" aria-hidden />{label}{users.length > 0 && <span className="tabular-nums">· {users.length}</span>}
             </button>
           );
@@ -173,7 +176,7 @@ export function PollsPage() {
             const voted = !!userVote(p.id, null, votes);
             return (
               <li key={p.id}>
-                <Link to={`/polls/${p.id}`} className="card block h-full p-4 hover:border-navy/30">
+                <Link to={`/polls/${p.id}`} className="card block h-full p-4 hover:border-brand/30">
                   <div className="flex flex-wrap gap-1.5"><Badge tone="navy">{p.category}</Badge>{p.localityId && <Badge>{localityName(p.localityId)}</Badge>}<Badge>{p.origin === 'admin' ? 'Official poll' : 'Community poll'}</Badge>{p.demo && <DemoBadge />}</div>
                   <p className="mt-2 font-bold">{p.question}</p>
                   <p className="mt-1 text-sm text-muted">{participation(p, votes)} votes · {pollPhase(p, now) === 'scheduled' ? `Opens ${formatDateTime(p.opensAt)}` : pollPhase(p, now) === 'open' ? `Closes in ${countdown(p.closesAt, now)}` : `Closed ${formatDate(p.closesAt)}`}</p>
@@ -235,7 +238,7 @@ export function PollPage() {
         <fieldset className="card grid gap-2 p-4">
           <legend className="sr-only">Options</legend>
           {p.options.map((o) => (
-            <label key={o.id} className={cx('flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3', choice === o.id ? 'border-navy bg-navy-50' : 'border-line')}>
+            <label key={o.id} className={cx('flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3', choice === o.id ? 'border-brand bg-brand-50' : 'border-line')}>
               <input type="radio" name="poll" value={o.id} checked={choice === o.id} onChange={() => setChoice(o.id)} className="size-5 accent-navy" />{o.label}
             </label>
           ))}
@@ -268,7 +271,7 @@ export function PollPage() {
           </div>
         )}
       </section>
-      <button type="button" className="justify-self-start text-sm text-teal underline" onClick={() => setInfo(true)}>How voting is protected</button>
+      <button type="button" className="justify-self-start text-sm text-brand underline" onClick={() => setInfo(true)}>How voting is protected</button>
       <Dialog open={info} onClose={() => setInfo(false)} title="How voting is protected">
         <ul className="grid list-disc gap-2 pl-5 text-sm"><li>One vote per signed-in account.</li><li>In this demo the rule is checked in the browser only. In production, the server enforces a unique (poll, account) constraint and rate limits.</li><li>Hidden results are not sent to the browser before the reveal time in production.</li><li>Anonymous polls never show who voted for what.</li></ul>
       </Dialog>

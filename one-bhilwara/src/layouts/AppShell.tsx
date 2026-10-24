@@ -1,9 +1,9 @@
-import { Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell, Bot, Briefcase, Building2, BusFront, CalendarDays, ChartNoAxesColumn, Compass, Factory, FlaskConical, Gift, GraduationCap, HandCoins, HeartHandshake,
   HeartPulse, Home, House, Landmark, LayoutDashboard, MapPin, Megaphone, MessagesSquare, Newspaper, PhoneCall, Scale, Search, Settings, ShieldCheck,
-  ShoppingBag, Siren, Store, User, Vote, Wheat, Wifi, WifiOff, Wrench
+  Menu, Plus, ShoppingBag, Siren, Store, User, Vote, Wheat, Wifi, WifiOff, Wrench, X
 } from 'lucide-react';
 import { LOCALITIES, localityName, ROLES } from '@/config/catalog';
 import { useCurrentUser, useDB, useLang, useOnline, useSession, useT } from '@/hooks/useStore';
@@ -50,8 +50,8 @@ function DemoBar() {
         <div className="bg-amber-50 border-b border-amber/30 text-[13px] text-amber-700">
           <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 lg:px-6">
             <FlaskConical className="size-4 shrink-0" aria-hidden />
-            <p className="flex-1 text-ink/80">{t('demoNotice')}</p>
-            <button type="button" className="font-semibold underline" onClick={() => setOpen(true)}>{t('switchRole')}</button>
+            <p className="flex-1 truncate text-ink/80"><span className="sm:hidden">Demo mode · sample data only</span><span className="hidden sm:inline">{t('demoNotice')}</span></p>
+            <button type="button" className="shrink-0 font-semibold underline" onClick={() => setOpen(true)}><span className="sm:hidden">Roles</span><span className="hidden sm:inline">{t('switchRole')}</span></button>
             <button type="button" className="px-1 font-semibold" aria-label="Hide demo notice" onClick={() => sessionStore.set({ demoBannerDismissed: true })}>✕</button>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function RoleDialog({ open, onClose }: { open: boolean; onClose: () => vo
     <Dialog open={open} onClose={onClose} title={t('switchRole')} description="Development/demo feature only. It is not secure authentication; in production, roles are assigned and enforced by the server.">
       <div className="grid gap-2">
         {ROLES.map((r) => (
-          <button key={r.id} type="button" onClick={() => set(r.id)} className={cx('card flex items-center justify-between p-3 text-left hover:border-navy/40', role === r.id && 'border-navy ring-2 ring-navy/15')} aria-pressed={role === r.id}>
+          <button key={r.id} type="button" onClick={() => set(r.id)} className={cx('card flex items-center justify-between p-3 text-left hover:border-brand/40', role === r.id && 'border-brand ring-2 ring-brand/15')} aria-pressed={role === r.id}>
             <span><span className="block font-semibold text-ink">{r.label}</span><span className="text-sm text-muted">{r.desc}</span></span>
             {role === r.id && <span className="text-xs font-bold text-teal">Active</span>}
           </button>
@@ -107,48 +107,110 @@ export function RoleDialog({ open, onClose }: { open: boolean; onClose: () => vo
 function Header() {
   const t = useT();
   const nav = useNavigate();
+  const loc = useLocation();
   const user = useCurrentUser();
   const { prefs, userId } = useSession();
   const lang = useLang();
-  const unread = useDB((s) => s.notifications.filter((n) => (n.userId === userId || n.userId === 'all') && !n.read && prefs.notifyCategories.includes(n.type)).length);
+  const unread = useUnread();
   const [q, setQ] = useState('');
   const [locOpen, setLocOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const isHome = loc.pathname === '/';
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
+    <header className={cx('sticky top-0 z-30 border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur', !isHome && 'hidden lg:block')}>
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 lg:px-6">
-        <Link to="/" className="flex items-center gap-2 text-navy" aria-label="One Bhilwara home">
-          <img src="/icons/icon-192.png" alt="" width={36} height={36} className="rounded-xl" />
-          <span className="hidden text-lg font-extrabold tracking-tight sm:block">One <span className="text-teal">Bhilwara</span></span>
+        <button type="button" onClick={() => setMenu(true)} className="-ml-2 grid size-10 place-items-center rounded-lg text-ink hover:bg-page lg:hidden" aria-label="Open menu"><Menu className="size-6" aria-hidden /></button>
+        <Link to="/" className="flex items-center gap-2.5" aria-label="One Bhilwara home">
+          <img src="/icons/icon-192.png" alt="" width={36} height={36} className="hidden rounded-xl lg:block" />
+          <span className="leading-tight">
+            <span className="block text-[22px] font-extrabold tracking-tight text-navy">One <span className="text-brand">Bhilwara</span></span>
+            <span className="block text-[11px] font-medium text-muted">Local. For You. Always.</span>
+          </span>
         </Link>
-        <button type="button" onClick={() => setLocOpen(true)} className="ml-1 inline-flex min-h-10 max-w-[44vw] items-center gap-1 rounded-lg px-2 text-sm font-semibold text-ink hover:bg-page" aria-label={`${t('locality')}: ${localityName(prefs.localityId, lang)}. Change`}>
-          <MapPin className="size-4 shrink-0 text-teal" aria-hidden /><span className="truncate">{localityName(prefs.localityId, lang)}</span>
+        <button type="button" onClick={() => setLocOpen(true)} className="ml-3 hidden min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-ink hover:bg-page lg:inline-flex" aria-label={`${t('locality')}: ${localityName(prefs.localityId, lang)}. Change`}>
+          <MapPin className="size-4 text-brand" aria-hidden />{localityName(prefs.localityId, lang)}
         </button>
         <form className="ml-auto hidden flex-1 md:block md:max-w-md" role="search" onSubmit={(e) => { e.preventDefault(); nav(`/search?q=${encodeURIComponent(q)}`); }}>
           <label htmlFor="global-search" className="sr-only">{t('search')}</label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-            <input id="global-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPlaceholder')} className="input min-h-10 pl-9" />
+            <input id="global-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPlaceholder')} className="input min-h-10 rounded-full pl-9" />
           </div>
         </form>
         <div className="ml-auto flex items-center gap-1 md:ml-2">
-          <Link to="/search" className="grid size-10 place-items-center rounded-lg hover:bg-page md:hidden" aria-label={t('search')}><Search className="size-5" aria-hidden /></Link>
-          <Link to="/notifications" className="relative grid size-10 place-items-center rounded-lg hover:bg-page" aria-label={`${t('notifications')}${unread ? `, ${unread} unread` : ''}`}>
-            <Bell className="size-5" aria-hidden />
-            {unread > 0 && <span className="absolute right-1 top-1 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>}
+          <Link to="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-page" aria-label={`${t('notifications')}${unread ? `, ${unread} unread` : ''}`}>
+            <Bell className="size-6 text-ink" aria-hidden />
+            {unread > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-danger ring-2 ring-white" />}
           </Link>
           <label htmlFor="lang" className="sr-only">{t('language')}</label>
-          <select id="lang" value={lang} onChange={(e) => sessionStore.setPrefs({ lang: e.target.value as 'en' | 'hi' })} className="min-h-10 rounded-lg border border-line bg-white px-1.5 text-sm font-semibold">
+          <select id="lang" value={lang} onChange={(e) => sessionStore.setPrefs({ lang: e.target.value as 'en' | 'hi' })} className="hidden min-h-10 rounded-lg border border-line bg-white px-1.5 text-sm font-semibold lg:block">
             <option value="en">EN</option><option value="hi">हिं</option>
           </select>
           {userId && user ? (
-            <Link to="/profile" className="ml-1 rounded-full" aria-label={`${t('navProfile')}: ${user.name}`}><Avatar name={user.name} size={36} /></Link>
+            <Link to="/profile" className="ml-1 hidden rounded-full lg:block" aria-label={`${t('navProfile')}: ${user.name}`}><Avatar name={user.name} size={36} /></Link>
           ) : (
-            <Link to="/signin" className="ml-1 inline-flex min-h-10 items-center rounded-lg bg-navy px-3 text-sm font-semibold text-white">{t('signIn')}</Link>
+            <Link to="/signin" className="ml-1 hidden min-h-10 items-center rounded-lg bg-brand px-3 text-sm font-semibold text-white lg:inline-flex">{t('signIn')}</Link>
           )}
         </div>
       </div>
       <LocalityDialog open={locOpen} onClose={() => setLocOpen(false)} />
+      <MobileMenu open={menu} onClose={() => setMenu(false)} onLocality={() => { setMenu(false); setLocOpen(true); }} />
     </header>
+  );
+}
+
+function useUnread() {
+  const { prefs, userId } = useSession();
+  return useDB((s) => s.notifications.filter((n) => (n.userId === userId || n.userId === 'all') && !n.read && prefs.notifyCategories.includes(n.type)).length);
+}
+
+/** Slide-in drawer giving mobile users access to every module. */
+function MobileMenu({ open, onClose, onLocality }: { open: boolean; onClose: () => void; onLocality: () => void }) {
+  const groups = useNavGroups();
+  const { role, prefs, userId } = useSession();
+  const user = useCurrentUser();
+  const lang = useLang();
+  const t = useT();
+  const [roles, setRoles] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
+  const loc = useLocation();
+  useEffect(() => { const d = ref.current; if (!d) return; if (open && !d.open) d.showModal(); if (!open && d.open) d.close(); }, [open]);
+  useEffect(() => { onClose(); }, [loc.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <dialog ref={ref} aria-label="Menu" onClose={onClose} onCancel={(e) => { e.preventDefault(); onClose(); }} onClick={(e) => { if (e.target === ref.current) onClose(); }}
+        className="m-0 h-dvh max-h-dvh w-[86vw] max-w-sm bg-white p-0 backdrop:bg-navy/50">
+        {open && (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b border-line p-4">
+              <div className="flex items-center gap-3">
+                {user ? <Avatar name={user.name} size={40} /> : <img src="/icons/icon-192.png" alt="" width={40} height={40} className="rounded-xl" />}
+                <div><p className="font-bold text-ink">{user?.name ?? 'One Bhilwara'}</p>{userId ? <Link to="/profile" className="text-sm text-brand">View profile</Link> : <Link to="/signin" className="text-sm text-brand">{t('signIn')}</Link>}</div>
+              </div>
+              <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-full hover:bg-page" aria-label="Close menu"><X className="size-5" aria-hidden /></button>
+            </div>
+            <div className="flex gap-2 border-b border-line p-3">
+              <button type="button" onClick={onLocality} className="chip flex-1 justify-center"><MapPin className="size-4 text-brand" aria-hidden />{localityName(prefs.localityId, lang)}</button>
+              <select aria-label={t('language')} value={lang} onChange={(e) => sessionStore.setPrefs({ lang: e.target.value as 'en' | 'hi' })} className="chip">
+                <option value="en">English</option><option value="hi">हिंदी</option>
+              </select>
+            </div>
+            <nav aria-label="All sections" className="flex-1 overflow-y-auto p-3">
+              {groups.map((g) => (
+                <div key={g.title} className="mb-3">
+                  <p className="mb-1 px-3 text-xs font-bold uppercase tracking-wide text-muted">{g.title}</p>
+                  <ul>{g.items.filter((it) => !it.roles || it.roles.includes(role)).map((it) => (
+                    <li key={it.to}><NavLink to={it.to} end={it.to === '/'} className={({ isActive }) => cx('flex min-h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium', isActive ? 'bg-brand-50 text-brand' : 'text-ink hover:bg-page')}>{it.icon}{it.label}</NavLink></li>
+                  ))}</ul>
+                </div>
+              ))}
+            </nav>
+            <div className="border-t border-line p-3"><Button variant="secondary" block icon={<FlaskConical className="size-4" aria-hidden />} onClick={() => setRoles(true)}>{t('switchRole')}</Button></div>
+          </div>
+        )}
+      </dialog>
+      <RoleDialog open={roles} onClose={() => setRoles(false)} />
+    </>
   );
 }
 
@@ -165,7 +227,7 @@ export function LocalityDialog({ open, onClose }: { open: boolean; onClose: () =
             <button type="button" aria-pressed={prefs.localityId === l.id} onClick={() => {
               sessionStore.setPrefs({ localityId: l.id, localities: Array.from(new Set([l.id, ...prefs.localities])).slice(0, 5) });
               toast(`Locality set to ${l.name}`); onClose();
-            }} className={cx('w-full rounded-lg border px-3 py-2.5 text-left text-sm font-medium', prefs.localityId === l.id ? 'border-navy bg-navy text-white' : 'border-line bg-white hover:border-navy/40')}>
+            }} className={cx('w-full rounded-lg border px-3 py-2.5 text-left text-sm font-medium', prefs.localityId === l.id ? 'border-brand bg-brand text-white' : 'border-line bg-white hover:border-brand/40')}>
               {lang === 'hi' ? l.nameHi : l.name}<span className={cx('block text-xs', prefs.localityId === l.id ? 'text-white/70' : 'text-muted')}>{l.zone}</span>
             </button>
           </li>
@@ -217,7 +279,7 @@ function Sidebar() {
           <ul>
             {g.items.filter((it) => !it.roles || it.roles.includes(role)).map((it) => (
               <li key={it.to}>
-                <NavLink to={it.to} end={it.to === '/'} className={({ isActive }) => cx('flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium', isActive ? 'bg-navy text-white' : 'text-ink hover:bg-white')}>
+                <NavLink to={it.to} end={it.to === '/'} className={({ isActive }) => cx('flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium', isActive ? 'bg-brand-50 text-brand font-semibold' : 'text-ink hover:bg-white')}>
                   {it.icon}{it.label}
                 </NavLink>
               </li>
@@ -231,22 +293,61 @@ function Sidebar() {
 
 function BottomNav() {
   const t = useT();
-  const items = [
-    { to: '/', label: t('navHome'), I: Home }, { to: '/news', label: t('navNews'), I: Newspaper }, { to: '/discover', label: t('navDiscover'), I: Compass },
-    { to: '/ai', label: t('navAI'), I: Bot }, { to: '/profile', label: t('navProfile'), I: User }
-  ];
+  const unread = useUnread();
+  const [post, setPost] = useState(false);
+  const item = (to: string, label: string, I: typeof Home, badge = 0) => (
+    <li>
+      <NavLink to={to} end={to === '/'} className={({ isActive }) => cx('relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold', isActive ? 'text-brand' : 'text-muted')}>
+        <I className="size-[22px]" aria-hidden />{label}
+        {badge > 0 && <span className="absolute right-[calc(50%-18px)] top-2.5 size-2.5 rounded-full bg-danger ring-2 ring-white" aria-label={`${badge} unread`} />}
+      </NavLink>
+    </li>
+  );
   return (
-    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <ul className="grid grid-cols-5">
-        {items.map(({ to, label, I }) => (
+    <>
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(16_24_40/0.06)] lg:hidden">
+        <ul className="grid grid-cols-5">
+          {item('/', t('navHome'), Home)}
+          {item('/discover', t('navExplore'), Compass)}
+          <li className="flex justify-center">
+            <button type="button" onClick={() => setPost(true)} className="flex h-16 flex-col items-center justify-end gap-0.5 pb-1.5 text-[11px] font-semibold text-brand" aria-label="Post something" aria-haspopup="dialog">
+              <span className="-mt-5 grid size-12 place-items-center rounded-full bg-brand text-white shadow-lg ring-4 ring-white"><Plus className="size-6" aria-hidden /></span>{t('navPost')}
+            </button>
+          </li>
+          {item('/notifications', t('navActivity'), Bell, unread)}
+          {item('/profile', t('navProfile'), User)}
+        </ul>
+      </nav>
+      <PostSheet open={post} onClose={() => setPost(false)} />
+    </>
+  );
+}
+
+const POST_OPTIONS = [
+  { to: '/community?compose=1', label: 'Community post', desc: 'Ask, discuss, recommend', I: MessagesSquare, tint: 'bg-violet-50 text-violet-600' },
+  { to: '/service-requests/new', label: 'Request a service', desc: 'Get quotes from local providers', I: Wrench, tint: 'bg-brand-50 text-brand' },
+  { to: '/marketplace/new', label: 'Sell an item', desc: 'List in Buy & Sell', I: ShoppingBag, tint: 'bg-rose-50 text-rose-600' },
+  { to: '/property/new', label: 'List a property', desc: 'Rent, sale or PG', I: House, tint: 'bg-purple-50 text-purple-600' },
+  { to: '/employers?tab=post', label: 'Post a job', desc: 'Hire locally', I: Briefcase, tint: 'bg-emerald-50 text-emerald-600' },
+  { to: '/businesses/new', label: 'Add your business', desc: 'Free basic listing', I: Store, tint: 'bg-amber-50 text-amber-700' },
+  { to: '/polls/new', label: 'Suggest a poll', desc: 'Ask the city', I: Vote, tint: 'bg-sky-50 text-sky-600' }
+];
+
+function PostSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const nav = useNavigate();
+  return (
+    <Dialog open={open} onClose={onClose} title="Create" description="What would you like to post?">
+      <ul className="grid gap-2">
+        {POST_OPTIONS.map(({ to, label, desc, I, tint }) => (
           <li key={to}>
-            <NavLink to={to} end={to === '/'} className={({ isActive }) => cx('flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold', isActive ? 'text-navy' : 'text-muted')}>
-              {({ isActive }) => (<><span className={cx('grid h-7 w-12 place-items-center rounded-full', isActive && 'bg-navy-50')}><I className="size-5" aria-hidden /></span>{label}</>)}
-            </NavLink>
+            <button type="button" onClick={() => { onClose(); nav(to); }} className="flex w-full items-center gap-3 rounded-xl border border-line p-3 text-left hover:border-brand/40">
+              <span className={cx('grid size-11 place-items-center rounded-xl', tint)}><I className="size-5" aria-hidden /></span>
+              <span><span className="block font-semibold text-ink">{label}</span><span className="text-sm text-muted">{desc}</span></span>
+            </button>
           </li>
         ))}
       </ul>
-    </nav>
+    </Dialog>
   );
 }
 
@@ -261,7 +362,7 @@ function ConnectivityBanner() {
   }, [online, wasOffline]);
   if (online && !showBack) return null;
   return (
-    <div role="status" className={cx('flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium', online ? 'bg-teal-50 text-teal' : 'bg-navy-deep text-white')}>
+    <div role="status" className={cx('flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium', online ? 'bg-teal-50 text-teal' : 'bg-navy text-white')}>
       {online ? <Wifi className="size-4" aria-hidden /> : <WifiOff className="size-4" aria-hidden />}{online ? t('backOnline') : t('offline')}
     </div>
   );
@@ -272,7 +373,7 @@ function UpdatePrompt() {
   const t = useT();
   if (!updateReady) return null;
   return (
-    <div className="fixed inset-x-0 top-20 z-50 mx-auto flex w-fit items-center gap-3 rounded-xl bg-navy-deep px-4 py-3 text-sm text-white shadow-lg" role="status">
+    <div className="fixed inset-x-0 top-20 z-50 mx-auto flex w-fit items-center gap-3 rounded-xl bg-navy px-4 py-3 text-sm text-white shadow-lg" role="status">
       {t('updateReady')} <button type="button" className="font-bold text-amber" onClick={applyUpdate}>{t('reload')}</button>
     </div>
   );

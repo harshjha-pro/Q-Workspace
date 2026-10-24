@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, Siren, Trophy } from 'lucide-react';
+import { ChevronRight, ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, Siren, Trophy } from 'lucide-react';
 import type { CivicAlert, Match, Podcast } from '@/types/models';
 import { LOCALITIES, localityName, NEWS_CATEGORIES, newsCategoryName } from '@/config/catalog';
 import { matches as seedMatches, podcasts as seedPodcasts, prices as seedPrices } from '@/data/seed/content';
-import { useDB, useDocumentTitle, useLang, useLoading, useNow, useSession } from '@/hooks/useStore';
+import { useDB, useDocumentTitle, useLoading, useNow, useSession } from '@/hooks/useStore';
 import { repo } from '@/services/store';
 import { ArticleCard } from '@/components/cards';
+import { CityScene } from '@/components/illustrations';
 import { CommentsThread, LoadMore, ReportButton, SaveButton, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
-import { Badge, Button, cx, DemoBadge, EmptyState, ImagePlaceholder, MetaLine, Notice, PageHeader, SkeletonList, StatusPill } from '@/components/ui/primitives';
+import { Badge, Button, cx, DemoBadge, EmptyState, MetaLine, Notice, PageHeader, SectionHeader, SkeletonList, StatusPill } from '@/components/ui/primitives';
 import { Dialog, Tabs } from '@/components/ui/overlay';
 import { durationMMSS, formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
 import NotFound from '@/app/NotFound';
@@ -23,7 +24,9 @@ export function NewsPage() {
   const sort = params.get('sort') ?? 'newest';
   const { prefs } = useSession();
   const loading = useLoading();
+  const now = useNow();
   const articles = useDB((s) => s.articles.filter((a) => isLive(a.publishedAt, a.status)));
+  const alerts = useDB((s) => s.alerts.filter((a) => a.status !== 'resolved' && Date.parse(a.expiresAt) > now && Date.parse(a.startsAt) <= now));
   const list = useMemo(() => {
     let l = articles.filter((a) => (cat === 'all' || a.category === cat) && (!loc || a.localityId === loc));
     if (sort === 'local') l = [...l].sort((a, b) => Number(b.localityId === prefs.localityId) - Number(a.localityId === prefs.localityId));
@@ -34,25 +37,16 @@ export function NewsPage() {
   const set = (k: string, v: string) => { const p = new URLSearchParams(params); if (v && v !== 'all') p.set(k, v); else p.delete(k); setParams(p, { replace: true }); };
 
   return (
-    <div className="grid gap-5">
-      <PageHeader title="News & City Information" subtitle="Local news, civic updates and more. Source attribution is always shown." badge={<DemoBadge label="Demo newsroom" />} />
-      <div className="scroll-x">
-        <Link to="/alerts" className="chip"><Siren className="size-4 text-danger" aria-hidden />Civic alerts</Link>
-        <Link to="/community" className="chip">Community</Link>
-        <Link to="/polls" className="chip">Polls</Link>
-        <Link to="/podcasts" className="chip"><Headphones className="size-4" aria-hidden />Podcasts</Link>
-        <Link to="/sports" className="chip"><Trophy className="size-4" aria-hidden />Sports</Link>
-        <Link to="/prices" className="chip"><Fuel className="size-4" aria-hidden />Fuel & gold</Link>
-        <Link to="/agriculture" className="chip">Mandi</Link>
-      </div>
+    <div className="grid gap-4">
+      <PageHeader title="News" badge={<DemoBadge label="Demo newsroom" />} />
       <Tabs label="News categories" value={cat} onChange={(v) => set('category', v)} tabs={[{ id: 'all', label: 'All' }, ...NEWS_CATEGORIES.map((c) => ({ id: c.id, label: c.name }))]} />
       <div className="flex flex-wrap gap-2">
         <label className="sr-only" htmlFor="n-loc">Locality</label>
-        <select id="n-loc" className="input min-h-10 w-auto text-sm" value={loc} onChange={(e) => set('locality', e.target.value)}>
+        <select id="n-loc" className="chip w-auto max-w-[48%]" value={loc} onChange={(e) => set('locality', e.target.value)}>
           <option value="">All localities</option>{LOCALITIES.filter((l) => l.id !== 'all').map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
         <label className="sr-only" htmlFor="n-sort">Sort</label>
-        <select id="n-sort" className="input min-h-10 w-auto text-sm" value={sort} onChange={(e) => set('sort', e.target.value)}>
+        <select id="n-sort" className="chip w-auto max-w-[48%]" value={sort} onChange={(e) => set('sort', e.target.value)}>
           <option value="newest">Newest first</option><option value="local">My locality first</option>
         </select>
         {(cat !== 'all' || loc) && <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>Reset</Button>}
@@ -61,17 +55,49 @@ export function NewsPage() {
         <EmptyState title="No stories here yet" text="Try another category or locality." action={<Button variant="secondary" onClick={() => setParams({})}>Show all news</Button>} />
       ) : (
         <>
-          <div className="grid gap-3">{visible.map((a, i) => <ArticleCard key={a.id} a={a} variant={i === 0 && cat === 'all' ? 'hero' : 'list'} />)}</div>
+          <div className="grid gap-3 lg:grid-cols-2">{visible.map((a) => <ArticleCard key={a.id} a={a} />)}</div>
           <LoadMore hasMore={hasMore} onMore={more} />
         </>
       )}
+
+      <section className="mt-2">
+        <SectionHeader title="Civic Alerts" to="/alerts" linkLabel="View All" />
+        {alerts.length === 0 ? <p className="text-sm text-muted">No active alerts right now.</p> : (
+          <ul className="grid gap-3 lg:grid-cols-2">
+            {alerts.slice(0, 3).map((a) => (
+              <li key={a.id}>
+                <Link to="/alerts" className={cx('flex gap-3 rounded-2xl border p-4', a.severity === 'warning' || a.severity === 'critical' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50')}>
+                  <span className={cx('grid size-10 shrink-0 place-items-center rounded-full', a.severity === 'warning' || a.severity === 'critical' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700')}><Siren className="size-5" aria-hidden /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className={cx('block font-bold', a.severity === 'warning' || a.severity === 'critical' ? 'text-rose-700' : 'text-amber-800')}>{a.title}</span>
+                    <span className="block text-sm text-ink/75">{a.description}</span>
+                    <span className="mt-1 block text-xs text-muted">{a.localityId ? localityName(a.localityId) : 'Citywide'} · {a.source}</span>
+                  </span>
+                  <ChevronRight className="size-5 shrink-0 self-center text-rose-400" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-bold text-ink">More from One Bhilwara</h2>
+        <div className="scroll-x">
+          <Link to="/community" className="chip">Community</Link>
+          <Link to="/polls" className="chip">Polls</Link>
+          <Link to="/podcasts" className="chip"><Headphones className="size-4" aria-hidden />Podcasts</Link>
+          <Link to="/sports" className="chip"><Trophy className="size-4" aria-hidden />Sports</Link>
+          <Link to="/prices" className="chip"><Fuel className="size-4" aria-hidden />Fuel & gold</Link>
+          <Link to="/agriculture" className="chip">Mandi</Link>
+        </div>
+      </section>
     </div>
   );
 }
 
 export function ArticlePage() {
   const { id = '' } = useParams();
-  const lang = useLang();
   const { userId } = useSession();
   const a = useDB((s) => s.articles.find((x) => x.id === id));
   const related = useDB((s) => s.articles.filter((x) => x.id !== id && x.status === 'published' && (x.category === a?.category || x.localityId === a?.localityId)).slice(0, 3));
@@ -84,7 +110,8 @@ export function ArticlePage() {
       <nav className="text-sm text-muted"><Link to="/news" className="hover:underline">News</Link> / <Link to={`/news?category=${a.category}`} className="hover:underline">{newsCategoryName(a.category)}</Link></nav>
       <header className="grid gap-3">
         <div className="flex flex-wrap gap-1.5"><Badge tone="navy">{newsCategoryName(a.category)}</Badge>{a.localityId && <Badge>{localityName(a.localityId)}</Badge>}{a.demo && <DemoBadge label="Demo story — sample content" />}</div>
-        <h1 className="text-2xl font-extrabold leading-tight text-navy sm:text-3xl">{lang === 'hi' && a.titleHi ? a.titleHi : a.title}</h1>
+        <h1 className="text-2xl font-extrabold leading-tight text-ink sm:text-3xl">{a.titleHi ?? a.title}</h1>
+        {a.titleHi && <p className="text-lg font-semibold text-ink/80">{a.title}</p>}
         <p className="text-lg text-muted">{a.summary}</p>
         <MetaLine><span className="font-semibold text-ink">{a.source}</span><span>Published {formatDateTime(a.publishedAt)}</span>{a.updatedAt && <span>Updated {formatDateTime(a.updatedAt)}</span>}</MetaLine>
         <div className="flex flex-wrap gap-2">
@@ -93,7 +120,7 @@ export function ArticlePage() {
           <SaveButton type="article" id={a.id} /><ShareButton title={a.title} /><ReportButton targetType="article" targetId={a.id} title={a.title} />
         </div>
       </header>
-      <ImagePlaceholder seed={a.id} className="h-56 rounded-2xl" label="Illustration placeholder — no photo supplied" />
+      <CityScene seed={a.id} className="h-56 w-full rounded-2xl" label="Illustration — no photo supplied" />
       <div className="grid gap-4 text-[17px] leading-relaxed text-ink">{a.body.map((p, i) => <p key={i}>{p}</p>)}</div>
       <Notice tone={a.demo ? 'demo' : 'info'} title="Source">
         {a.sourceUrl ? <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">{a.source} <ExternalLink className="size-3.5" aria-hidden /></a>
@@ -164,7 +191,7 @@ export function PodcastsPage() {
         <ul className="grid gap-3">
           {list.map((p) => (
             <li key={p.id} className="card flex gap-3 p-4">
-              <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-navy text-amber"><Mic className="size-6" aria-hidden /></div>
+              <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-brand text-white"><Mic className="size-6" aria-hidden /></div>
               <div className="min-w-0 flex-1">
                 <p className="font-bold">{p.title}</p>
                 <p className="text-sm text-muted">{p.host} · {p.category} · {durationMMSS(p.durationSec)} · {formatDate(p.publishedAt)}</p>
@@ -256,7 +283,7 @@ export function PricesPage() {
           </div>
         ))}
       </div>
-      <Link to="/agriculture" className="card flex items-center justify-between p-4 font-semibold hover:border-navy/30">Mandi crop prices (sample) <span aria-hidden>→</span></Link>
+      <Link to="/agriculture" className="card flex items-center justify-between p-4 font-semibold hover:border-brand/30">Mandi crop prices (sample) <span aria-hidden>→</span></Link>
       <p className="text-xs text-muted">Updated {timeAgo(new Date().toISOString())} (demo timestamp).</p>
     </div>
   );

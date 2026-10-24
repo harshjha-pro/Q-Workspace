@@ -30,9 +30,9 @@ export function EducationPage() {
         toggles={[{ key: 'v', label: 'Verified only', on: f.verified, set: (v) => setF({ ...f, verified: v }) }]} onReset={() => setF(init())} />
       {loading ? <SkeletonList /> : list.length === 0 ? <EmptyState title="No institutions match" text="Try another category." /> : <div className="grid gap-3 md:grid-cols-2">{list.map((i) => <InstitutionCard key={i.id} i={i} />)}</div>}
       <section className="grid gap-3 sm:grid-cols-3">
-        <Link to="/property/students" className="card p-4 font-semibold hover:border-navy/30">Student accommodation →</Link>
-        <Link to="/jobs?type=part_time" className="card p-4 font-semibold hover:border-navy/30">Part-time & student jobs →</Link>
-        <Link to="/events" className="card p-4 font-semibold hover:border-navy/30">Workshops & educational events →</Link>
+        <Link to="/property/students" className="card p-4 font-semibold hover:border-brand/30">Student accommodation →</Link>
+        <Link to="/jobs?type=part_time" className="card p-4 font-semibold hover:border-brand/30">Part-time & student jobs →</Link>
+        <Link to="/events" className="card p-4 font-semibold hover:border-brand/30">Workshops & educational events →</Link>
       </section>
     </div>
   );

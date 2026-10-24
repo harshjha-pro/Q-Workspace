@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bookmark, BookmarkCheck, Flag, MapPin, MessageCircle, Phone, RotateCcw, Send, Share2, ThumbsUp } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Flag, Heart, Search, SlidersHorizontal, MapPin, MessageCircle, Phone, RotateCcw, Send, Share2, ThumbsUp } from 'lucide-react';
 import type { Comment, Enquiry, ID, Review } from '@/types/models';
 import { LOCALITIES } from '@/config/catalog';
 import { useCurrentUser, useDB, useSession } from '@/hooks/useStore';
@@ -34,6 +34,20 @@ export function SaveButton({ type, id, compact }: { type: string; id: ID; compac
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); guard(() => toast(toggleSave(type, id) ? 'Saved to your profile' : 'Removed from saved')); }}>
       {!compact && (saved ? 'Saved' : 'Save')}
     </Button>
+  );
+}
+
+/** Heart-style save toggle used on listing cards. */
+export function HeartButton({ type, id }: { type: string; id: ID }) {
+  useDB((s) => s.saved.length);
+  const saved = isSaved(type, id);
+  const guard = useRequireAuth();
+  const { toast } = useUI();
+  return (
+    <button type="button" aria-pressed={saved} aria-label={saved ? 'Remove from saved' : 'Save'} className="grid size-8 place-items-center rounded-full hover:bg-page"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); guard(() => toast(toggleSave(type, id) ? 'Saved to your profile' : 'Removed from saved')); }}>
+      <Heart className={cx('size-5', saved ? 'fill-rose-500 text-rose-500' : 'text-muted')} aria-hidden />
+    </button>
   );
 }
 
@@ -329,6 +343,33 @@ export function FilterBar({ q, onQ, placeholder, filters, values, onChange, sort
         <span className="ml-auto text-sm text-muted" aria-live="polite">{count} result{count === 1 ? '' : 's'}</span>
         {active && <Button variant="ghost" size="sm" icon={<RotateCcw className="size-4" aria-hidden />} onClick={onReset}>Reset</Button>}
       </div>
+    </div>
+  );
+}
+
+/** Mockup-style search pill with a filter button that opens a sheet of filters. */
+export function SearchFilterRow({ q, onQ, placeholder, activeFilters, children, onReset, count }: { q: string; onQ: (v: string) => void; placeholder: string; activeFilters: number; children: ReactNode; onReset: () => void; count: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="grid gap-2">
+      <div className="flex gap-2" role="search">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <label htmlFor="sfr-q" className="sr-only">{placeholder}</label>
+          <input id="sfr-q" type="search" className="input-pill min-h-11 pl-10" placeholder={placeholder} value={q} onChange={(e) => onQ(e.target.value)} />
+        </div>
+        <button type="button" onClick={() => setOpen(true)} className="relative grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-white text-ink hover:border-brand/40" aria-label={`Filters${activeFilters ? ` (${activeFilters} active)` : ''}`}>
+          <SlidersHorizontal className="size-5" aria-hidden />
+          {activeFilters > 0 && <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-brand text-[11px] font-bold text-white">{activeFilters}</span>}
+        </button>
+      </div>
+      <div className="flex items-center justify-between text-sm text-muted" aria-live="polite">
+        <span>{count} result{count === 1 ? '' : 's'}</span>
+        {(activeFilters > 0 || q) && <button type="button" className="inline-flex items-center gap-1 font-semibold text-brand" onClick={onReset}><RotateCcw className="size-3.5" aria-hidden />Reset</button>}
+      </div>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Filters" footer={<><Button variant="secondary" onClick={() => { onReset(); setOpen(false); }}>Reset</Button><Button onClick={() => setOpen(false)}>Show {count} result{count === 1 ? '' : 's'}</Button></>}>
+        <div className="grid gap-4">{children}</div>
+      </Dialog>
     </div>
   );
 }

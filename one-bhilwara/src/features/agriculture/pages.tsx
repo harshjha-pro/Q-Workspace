@@ -54,7 +54,7 @@ function Mandi({ initialCrop }: { initialCrop: string }) {
               <thead><tr className="border-b border-line text-left text-muted"><th className="p-3 font-medium">Crop</th><th className="p-3 font-medium">Market</th><th className="p-3 text-right font-medium">Min</th><th className="p-3 text-right font-medium">Max</th><th className="p-3 text-right font-medium">Modal</th><th className="p-3 font-medium">Date</th></tr></thead>
               <tbody>
                 {list.map((m) => (
-                  <tr key={m.id} className={m.id === selected ? 'bg-navy-50' : 'border-b border-line'}>
+                  <tr key={m.id} className={m.id === selected ? 'bg-brand-50' : 'border-b border-line'}>
                     <td className="p-3"><button type="button" className="font-semibold text-navy underline-offset-2 hover:underline" onClick={() => setSelected(m.id)} aria-pressed={m.id === selected}>{lang === 'hi' ? m.commodityHi : m.commodity}</button></td>
                     <td className="p-3 text-muted">{m.market}</td>
                     <td className="p-3 text-right tabular-nums">{formatINR(m.min)}</td><td className="p-3 text-right tabular-nums">{formatINR(m.max)}</td><td className="p-3 text-right font-semibold tabular-nums">{formatINR(m.modal)}</td>
@@ -217,7 +217,7 @@ function FarmerInfo() {
     <div className="grid gap-5">
       <section>
         <h2 className="mb-2 text-lg font-bold text-navy">Farmer schemes</h2>
-        <div className="grid gap-2 sm:grid-cols-2">{schemes.map((s) => <Link key={s.id} to={`/government/schemes/${s.id}`} className="card p-3 hover:border-navy/30"><p className="font-semibold">{s.name}</p><p className="text-sm text-muted">{s.department}</p></Link>)}</div>
+        <div className="grid gap-2 sm:grid-cols-2">{schemes.map((s) => <Link key={s.id} to={`/government/schemes/${s.id}`} className="card p-3 hover:border-brand/30"><p className="font-semibold">{s.name}</p><p className="text-sm text-muted">{s.department}</p></Link>)}</div>
         <p className="mt-2 text-xs text-muted">Always apply via official portals. Source and update dates are shown on each scheme page.</p>
       </section>
       <section className="grid gap-3 md:grid-cols-2">

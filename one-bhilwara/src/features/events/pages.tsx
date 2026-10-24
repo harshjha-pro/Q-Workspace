@@ -34,7 +34,7 @@ export function WeddingsPage() {
         <span className="ml-auto text-sm text-muted">{list.length} vendors</span>
       </div>
       {loading ? <SkeletonList /> : list.length === 0 ? <EmptyState title="No vendors in this category yet" action={<Button variant="secondary" onClick={() => { setCat(''); setVerified(false); }}>Show all</Button>} /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{list.map((b) => <BusinessCard key={b.id} b={b} />)}</div>}
-      <Link to="/services/wedding-services" className="card p-4 font-semibold hover:border-navy/30">Wedding helpers & event staff (per-day services) →</Link>
+      <Link to="/services/wedding-services" className="card p-4 font-semibold hover:border-brand/30">Wedding helpers & event staff (per-day services) →</Link>
     </div>
   );
 }

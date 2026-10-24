@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BarChart3, Building2, FileText, Plus, ShieldAlert, Sparkles, UserSearch } from 'lucide-react';
 import type { Application, ApplicationStatus, CandidateProfile, Job, RecruitmentRequest } from '@/types/models';
@@ -8,7 +8,7 @@ import { actorIds, audit, notify, sanitize } from '@/services/domain/common';
 import { demoCheckout } from '@/services/adapters/payments';
 import { repo } from '@/services/store';
 import { JobCard, jobTypeLabel } from '@/components/cards';
-import { FilterBar, LoadMore, LOCALITY_OPTIONS, ReportButton, SaveButton, SectionCard, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
+import { LoadMore, SearchFilterRow, LOCALITY_OPTIONS, ReportButton, SaveButton, SectionCard, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
 import { Badge, Button, DemoBadge, EmptyState, KeyValue, LinkButton, Notice, PageHeader, SkeletonList, SponsoredTag, Stat, StatusPill } from '@/components/ui/primitives';
 import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
 import { Checkbox, FilePicker, Select, TextArea, TextField, Toggle } from '@/components/ui/form';
@@ -19,38 +19,48 @@ import NotFound from '@/app/NotFound';
 const TYPES: { value: Job['type']; label: string }[] = [{ value: 'full_time', label: 'Full-time' }, { value: 'part_time', label: 'Part-time' }, { value: 'internship', label: 'Internship' }, { value: 'wfh', label: 'Work from home' }, { value: 'temporary', label: 'Temporary / seasonal' }];
 const STATUSES: ApplicationStatus[] = ['submitted', 'under_review', 'shortlisted', 'interview', 'selected', 'rejected'];
 
+const JOB_TABS = [
+  { id: 'all', label: 'All Jobs' }, { id: 'part_time', label: 'Part Time' }, { id: 'full_time', label: 'Full Time' }, { id: 'student', label: 'Student Jobs' },
+  { id: 'internship', label: 'Internships' }, { id: 'wfh', label: 'Work from Home' }, { id: 'temporary', label: 'Seasonal' }
+] as const;
+type JobTab = (typeof JOB_TABS)[number]['id'];
+
 export function JobsPage() {
   useDocumentTitle('Jobs');
   const [params] = useSearchParams();
   const loading = useLoading();
   const jobs = useDB((s) => s.jobs.filter((j) => j.status === 'open'));
-  const init = () => ({ q: '', values: { category: params.get('category') ?? '', type: params.get('type') ?? '', locality: '', salary: '' } as Record<string, string>, sort: 'newest', verified: false, featured: false });
+  const [tab, setTab] = useState<JobTab>((JOB_TABS.find((t) => t.id === params.get('type'))?.id) ?? 'all');
+  const init = () => ({ q: '', values: { category: params.get('category') ?? '', locality: '', salary: '' } as Record<string, string>, sort: 'newest', verified: false, featured: false });
   const [f, setF] = useState(init);
   const list = useMemo(() => {
-    let l = jobs.filter((j) => (!f.values.category || j.category === f.values.category) && (!f.values.type || j.type === f.values.type) && (!f.values.locality || j.localityId === f.values.locality));
+    let l = jobs.filter((j) => (tab === 'all' || (tab === 'student' ? j.category === 'Student jobs' : j.type === tab)) && (!f.values.category || j.category === f.values.category) && (!f.values.locality || j.localityId === f.values.locality));
     if (f.q) l = l.filter((j) => `${j.title} ${j.employerName} ${j.skills.join(' ')} ${j.description}`.toLowerCase().includes(f.q.toLowerCase()));
     if (f.values.salary) l = l.filter((j) => j.salaryPeriod === 'month' ? j.salaryMax >= Number(f.values.salary) : j.salaryMax * (j.salaryPeriod === 'day' ? 26 : 208) >= Number(f.values.salary));
     if (f.verified) l = l.filter((j) => j.verifiedEmployer);
     if (f.featured) l = l.filter((j) => j.featured || j.urgent);
-    l = [...l].sort((a, b) => f.sort === 'salary' ? b.salaryMax - a.salaryMax : f.sort === 'deadline' ? a.deadline.localeCompare(b.deadline) : Number(!!b.featured) - Number(!!a.featured) || b.createdAt.localeCompare(a.createdAt));
-    return l;
-  }, [jobs, f]);
+    return [...l].sort((a, b) => f.sort === 'salary' ? b.salaryMax - a.salaryMax : f.sort === 'deadline' ? a.deadline.localeCompare(b.deadline) : Number(!!b.featured) - Number(!!a.featured) || b.createdAt.localeCompare(a.createdAt));
+  }, [jobs, f, tab]);
   const { visible, hasMore, more } = usePaged(list, 10);
+  const active = Object.values(f.values).filter(Boolean).length + Number(f.verified) + Number(f.featured) + Number(f.sort !== 'newest');
+  const setV = (k: string, v: string) => setF({ ...f, values: { ...f.values, [k]: v } });
   return (
-    <div className="grid gap-5">
-      <PageHeader title="Jobs & careers" subtitle="Local full-time, part-time, student and seasonal work. Applying is always free."
-        actions={<><LinkButton variant="secondary" to="/applications">My applications</LinkButton><LinkButton to="/employers?tab=post" icon={<Plus className="size-4" aria-hidden />}>Post a job</LinkButton></>} />
-      <FilterBar q={f.q} onQ={(q) => setF({ ...f, q })} placeholder="Job title, skill or employer" count={list.length}
-        filters={[{ key: 'category', label: 'Category', options: JOB_CATEGORIES }, { key: 'type', label: 'Type', options: TYPES }, { key: 'locality', label: 'Locality', options: LOCALITY_OPTIONS },
-          { key: 'salary', label: 'Min salary', options: [{ value: '10000', label: '₹10,000+/mo' }, { value: '15000', label: '₹15,000+/mo' }, { value: '20000', label: '₹20,000+/mo' }] }]}
-        values={f.values} onChange={(k, v) => setF({ ...f, values: { ...f.values, [k]: v } })}
-        sorts={[{ value: 'newest', label: 'Newest' }, { value: 'salary', label: 'Highest salary' }, { value: 'deadline', label: 'Deadline soon' }]} sort={f.sort} onSort={(sort) => setF({ ...f, sort })}
-        toggles={[{ key: 'v', label: 'Verified employers', on: f.verified, set: (v) => setF({ ...f, verified: v }) }, { key: 'f', label: 'Featured & urgent', on: f.featured, set: (v) => setF({ ...f, featured: v }) }]}
-        onReset={() => setF({ ...init(), values: { category: '', type: '', locality: '', salary: '' } })} />
-      {loading ? <SkeletonList /> : list.length === 0 ? <EmptyState title="No jobs match" text="Remove a filter or set up job alerts in Settings." action={<LinkButton variant="secondary" to="/settings#personalisation">Job preferences</LinkButton>} /> : (
-        <><div className="grid gap-3 md:grid-cols-2">{visible.map((j) => <JobCard key={j.id} j={j} />)}</div><LoadMore hasMore={hasMore} onMore={more} /></>
+    <div className="grid gap-4">
+      <PageHeader title="Jobs" hideActionsOnMobile actions={<><LinkButton variant="secondary" size="sm" to="/applications">My applications</LinkButton><LinkButton size="sm" to="/employers?tab=post" icon={<Plus className="size-4" aria-hidden />}>Post a job</LinkButton></>} />
+      <Tabs label="Job type" value={tab} onChange={setTab} tabs={JOB_TABS.map((t) => ({ id: t.id, label: t.label }))} />
+      <SearchFilterRow q={f.q} onQ={(q) => setF({ ...f, q })} placeholder="Search job role, company..." activeFilters={active} count={list.length} onReset={() => { setF({ ...init(), values: { category: '', locality: '', salary: '' } }); setTab('all'); }}>
+        <Select label="Category" value={f.values.category} placeholder="All categories" onChange={(e) => setV('category', e.target.value)} options={JOB_CATEGORIES} />
+        <Select label="Locality" value={f.values.locality} placeholder="All localities" onChange={(e) => setV('locality', e.target.value)} options={LOCALITY_OPTIONS} />
+        <Select label="Minimum salary" value={f.values.salary} placeholder="Any" onChange={(e) => setV('salary', e.target.value)} options={[{ value: '10000', label: '₹10,000+/month' }, { value: '15000', label: '₹15,000+/month' }, { value: '20000', label: '₹20,000+/month' }]} />
+        <Select label="Sort by" value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} options={[{ value: 'newest', label: 'Newest' }, { value: 'salary', label: 'Highest salary' }, { value: 'deadline', label: 'Deadline soon' }]} />
+        <Toggle label="Verified employers only" checked={f.verified} onChange={(v) => setF({ ...f, verified: v })} />
+        <Toggle label="Featured & urgent only" checked={f.featured} onChange={(v) => setF({ ...f, featured: v })} />
+      </SearchFilterRow>
+      {loading ? <SkeletonList /> : list.length === 0 ? <EmptyState title="No jobs match" text="Remove a filter or set job preferences in Settings." action={<LinkButton variant="secondary" to="/settings#personalisation">Job preferences</LinkButton>} /> : (
+        <><div className="grid gap-3 lg:grid-cols-2">{visible.map((j) => <JobCard key={j.id} j={j} />)}</div><LoadMore hasMore={hasMore} onMore={more} /></>
       )}
-      <Link to="/recruitment" className="card flex items-center gap-3 p-4 hover:border-navy/30"><UserSearch className="size-7 text-navy" aria-hidden /><span><span className="block font-bold">Hiring? Try assisted recruitment</span><span className="text-sm text-muted">We help shortlist candidates for a disclosed fee.</span></span></Link>
+      <p className="text-center text-xs text-muted">Applying on One Bhilwara is always free. Never pay anyone to get a job.</p>
+      <Link to="/recruitment" className="card flex items-center gap-3 p-4 hover:border-brand/30"><UserSearch className="size-7 text-brand" aria-hidden /><span><span className="block font-bold">Hiring? Try assisted recruitment</span><span className="text-sm text-muted">We help shortlist candidates for a disclosed fee.</span></span></Link>
     </div>
   );
 }
@@ -70,6 +80,11 @@ export function JobPage() {
   const guard = useRequireAuth();
   const { toast } = useUI();
   const nav = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const openApply = () => guard(() => { setForm({ name: user?.name ?? '', mobile: user?.mobile ?? '', note: '' }); setResume(user?.candidate?.resumeName ? [user.candidate.resumeName] : []); setConsent(false); setErrors({}); setOpen(true); });
+  useEffect(() => {
+    if (params.get('apply') === '1' && j && !existing) { setParams({}, { replace: true }); openApply(); }
+  }, [j?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useDocumentTitle(j?.title ?? 'Job');
   if (!j || j.status === 'removed') return <NotFound />;
   const closed = j.status !== 'open' || j.deadline < new Date().toISOString().slice(0, 10);
@@ -98,7 +113,7 @@ export function JobPage() {
           ['Experience', j.experience], ['Education', j.education], ['Apply by', formatDate(j.deadline)], ['Posted', timeAgo(j.createdAt)]]} />
         <div className="flex flex-wrap gap-2">
           {existing ? <LinkButton to="/applications" variant="teal">Applied · {existing.status.replace('_', ' ')}</LinkButton>
-            : <Button disabled={closed} onClick={() => guard(() => { setForm({ name: user?.name ?? '', mobile: user?.mobile ?? '', note: '' }); setResume(user?.candidate?.resumeName ? [user.candidate.resumeName] : []); setConsent(false); setErrors({}); setOpen(true); })}>{closed ? 'Applications closed' : 'Apply now'}</Button>}
+            : <Button disabled={closed} onClick={openApply}>{closed ? 'Applications closed' : 'Apply now'}</Button>}
           <SaveButton type="job" id={j.id} /><ShareButton title={j.title} /><ReportButton targetType="job" targetId={j.id} title={j.title} />
         </div>
       </header>
@@ -245,7 +260,7 @@ function Applicants({ apps }: { apps: Application[] }) {
                   notify(a.userId, 'job', 'Application update', `${a.jobTitle}: ${status.replace('_', ' ')}`, '/applications');
                   toast('Status updated — candidate notified (in-app)');
                 }}>{STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select>
-                <a href={`tel:${a.mobile}`} className="text-sm font-semibold text-teal underline">Call candidate</a>
+                <a href={`tel:${a.mobile}`} className="text-sm font-semibold text-brand underline">Call candidate</a>
               </div>
             )}
           </li>

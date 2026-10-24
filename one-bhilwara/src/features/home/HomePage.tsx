@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bot, CloudSun, Download, Landmark, MessagesSquare, Search, Settings2, Siren, Sparkles, TrendingUp, Vote } from 'lucide-react';
-import { DISCOVER, HOME_SECTIONS, localityName } from '@/config/catalog';
+import { Bot, Briefcase, CalendarDays, ChevronDown, Download, GraduationCap, Home, Landmark, LayoutGrid, MapPin, MessagesSquare, Mic, Newspaper, Search, Settings2, ShoppingBag, Siren, Sparkles, Sun, TrendingUp, Vote, Wrench } from 'lucide-react';
+import { HOME_SECTIONS, localityName } from '@/config/catalog';
 import { mandi } from '@/data/seed/content';
-import { useCurrentUser, useDB, useDocumentTitle, useLang, useLoading, useNow, useSession, useT } from '@/hooks/useStore';
+import { useDB, useDocumentTitle, useLang, useLoading, useNow, useSession, useT } from '@/hooks/useStore';
 import { getWeather, type Weather } from '@/services/adapters/weather';
 import { participation, pollPhase } from '@/services/domain/polls';
 import { rankProviders } from '@/services/domain/serviceMatching';
@@ -12,7 +12,8 @@ import { usePWA } from '@/app/pwa';
 import { ArticleCard, BusinessCard, ClassifiedCard, EventCard, JobCard, OfferCard, PropertyCard, ProviderCard } from '@/components/cards';
 import { Badge, Button, cx, DemoBadge, SectionHeader, Skeleton, SkeletonList, SponsoredTag } from '@/components/ui/primitives';
 import { Dialog, useUI } from '@/components/ui/overlay';
-import { Icon } from '@/components/ui/Icon';
+import { CityScene } from '@/components/illustrations';
+import { LocalityDialog } from '@/layouts/AppShell';
 import { Checkbox } from '@/components/ui/form';
 import { formatINR, timeAgo } from '@/utils/format';
 
@@ -20,41 +21,23 @@ export default function HomePage() {
   const t = useT();
   useDocumentTitle('');
   const loading = useLoading(300);
-  const user = useCurrentUser();
   const { prefs } = useSession();
-  const lang = useLang();
   const [customise, setCustomise] = useState(false);
-  const hour = new Date().getHours();
-  const greet = hour < 12 ? t('greetingMorning') : hour < 17 ? t('greetingAfternoon') : t('greetingEvening');
   const show = (id: string) => prefs.homeSections.includes(id);
 
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-teal">{localityName(prefs.localityId, lang)}, Bhilwara</p>
-            <h1 className="text-2xl font-extrabold tracking-tight text-navy sm:text-3xl">{greet}{user ? `, ${user.name.split(' ')[0]}` : ''}</h1>
-            <p className="text-muted">{t('tagline')}</p>
-          </div>
-          <Button variant="ghost" size="sm" icon={<Settings2 className="size-4" aria-hidden />} onClick={() => setCustomise(true)}>{t('customiseHome')}</Button>
-        </div>
+    <div className="grid gap-6">
+      <div className="grid gap-4">
+        <LocationRow />
         <HomeSearch />
-      </section>
-
-      {show('alerts') && <AlertStrip />}
-
-      <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-        <QuickGrid />
-        <div className="grid content-start gap-4">
-          <WeatherWidget />
-          <InstallCard />
-        </div>
+        <Hero />
       </div>
+      <CategoryGrid />
+      {show('news') && <NewsSection />}
+      {show('alerts') && <AlertStrip />}
 
       {loading ? <SkeletonList rows={3} /> : (
         <>
-          {show('news') && <NewsSection />}
           {show('community') && <CommunitySection />}
           <AICallout />
           {show('services') && <ServicesSection />}
@@ -67,6 +50,8 @@ export default function HomePage() {
           {show('businesses') && <BusinessesSection />}
           {show('offers') && <OffersSection />}
           {show('recommended') && <RecommendedSection />}
+          <InstallCard />
+          <Button variant="ghost" className="justify-self-center" icon={<Settings2 className="size-4" aria-hidden />} onClick={() => setCustomise(true)}>{t('customiseHome')}</Button>
         </>
       )}
 
@@ -75,17 +60,106 @@ export default function HomePage() {
   );
 }
 
+function LocationRow() {
+  const { prefs } = useSession();
+  const lang = useLang();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full text-sm font-semibold text-ink" aria-label={`Locality: ${localityName(prefs.localityId, lang)}. Change`}>
+        <MapPin className="size-4 fill-brand text-white" aria-hidden />{prefs.localityId === 'all' ? 'Bhilwara' : `${localityName(prefs.localityId, lang)}, Bhilwara`}<ChevronDown className="size-4 text-muted" aria-hidden />
+      </button>
+      <WeatherPill />
+      <LocalityDialog open={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+}
+
+function WeatherPill() {
+  const [w, setW] = useState<Weather | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    getWeather(ctl.signal).then(setW).catch(() => undefined);
+    return () => ctl.abort();
+  }, []);
+  if (!w) return <Skeleton className="h-7 w-20 rounded-full" />;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700" title={`${w.label} · Source: ${w.source}`}>
+      <Sun className="size-4" aria-hidden />{Math.round(w.tempC)}°C{!w.live && <span className="text-[10px] font-bold uppercase">demo</span>}
+    </span>
+  );
+}
+
 function HomeSearch() {
-  const t = useT();
   const nav = useNavigate();
+  const { toast } = useUI();
+  const lang = useLang();
   const [q, setQ] = useState('');
+  const [listening, setListening] = useState(false);
+  const voice = () => {
+    const W = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
+    const R = W.SpeechRecognition ?? W.webkitSpeechRecognition;
+    if (!R) { toast('Voice search isn’t supported in this browser.', 'info'); return; }
+    const rec = new R();
+    rec.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
+    rec.onresult = (e) => { const text = e.results[0][0].transcript; setQ(text); nav(`/search?q=${encodeURIComponent(text)}`); };
+    rec.onerror = () => toast('Couldn’t hear that. Please try again.', 'error');
+    rec.onend = () => setListening(false);
+    setListening(true);
+    rec.start();
+  };
   return (
     <form role="search" onSubmit={(e) => { e.preventDefault(); nav(`/search?q=${encodeURIComponent(q)}`); }} className="relative">
-      <label htmlFor="home-search" className="sr-only">{t('searchPlaceholder')}</label>
+      <label htmlFor="home-search" className="sr-only">Search services, jobs, products</label>
       <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />
-      <input id="home-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPlaceholder')} className="input min-h-14 rounded-2xl pl-12 pr-28 text-base shadow-sm" />
-      <Button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2">{t('search')}</Button>
+      <input id="home-search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services, jobs, products, etc..." className="input-pill pl-12 pr-14 shadow-sm" />
+      <button type="button" onClick={voice} className={cx('absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full', listening ? 'bg-brand text-white' : 'text-ink hover:bg-page')} aria-label={listening ? 'Listening…' : 'Search by voice'}>
+        <Mic className="size-5" aria-hidden />
+      </button>
     </form>
+  );
+}
+
+interface SpeechRec { lang: string; start: () => void; onresult: (e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void; onerror: () => void; onend: () => void }
+
+function Hero() {
+  return (
+    <Link to="/discover" className="relative block h-40 overflow-hidden rounded-2xl shadow-[var(--shadow-card)] sm:h-52">
+      <CityScene seed="hero-bhilwara" className="absolute inset-0 h-full w-full" label="Illustration of a Rajasthani palace at sunset" />
+      <div className="absolute inset-0 bg-gradient-to-r from-navy/85 via-navy/40 to-transparent" />
+      <div className="relative flex h-full flex-col justify-center p-5 text-white sm:p-8">
+        <p className="max-w-[16ch] text-2xl font-extrabold leading-tight sm:text-3xl">Together for a Better Bhilwara</p>
+        <p className="mt-2 text-sm text-white/85">Local services | Opportunities | Community</p>
+      </div>
+    </Link>
+  );
+}
+
+const CATEGORY_TILES = [
+  { to: '/jobs', label: 'Jobs', I: Briefcase, g: 'from-emerald-400 to-emerald-600' },
+  { to: '/property', label: 'Property', I: Home, g: 'from-violet-400 to-violet-600' },
+  { to: '/marketplace', label: 'Buy & Sell', I: ShoppingBag, g: 'from-rose-400 to-rose-600' },
+  { to: '/services', label: 'Services', I: Wrench, g: 'from-sky-400 to-blue-600' },
+  { to: '/education', label: 'Education', I: GraduationCap, g: 'from-teal-400 to-teal-600' },
+  { to: '/events', label: 'Events', I: CalendarDays, g: 'from-orange-400 to-orange-600' },
+  { to: '/news', label: 'News', I: Newspaper, g: 'from-indigo-400 to-indigo-600' },
+  { to: '/discover', label: 'More', I: LayoutGrid, g: 'from-slate-100 to-slate-200', muted: true }
+];
+
+function CategoryGrid() {
+  return (
+    <nav aria-label="Categories">
+      <ul className="grid grid-cols-4 gap-x-2 gap-y-5 sm:grid-cols-8">
+        {CATEGORY_TILES.map(({ to, label, I, g, muted }) => (
+          <li key={to}>
+            <Link to={to} className="flex flex-col items-center gap-2 text-center text-[13px] font-medium text-ink">
+              <span className={cx('grid size-14 place-items-center rounded-2xl bg-gradient-to-br shadow-sm', g, muted ? 'text-ink' : 'text-white')}><I className="size-7" aria-hidden /></span>
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -113,59 +187,13 @@ function AlertStrip() {
   );
 }
 
-function QuickGrid() {
-  const t = useT();
-  const items = [...DISCOVER.slice(0, 11), { slug: 'offers', name: 'Offers', icon: 'Store', route: '/offers' }];
-  return (
-    <section aria-labelledby="quick-h">
-      <h2 id="quick-h" className="mb-3 text-lg font-bold text-navy">{t('quickAccess')}</h2>
-      <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-        {items.map((c) => (
-          <li key={c.slug}>
-            <Link to={c.route} className="flex h-full flex-col items-center gap-1.5 rounded-xl bg-white p-2.5 text-center text-xs font-semibold text-ink shadow-[var(--shadow-card)] ring-1 ring-line hover:ring-navy/30">
-              <span className="grid size-10 place-items-center rounded-full bg-navy-50 text-navy"><Icon name={c.icon} /></span>
-              <span className="leading-tight">{c.name}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function WeatherWidget() {
-  const t = useT();
-  const [w, setW] = useState<Weather | null>(null);
-  const [err, setErr] = useState('');
-  useEffect(() => {
-    const ctl = new AbortController();
-    getWeather(ctl.signal).then(setW).catch((e: Error) => { if (e.name !== 'AbortError') setErr('Weather unavailable right now.'); });
-    return () => ctl.abort();
-  }, []);
-  return (
-    <section className="card p-4" aria-labelledby="wx-h">
-      <div className="flex items-center justify-between"><h2 id="wx-h" className="text-sm font-semibold text-muted">{t('weather')} · Bhilwara</h2>{w && !w.live && <DemoBadge label="Demo" />}</div>
-      {err ? <p className="mt-2 text-sm text-muted">{err}</p> : !w ? <div className="mt-2 grid gap-2"><Skeleton className="h-8 w-24" /><Skeleton className="h-3 w-32" /></div> : (
-        <div className="mt-1 flex items-center gap-3">
-          <CloudSun className="size-10 text-amber" aria-hidden />
-          <div>
-            <p className="text-3xl font-extrabold text-navy">{Math.round(w.tempC)}°C</p>
-            <p className="text-sm text-muted">{w.label} · Humidity {Math.round(w.humidity)}%</p>
-          </div>
-        </div>
-      )}
-      {w && <p className="mt-2 text-xs text-muted">Source: {w.source}</p>}
-    </section>
-  );
-}
-
 function InstallCard() {
   const { canInstall, install, standalone } = usePWA();
   const t = useT();
   const { toast } = useUI();
   if (standalone) return null;
   return (
-    <section className="card bg-navy p-4 text-white">
+    <section className="card border-0 bg-gradient-to-br from-brand to-brand-600 p-4 text-white">
       <p className="font-bold">{t('installApp')}</p>
       <p className="text-sm text-white/75">Works offline for pages you’ve visited. No app store needed.</p>
       {canInstall ? (
@@ -182,15 +210,11 @@ function NewsSection() {
   const { prefs } = useSession();
   const articles = useDB((s) => s.articles.filter((a) => a.status === 'published' && Date.parse(a.publishedAt) <= Date.now()));
   const sorted = useMemo(() => [...articles].sort((a, b) => Number(b.localityId === prefs.localityId) - Number(a.localityId === prefs.localityId) || b.publishedAt.localeCompare(a.publishedAt)), [articles, prefs.localityId]);
-  const [hero, ...rest] = sorted;
-  if (!hero) return null;
+  if (!sorted.length) return null;
   return (
     <section>
-      <SectionHeader title={t('localNews')} to="/news" linkLabel={t('seeAll')} />
-      <div className="grid gap-4 md:grid-cols-2">
-        <ArticleCard a={hero} variant="hero" />
-        <div className="card divide-y divide-line px-4">{rest.slice(0, 4).map((a) => <ArticleCard key={a.id} a={a} variant="compact" />)}</div>
-      </div>
+      <SectionHeader title={t('localNews')} to="/news" linkLabel="View All" />
+      <div className="grid gap-3 md:grid-cols-2">{sorted.slice(0, 4).map((a) => <ArticleCard key={a.id} a={a} />)}</div>
     </section>
   );
 }
@@ -215,7 +239,7 @@ function CommunitySection() {
         </ul>
         <div className="grid gap-3">
           {polls.slice(0, 2).map((p) => (
-            <Link key={p.id} to={`/polls/${p.id}`} className="card flex items-start gap-3 p-4 hover:border-navy/30">
+            <Link key={p.id} to={`/polls/${p.id}`} className="card flex items-start gap-3 p-4 hover:border-brand/30">
               <Vote className="size-6 shrink-0 text-navy" aria-hidden />
               <span className="flex-1"><span className="block font-semibold">{p.question}</span><span className="text-sm text-muted">{participation(p, votes)} votes · tap to vote</span></span>
             </Link>
@@ -306,7 +330,7 @@ function GovSection() {
     <section>
       <SectionHeader title={t('govServices')} to="/government" linkLabel={t('seeAll')} icon={<Landmark className="size-5 text-teal" aria-hidden />} />
       <div className="grid gap-2 sm:grid-cols-2">
-        {schemes.map((s) => <Link key={s.id} to={`/government/schemes/${s.id}`} className="card p-3 hover:border-navy/30"><p className="font-semibold">{s.name}</p><p className="text-sm text-muted">{s.level === 'central' ? 'Central' : 'Rajasthan'} · {s.category}</p></Link>)}
+        {schemes.map((s) => <Link key={s.id} to={`/government/schemes/${s.id}`} className="card p-3 hover:border-brand/30"><p className="font-semibold">{s.name}</p><p className="text-sm text-muted">{s.level === 'central' ? 'Central' : 'Rajasthan'} · {s.category}</p></Link>)}
       </div>
       <p className="mt-2 text-xs text-muted">One Bhilwara is not a government authority. Always apply through official portals.</p>
     </section>
@@ -355,7 +379,7 @@ function RecommendedSection() {
     <section>
       <SectionHeader title={t('recommended')} to="/settings#personalisation" linkLabel="Edit interests" />
       {recs.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2">{recs.map((r) => <li key={r.link}><Link to={r.link} className="card block p-3 hover:border-navy/30"><p className="font-semibold">{r.label}</p><p className="text-xs text-muted">{r.why}</p></Link></li>)}</ul>
+        <ul className="grid gap-2 sm:grid-cols-2">{recs.map((r) => <li key={r.link}><Link to={r.link} className="card block p-3 hover:border-brand/30"><p className="font-semibold">{r.label}</p><p className="text-xs text-muted">{r.why}</p></Link></li>)}</ul>
       ) : <p className="text-sm text-muted">Choose interests in Settings to get recommendations.</p>}
     </section>
   );

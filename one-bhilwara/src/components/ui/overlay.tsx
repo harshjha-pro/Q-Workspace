@@ -17,7 +17,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
   return (
     <dialog ref={ref} aria-labelledby={titleId} onClose={onClose} onCancel={(e) => { e.preventDefault(); onClose(); }}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className={cx('m-auto w-[calc(100%-24px)] rounded-2xl p-0 backdrop:bg-navy-deep/50 shadow-xl', size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg')}>
+      className={cx('m-auto w-[calc(100%-24px)] rounded-2xl p-0 backdrop:bg-navy/50 shadow-xl', size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg')}>
       {open && (
         <div className="flex max-h-[85vh] flex-col">
           <div className="flex items-start justify-between gap-3 border-b border-line p-4">
@@ -60,7 +60,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => {
           const I = t.tone === 'success' ? CheckCircle2 : t.tone === 'error' ? CircleAlert : Info;
           return (
-            <div key={t.id} className="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl bg-navy-deep px-4 py-3 text-sm text-white shadow-lg">
+            <div key={t.id} className="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl bg-navy px-4 py-3 text-sm text-white shadow-lg">
               <I className={cx('size-5 shrink-0', t.tone === 'success' ? 'text-teal-100' : t.tone === 'error' ? 'text-red-300' : 'text-amber')} aria-hidden />
               <span>{t.text}</span>
               {t.action && <button type="button" className="ml-1 font-semibold text-amber" onClick={() => { t.action!.onClick(); setToasts((x) => x.filter((y) => y.id !== t.id)); }}>{t.action.label}</button>}
@@ -92,12 +92,12 @@ export function Tabs<T extends string>({ tabs, value, onChange, label, className
     refs.current[next.id]?.focus();
   };
   return (
-    <div role="tablist" aria-label={label} className={cx('scroll-x border-b border-line', className)}>
+    <div role="tablist" aria-label={label} className={cx('scroll-x', className)}>
       {tabs.map((t, i) => (
         <button key={t.id} ref={(el) => { refs.current[t.id] = el; }} role="tab" type="button" aria-selected={value === t.id} tabIndex={value === t.id ? 0 : -1}
           onKeyDown={(e) => onKey(e, i)} onClick={() => onChange(t.id)}
-          className={cx('-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold', value === t.id ? 'border-navy text-navy' : 'border-transparent text-muted hover:text-ink')}>
-          {t.label}{t.count !== undefined && <span className="ml-1.5 rounded-full bg-page px-1.5 text-xs text-muted">{t.count}</span>}
+          className={cx('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors', value === t.id ? 'border-brand bg-brand text-white' : 'border-line bg-white text-ink hover:border-brand/40')}>
+          {t.label}{t.count !== undefined && <span className={cx('ml-1.5 rounded-full px-1.5 text-xs', value === t.id ? 'bg-white/20' : 'bg-page text-muted')}>{t.count}</span>}
         </button>
       ))}
     </div>

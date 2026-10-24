@@ -9,8 +9,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#F5F7FA",
-  "theme_color": "#13243A",
+  "background_color": "#F6F8FC",
+  "theme_color": "#1D5FE0",
   "categories": ["news", "lifestyle", "business", "utilities"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

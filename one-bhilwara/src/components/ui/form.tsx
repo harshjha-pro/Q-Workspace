@@ -73,7 +73,7 @@ export function RadioCards<T extends string>({ label, options, value, onChange }
       <legend className="label">{label}</legend>
       <div className="grid gap-2 sm:grid-cols-3">
         {options.map((o) => (
-          <label key={o.value} className={cx('card cursor-pointer p-3 text-sm', value === o.value && 'border-navy ring-2 ring-navy/15')}>
+          <label key={o.value} className={cx('card cursor-pointer p-3 text-sm', value === o.value && 'border-brand ring-2 ring-brand/15')}>
             <input type="radio" className="sr-only" checked={value === o.value} onChange={() => onChange(o.value)} />
             <span className="font-semibold text-ink">{o.label}</span>
             {o.description && <span className="block text-xs text-muted">{o.description}</span>}
@@ -97,7 +97,7 @@ export function FilePicker({ label, value, onChange, accept = 'image/*', multipl
   return (
     <div>
       <span className="label">{label}</span>
-      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line bg-white px-3 text-sm text-muted hover:border-navy/40">
+      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-line bg-white px-3 text-sm text-muted hover:border-brand/40">
         <Paperclip className="size-4" aria-hidden /> Choose file{multiple ? 's' : ''}
       </label>
       <input id={id} type="file" className="sr-only" accept={accept} multiple={multiple} onChange={(e) => {

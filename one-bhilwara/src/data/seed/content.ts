@@ -15,21 +15,21 @@ export const articles = (): Article[] => [
   ], { localityId: 'shastri-nagar', breaking: true, titleHi: 'शास्त्री नगर में इस सप्ताहांत वार्ड स्वच्छता अभियान', tags: ['cleanliness', 'volunteers'] }),
   art('n-2', 'business', 5, 'Textile units explore rooftop solar to cut power costs', 'A sample feature on how small weaving units evaluate solar installations, financing and payback.', [
     'Demo story. This placeholder article shows the business & textile category layout.', 'Live content would cite the reporter, publication and data sources.'
-  ], { localityId: 'riico', tags: ['textile', 'solar'] }),
+  ], { localityId: 'riico', tags: ['textile', 'solar'], titleHi: 'भीलवाड़ा की कपड़ा इकाइयाँ बिजली खर्च घटाने के लिए छत पर सोलर की ओर' }),
   art('n-3', 'traffic', 7, 'Diversion near the main market during evening hours (simulated)', 'A simulated traffic advisory showing how road updates are presented with locality tags.', [
     'Demo story. Always follow on-ground instructions from traffic police.'
-  ], { localityId: 'bhopalganj', tags: ['traffic'] }),
-  art('n-4', 'education', 10, 'Library adds evening study slots for competitive-exam aspirants', 'Sample education story about extended reading-room hours for students.', ['Demo story for the education category.'], { localityId: 'subhash-nagar' }),
-  art('n-5', 'agriculture', 14, 'Mustard arrivals pick up at local mandis (sample)', 'Sample agriculture story. See the Mandi Prices dashboard for labelled sample rates.', ['Demo story. Prices referenced in this app are sample data until a verified market-data source is connected.'], { tags: ['mandi', 'mustard'] }),
-  art('n-6', 'sports', 18, 'Under-16 cricket trials announced for district team (sample)', 'A sample sports story with trial dates and eligibility placeholders.', ['Demo story for sports coverage.']),
-  art('n-7', 'events', 20, 'Garba nights return with family-friendly timings (sample)', 'Sample events story linking to the Events section for passes.', ['Demo story. Event details are sample data.'], { localityId: 'suwana' }),
-  art('n-8', 'rajasthan', 26, 'State portal adds more services for e-Mitra kiosks (sample)', 'Sample Rajasthan story. Official announcements should be checked on government portals.', ['Demo story — no real announcement is reported here.']),
-  art('n-9', 'india', 30, 'Digital payments growth continues in tier-2 cities (sample)', 'Sample national story placeholder.', ['Demo story — national news requires a licensed news feed.']),
-  art('n-10', 'world', 34, 'Global cotton market outlook: what it means for local mills (sample)', 'Sample world story placeholder with local angle.', ['Demo story — world news requires a licensed news feed.']),
-  art('n-11', 'notices', 40, 'Public notice format: property tax reminder (sample)', 'A sample public-notice layout. Real notices must link to the issuing office.', ['Demo notice — not issued by any authority.']),
-  art('n-12', 'entertainment', 44, 'Weekend picks: folk music, food stalls and a heritage walk (sample)', 'A sample entertainment round-up.', ['Demo story.']),
-  art('n-13', 'social', 50, 'Wedding season: how families are booking vendors earlier (sample)', 'Sample social story connecting to the Weddings section.', ['Demo story.']),
-  art('n-14', 'bhilwara', 3, 'New community park benches installed in R.C. Vyas Colony (sample)', 'Sample hyperlocal story showing locality-based news.', ['Demo story for local Bhilwara news.'], { localityId: 'rc-vyas' }),
+  ], { localityId: 'bhopalganj', tags: ['traffic'], titleHi: 'मुख्य बाज़ार के पास शाम को यातायात डायवर्ज़न (सिम्युलेटेड)' }),
+  art('n-4', 'education', 10, 'Library adds evening study slots for competitive-exam aspirants', 'Sample education story about extended reading-room hours for students.', ['Demo story for the education category.'], { titleHi: 'प्रतियोगी परीक्षा की तैयारी के लिए पुस्तकालय में शाम के नए स्लॉट',  localityId: 'subhash-nagar' }),
+  art('n-5', 'agriculture', 14, 'Mustard arrivals pick up at local mandis (sample)', 'Sample agriculture story. See the Mandi Prices dashboard for labelled sample rates.', ['Demo story. Prices referenced in this app are sample data until a verified market-data source is connected.'], { tags: ['mandi', 'mustard'], titleHi: 'स्थानीय मंडियों में सरसों की आवक बढ़ी (नमूना)' }),
+  art('n-6', 'sports', 18, 'Under-16 cricket trials announced for district team (sample)', 'A sample sports story with trial dates and eligibility placeholders.', ['Demo story for sports coverage.'], { titleHi: 'ज़िला टीम के लिए अंडर-16 क्रिकेट ट्रायल की घोषणा (नमूना)' }),
+  art('n-7', 'events', 20, 'Garba nights return with family-friendly timings (sample)', 'Sample events story linking to the Events section for passes.', ['Demo story. Event details are sample data.'], { titleHi: 'परिवार के अनुकूल समय के साथ गरबा रातें लौटीं (नमूना)',  localityId: 'suwana' }),
+  art('n-8', 'rajasthan', 26, 'State portal adds more services for e-Mitra kiosks (sample)', 'Sample Rajasthan story. Official announcements should be checked on government portals.', ['Demo story — no real announcement is reported here.'], { titleHi: 'ई-मित्र कियोस्क पर राज्य पोर्टल की और सेवाएँ (नमूना)' }),
+  art('n-9', 'india', 30, 'Digital payments growth continues in tier-2 cities (sample)', 'Sample national story placeholder.', ['Demo story — national news requires a licensed news feed.'], { titleHi: 'टियर-2 शहरों में डिजिटल भुगतान बढ़ना जारी (नमूना)' }),
+  art('n-10', 'world', 34, 'Global cotton market outlook: what it means for local mills (sample)', 'Sample world story placeholder with local angle.', ['Demo story — world news requires a licensed news feed.'], { titleHi: 'वैश्विक कपास बाज़ार का स्थानीय मिलों पर असर (नमूना)' }),
+  art('n-11', 'notices', 40, 'Public notice format: property tax reminder (sample)', 'A sample public-notice layout. Real notices must link to the issuing office.', ['Demo notice — not issued by any authority.'], { titleHi: 'सार्वजनिक सूचना: संपत्ति कर अनुस्मारक (नमूना)' }),
+  art('n-12', 'entertainment', 44, 'Weekend picks: folk music, food stalls and a heritage walk (sample)', 'A sample entertainment round-up.', ['Demo story.'], { titleHi: 'सप्ताहांत: लोक संगीत, फूड स्टॉल और हेरिटेज वॉक (नमूना)' }),
+  art('n-13', 'social', 50, 'Wedding season: how families are booking vendors earlier (sample)', 'Sample social story connecting to the Weddings section.', ['Demo story.'], { titleHi: 'शादी का मौसम: परिवार पहले से वेंडर बुक कर रहे हैं (नमूना)' }),
+  art('n-14', 'bhilwara', 3, 'New community park benches installed in R.C. Vyas Colony (sample)', 'Sample hyperlocal story showing locality-based news.', ['Demo story for local Bhilwara news.'], { titleHi: 'आर.सी. व्यास कॉलोनी के पार्क में नई बेंचें लगीं (नमूना)',  localityId: 'rc-vyas' }),
   art('n-15', 'bhilwara', 60, 'Draft: Monsoon preparedness checklist for residents', 'Unpublished draft visible only in the admin news manager.', ['Draft content.'], { status: 'draft' }),
   art('n-16', 'civic', 0, 'Scheduled: Water supply timing update', 'Scheduled article that publishes automatically at its scheduled time.', ['Scheduled demo content.'], { status: 'scheduled', scheduledAt: ahead(6), publishedAt: ahead(6) })
 ];
@@ -48,6 +48,8 @@ export const alerts = (): CivicAlert[] => [
 ];
 
 export const posts = (): Post[] => [
+  { id: 'po-0', kind: 'announcement', userId: DEMO_USER_ID, userName: 'Aarav Sharma', localityId: 'shastri-nagar', text: 'भीलवाड़ा में आज बारिश की संभावना है। सभी लोग सावधान रहें। (demo post)', reactions: { like: ['u-2', 'u-4', 'u-12'] }, status: 'published', createdAt: ago(2), demo: true },
+  { id: 'po-00', kind: 'question', userId: DEMO_USER_ID, userName: 'Aarav Sharma', localityId: 'shastri-nagar', text: 'Need a good mechanic for my bike. Any suggestions?', reactions: { like: ['u-11'], helpful: ['u-2'] }, status: 'published', createdAt: ago(5), demo: true },
   { id: 'po-1', kind: 'question', userId: 'u-2', userName: 'Priya M.', localityId: 'azad-nagar', text: 'Any recommendations for a reliable maths tutor for Class 10 near Azad Nagar?', reactions: { like: ['u-4', 'u-12'], helpful: ['u-3'] }, status: 'published', createdAt: ago(3), demo: true },
   { id: 'po-2', kind: 'suggestion', userId: 'u-7', userName: 'Mahendra G.', localityId: 'pur', text: 'Suggestion: more shaded seating at bus stops before summer. Who agrees?', reactions: { like: ['u-2', 'u-4', 'u-11', DEMO_USER_ID] }, status: 'published', createdAt: ago(9), demo: true },
   { id: 'po-3', kind: 'announcement', userId: 'u-12', userName: 'Pooja V.', localityId: 'shastri-nagar', text: 'Blood donation camp volunteers needed this Sunday (sample announcement).', reactions: { like: ['u-2'] }, status: 'published', createdAt: ago(15), demo: true },
@@ -58,6 +60,7 @@ export const posts = (): Post[] => [
 ];
 
 export const comments = (): Comment[] => [
+  { id: 'cm-0', targetType: 'post', targetId: 'po-00', userId: 'u-11', userName: 'Ramesh C.', text: 'Try the mechanics listed under Services → Mechanics.', likedBy: [], createdAt: ago(4), demo: true },
   { id: 'cm-1', targetType: 'article', targetId: 'n-1', userId: 'u-4', userName: 'Sunita K.', text: 'Great initiative. Where do volunteers meet?', likedBy: ['u-2'], createdAt: ago(1.5), demo: true },
   { id: 'cm-2', targetType: 'article', targetId: 'n-1', parentId: 'cm-1', userId: 'u-12', userName: 'Pooja V.', text: 'Check the community post — meeting point is listed there (sample).', likedBy: [], createdAt: ago(1), demo: true },
   { id: 'cm-3', targetType: 'post', targetId: 'po-1', userId: 'u-12', userName: 'Pooja V.', text: 'Try the tutors listed under Services → Tutors.', likedBy: ['u-2'], createdAt: ago(2), demo: true },

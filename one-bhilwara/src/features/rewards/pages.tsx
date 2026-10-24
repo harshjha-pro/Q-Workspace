@@ -117,7 +117,7 @@ export function RewardsPage() {
     <div className="grid gap-5">
       <PageHeader title="Rewards & engagement" subtitle="Earn points for taking part in your city." badge={<DemoBadge label="Demo rewards" />} actions={<LinkButton variant="secondary" to="/offers">Offers</LinkButton>} />
       <div className="grid gap-3 md:grid-cols-3">
-        <div className="card bg-navy p-5 text-white"><p className="text-sm text-white/70">Your points</p><p className="text-4xl font-extrabold">{total}</p><p className="mt-1 text-xs text-white/70">Engagement credits only — not money and not exchangeable for cash.</p></div>
+        <div className="card border-0 bg-gradient-to-br from-brand to-brand-600 p-5 text-white"><p className="text-sm text-white/70">Your points</p><p className="text-4xl font-extrabold">{total}</p><p className="mt-1 text-xs text-white/70">Engagement credits only — not money and not exchangeable for cash.</p></div>
         <div className="card p-5"><p className="flex items-center gap-2 font-bold"><CalendarCheck className="size-5 text-teal" aria-hidden />Daily check-in</p><p className="text-sm text-muted">Once per day.</p><Button className="mt-3" disabled={checkedToday('daily')} onClick={() => checkIn('daily', 'daily', 'Daily check-in')}>{checkedToday('daily') ? 'Checked in today' : 'Check in'}</Button></div>
         <div className="card p-5"><p className="flex items-center gap-2 font-bold"><Gift className="size-5 text-amber" aria-hidden />Diwali campaign (sample)</p><p className="text-sm text-muted">Participate in festival activities to earn bonus points. Campaign rules apply.</p><Badge tone="amber" className="mt-2">Ends {formatDate(new Date(Date.now() + 20 * 86400_000))}</Badge></div>
       </div>
@@ -171,7 +171,7 @@ export function RewardsPage() {
         )}
       </section>
       <Notice tone="info" title="Campaign terms (draft)">Points have no cash value and can’t be transferred. We never award points for reviews or ratings, and we remove points earned through fake accounts or automated activity. Rules may change; legal review pending.</Notice>
-      <Link to="/polls" className="text-sm font-semibold text-teal underline">Vote in polls to earn points →</Link>
+      <Link to="/polls" className="text-sm font-semibold text-brand underline">Vote in polls to earn points →</Link>
     </div>
   );
 }

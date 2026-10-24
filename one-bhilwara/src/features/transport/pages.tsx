@@ -88,7 +88,7 @@ function TripSearch({ mode }: { mode: 'bus' | 'train' }) {
           ))}
         </ul>
       )}
-      <a href={mode === 'bus' ? 'https://rsrtconline.rajasthan.gov.in/' : 'https://www.irctc.co.in/'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-teal underline">Book real tickets on the official site <ExternalLink className="size-3.5" aria-hidden /></a>
+      <a href={mode === 'bus' ? 'https://rsrtconline.rajasthan.gov.in/' : 'https://www.irctc.co.in/'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-brand underline">Book real tickets on the official site <ExternalLink className="size-3.5" aria-hidden /></a>
       <Dialog open={!!pick} onClose={() => setPick(null)} title={done ? 'Demo booking saved' : 'Booking summary'}
         footer={done ? <Button onClick={() => setPick(null)}>Close</Button> : <><Button variant="secondary" onClick={() => setPick(null)}>Cancel</Button><Button onClick={() => {
           const b: Booking = { id: uid('bk'), kind: mode, refId: pick!.id, title: `${pick!.operator}: ${f.from} → ${f.to}`, userId: userId!, reference: demoRef(), lines: [{ label: `${pick!.klass} seat`, qty: pax, price: pick!.fare }], total: pick!.fare * pax, attendees: [], status: 'demo_confirmed', date: f.date, meta: { departure: pick!.dep }, createdAt: nowIso(), demo: true };
@@ -117,9 +117,9 @@ function LocalTransport() {
     <div className="grid gap-5">
       <SectionCard title="Important transport contacts">
         <ul className="grid gap-2 text-sm">
-          <li className="flex justify-between"><span>Railway enquiry & help</span><a className="font-semibold text-teal" href="tel:139">139</a></li>
-          <li className="flex justify-between"><span>National Highway emergency</span><a className="font-semibold text-teal" href="tel:1033">1033</a></li>
-          <li className="flex justify-between"><span>Rajasthan Roadways (RSRTC)</span><a className="font-semibold text-teal" href="https://rsrtconline.rajasthan.gov.in/" target="_blank" rel="noopener noreferrer">Official site ↗</a></li>
+          <li className="flex justify-between"><span>Railway enquiry & help</span><a className="font-semibold text-brand" href="tel:139">139</a></li>
+          <li className="flex justify-between"><span>National Highway emergency</span><a className="font-semibold text-brand" href="tel:1033">1033</a></li>
+          <li className="flex justify-between"><span>Rajasthan Roadways (RSRTC)</span><a className="font-semibold text-brand" href="https://rsrtconline.rajasthan.gov.in/" target="_blank" rel="noopener noreferrer">Official site ↗</a></li>
         </ul>
       </SectionCard>
       <section><h2 className="mb-2 text-lg font-bold text-navy">Taxi & vehicle providers</h2>{providers.length ? <div className="grid gap-3 md:grid-cols-2">{providers.map((b) => <div key={b.id} className="grid gap-2"><BusinessCard b={b} /><EnquiryButton targetType="transport" targetId={b.id} targetName={b.name} label="Travel enquiry" variant="secondary" /></div>)}</div> : <EmptyState title="No providers listed" />}</section>

@@ -4,7 +4,7 @@ import { applications, bookings, classifieds, concierge, enquiries, events, jobs
 import { alerts, articles, comments, polls, posts, schemes } from './content';
 import { ago, ahead, dayStr } from './time';
 
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const defaultSettings = (): Settings => ({
   fees: { conciergeFee: 99, recruitmentFeePercent: 8.33, featuredJob: 299, urgentJob: 149, eventBookingFeePercent: 2, serviceCommissionPercent: 0, gstPercent: 18 },

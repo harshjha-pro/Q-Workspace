@@ -20,8 +20,8 @@ export function DiscoverPage() {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {DISCOVER.map((c) => (
           <li key={c.slug}>
-            <Link to={`/discover/${c.slug}`} className="card flex h-full flex-col gap-3 p-4 hover:border-navy/30">
-              <span className="grid size-11 place-items-center rounded-xl bg-navy text-white"><Icon name={c.icon} /></span>
+            <Link to={`/discover/${c.slug}`} className="card flex h-full flex-col gap-3 p-4 hover:border-brand/30">
+              <span className="grid size-11 place-items-center rounded-xl bg-brand text-white"><Icon name={c.icon} /></span>
               <span className="font-semibold leading-tight text-ink">{c.name}</span>
             </Link>
           </li>
@@ -44,8 +44,8 @@ function Collections() {
     <section className="grid gap-4 md:grid-cols-2">
       {cols.map((c) => (
         <div key={c.title} className="card p-4">
-          <div className="mb-2 flex items-center justify-between"><h2 className="font-bold text-navy">{c.title}</h2><Link to={c.link} className="text-sm font-semibold text-teal">See all →</Link></div>
-          <ul className="divide-y divide-line">{c.items.map((i) => <li key={i.id}><Link to={i.to} className="block py-2 text-sm hover:text-navy">{i.label}</Link></li>)}</ul>
+          <div className="mb-2 flex items-center justify-between"><h2 className="font-bold text-navy">{c.title}</h2><Link to={c.link} className="text-sm font-semibold text-brand">See all →</Link></div>
+          <ul className="divide-y divide-line">{c.items.map((i) => <li key={i.id}><Link to={i.to} className="block py-2 text-sm hover:text-brand">{i.label}</Link></li>)}</ul>
         </div>
       ))}
     </section>
@@ -67,7 +67,7 @@ export function CategoryLandingPage() {
       case 'food-shopping': return { lead: 'Restaurants, groceries, clothing, electronics and local offers.', body: <><div className="grid gap-3 md:grid-cols-3">{db.businesses.filter((b) => ['Grocery', 'Restaurants & cafes', 'Clothing', 'Electronics', 'Retail', 'Jewellery'].includes(b.category)).map((b) => <BusinessCard key={b.id} b={b} />)}</div><h2 className="mt-6 mb-3 text-lg font-bold text-navy">Offers</h2><div className="grid gap-3 sm:grid-cols-3">{db.offers.filter((o) => o.status === 'active').map((o) => <Link key={o.id} to={`/offers?id=${o.id}`}><OfferCard o={o} /></Link>)}</div></> };
       case 'directory': return { lead: 'Every listed local business, by category.', body: <div className="grid gap-3 md:grid-cols-3">{db.businesses.slice(0, 9).map((b) => <BusinessCard key={b.id} b={b} />)}</div> };
       case 'weddings-events': return { lead: 'Venues, vendors and what’s on in the city.', body: <div className="grid gap-3 md:grid-cols-3">{db.events.slice(0, 6).map((e) => <EventCard key={e.id} e={e} />)}</div> };
-      case 'news-community': return { lead: 'Local news, civic alerts, discussions and polls.', body: <div className="grid gap-2 sm:grid-cols-2">{[['Local news', '/news'], ['Civic alerts', '/alerts'], ['Community', '/community'], ['Polls', '/polls'], ['Podcasts', '/podcasts'], ['Sports', '/sports']].map(([l, to]) => <Link key={to} to={to} className="card p-4 font-semibold hover:border-navy/30">{l} →</Link>)}</div> };
+      case 'news-community': return { lead: 'Local news, civic alerts, discussions and polls.', body: <div className="grid gap-2 sm:grid-cols-2">{[['Local news', '/news'], ['Civic alerts', '/alerts'], ['Community', '/community'], ['Polls', '/polls'], ['Podcasts', '/podcasts'], ['Sports', '/sports']].map(([l, to]) => <Link key={to} to={to} className="card p-4 font-semibold hover:border-brand/30">{l} →</Link>)}</div> };
       default: return { lead: 'Open the full section to browse, filter and take action.', body: null };
     }
   })();
@@ -187,7 +187,7 @@ export function SearchPage() {
 function ResultRow({ r }: { r: SearchResult }) {
   return (
     <li>
-      <Link to={r.link} className="card flex items-center gap-3 p-3 hover:border-navy/30">
+      <Link to={r.link} className="card flex items-center gap-3 p-3 hover:border-brand/30">
         <Badge tone="navy" className="w-24 justify-center">{SEARCH_TYPES.find((t) => t.id === r.type)?.label}</Badge>
         <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{r.title}</span><span className="block truncate text-sm text-muted">{r.subtitle}</span></span>
         {r.verified && <VerificationBadge status="verified" />}

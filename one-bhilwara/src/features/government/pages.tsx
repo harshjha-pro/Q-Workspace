@@ -45,7 +45,7 @@ export function GovernmentPage() {
           {list.length === 0 ? <EmptyState title="No schemes match" action={<Button variant="secondary" onClick={() => { setQ(''); setCat(''); setLevel(''); }}>Reset</Button>} /> : (
             <ul className="grid gap-3 md:grid-cols-2">
               {list.map((s) => (
-                <li key={s.id}><Link to={`/government/schemes/${s.id}`} className="card flex h-full gap-3 p-4 hover:border-navy/30">
+                <li key={s.id}><Link to={`/government/schemes/${s.id}`} className="card flex h-full gap-3 p-4 hover:border-brand/30">
                   <Landmark className="size-6 shrink-0 text-navy" aria-hidden />
                   <span><span className="block font-bold">{s.name}</span><span className="block text-sm text-muted">{s.level === 'central' ? 'Central' : 'Rajasthan'} · {s.category}</span><span className="mt-1 block line-clamp-2 text-sm">{s.description}</span></span>
                 </Link></li>
@@ -88,7 +88,7 @@ export function SchemePage() {
         <p className="text-sm text-muted">Responsible: {s.department}</p>
         <p>{s.description}</p>
         <div className="flex flex-wrap gap-2">
-          <a href={s.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-navy px-4 font-semibold text-white">Official portal <ExternalLink className="size-4" aria-hidden /></a>
+          <a href={s.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand px-4 font-semibold text-white">Official portal <ExternalLink className="size-4" aria-hidden /></a>
           <LinkButton variant="secondary" to="/government/eligibility">Check eligibility</LinkButton>
           <SaveButton type="scheme" id={s.id} /><ShareButton title={s.name} />
         </div>
@@ -143,7 +143,7 @@ export function EligibilityPage() {
               {r.failed.length > 0 && <p className="text-sm"><b>Not matched:</b> {r.failed.join('; ')}</p>}
               <p className="text-sm text-muted"><CircleHelp className="mr-1 inline size-4" aria-hidden /><b>Not confirmed:</b> {r.notConfirmed.join('; ')}</p>
               <p className="text-sm"><FileCheck2 className="mr-1 inline size-4" aria-hidden /><b>Documents:</b> {r.scheme.documents.join(', ')}</p>
-              <a href={r.scheme.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-teal underline">Official next step <ExternalLink className="size-3.5" aria-hidden /></a>
+              <a href={r.scheme.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-brand underline">Official next step <ExternalLink className="size-3.5" aria-hidden /></a>
             </article>
           ))}
         </section>

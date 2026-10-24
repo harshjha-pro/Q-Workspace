@@ -29,8 +29,8 @@ export function NotificationsPage() {
           {list.map((n) => {
             const I = ICONS[n.type] ?? Bell;
             return (
-              <li key={n.id} className={cx('flex items-start gap-3 p-4', !n.read && 'bg-navy-50/50')}>
-                <span className={cx('grid size-9 shrink-0 place-items-center rounded-full', n.type === 'alert' ? 'bg-danger-50 text-danger' : 'bg-navy-50 text-navy')}><I className="size-4" aria-hidden /></span>
+              <li key={n.id} className={cx('flex items-start gap-3 p-4', !n.read && 'bg-brand-50/60')}>
+                <span className={cx('grid size-9 shrink-0 place-items-center rounded-full', n.type === 'alert' ? 'bg-danger-50 text-danger' : 'bg-brand-50 text-brand')}><I className="size-4" aria-hidden /></span>
                 <Link to={n.link} onClick={() => mark([n.id])} className="min-w-0 flex-1">
                   <p className={cx('text-sm', !n.read && 'font-bold')}>{n.title}{!n.read && <span className="sr-only"> (unread)</span>}</p>
                   <p className="text-sm text-muted">{n.body}</p>

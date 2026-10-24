@@ -1,15 +1,15 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Link, type LinkProps } from 'react-router-dom';
-import { BadgeCheck, CircleAlert, Clock3, FlaskConical, Info, Loader2, Megaphone, ShieldAlert, Star } from 'lucide-react';
+import { Link, useNavigate, type LinkProps } from 'react-router-dom';
+import { ArrowLeft, BadgeCheck, CircleAlert, Clock3, FlaskConical, Info, Loader2, Megaphone, ShieldAlert, Star } from 'lucide-react';
 import type { Verification } from '@/types/models';
 
 export const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(' ');
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'teal' | 'danger' | 'amber';
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-navy text-white hover:bg-navy-deep',
-  secondary: 'bg-white text-ink border border-line hover:border-navy/40',
-  ghost: 'text-navy hover:bg-navy-50',
+  primary: 'bg-brand text-white hover:bg-brand-600',
+  secondary: 'bg-white text-ink border border-line hover:border-brand/40',
+  ghost: 'text-brand hover:bg-brand-50',
   teal: 'bg-teal text-white hover:bg-teal/90',
   danger: 'bg-danger text-white hover:bg-danger/90',
   amber: 'bg-amber text-navy-deep hover:bg-amber/90'
@@ -49,7 +49,7 @@ export function Card({ className, children, as: As = 'div', ...rest }: { classNa
 
 type Tone = 'navy' | 'teal' | 'amber' | 'red' | 'gray' | 'blue' | 'violet' | 'green';
 const TONES: Record<Tone, string> = {
-  navy: 'bg-navy-50 text-navy', teal: 'bg-teal-50 text-teal', amber: 'bg-amber-50 text-amber-700', red: 'bg-danger-50 text-danger',
+  navy: 'bg-brand-50 text-brand', teal: 'bg-teal-50 text-teal', amber: 'bg-amber-50 text-amber-700', red: 'bg-danger-50 text-danger',
   gray: 'bg-page text-muted border border-line', blue: 'bg-blue-50 text-blue-700', violet: 'bg-violet-50 text-violet-700', green: 'bg-green-50 text-green-700'
 };
 
@@ -129,7 +129,7 @@ export function SkeletonList({ rows = 4, className }: { rows?: number; className
 export function EmptyState({ icon, title, text, action }: { icon?: ReactNode; title: string; text?: string; action?: ReactNode }) {
   return (
     <div className="card p-8 text-center grid justify-items-center gap-2">
-      <div className="size-12 grid place-items-center rounded-full bg-navy-50 text-navy">{icon ?? <Info className="size-6" aria-hidden />}</div>
+      <div className="size-12 grid place-items-center rounded-full bg-brand-50 text-brand">{icon ?? <Info className="size-6" aria-hidden />}</div>
       <h3 className="font-semibold text-ink">{title}</h3>
       {text && <p className="text-sm text-muted max-w-sm">{text}</p>}
       {action && <div className="mt-2">{action}</div>}
@@ -139,7 +139,7 @@ export function EmptyState({ icon, title, text, action }: { icon?: ReactNode; ti
 
 export function Notice({ tone = 'info', title, children, className }: { tone?: 'info' | 'warning' | 'demo' | 'danger' | 'success'; title?: string; children: ReactNode; className?: string }) {
   const styles = {
-    info: ['bg-navy-50 border-navy-100 text-navy', Info], warning: ['bg-amber-50 border-amber/30 text-amber-700', CircleAlert], demo: ['bg-amber-50 border-amber/30 text-amber-700', FlaskConical],
+    info: ['bg-brand-50 border-brand-100 text-brand', Info], warning: ['bg-amber-50 border-amber/30 text-amber-700', CircleAlert], demo: ['bg-amber-50 border-amber/30 text-amber-700', FlaskConical],
     danger: ['bg-danger-50 border-danger/20 text-danger', ShieldAlert], success: ['bg-teal-50 border-teal/20 text-teal', BadgeCheck]
   } as const;
   const [cls, I] = styles[tone];
@@ -151,14 +151,23 @@ export function Notice({ tone = 'info', title, children, className }: { tone?: '
   );
 }
 
-export function PageHeader({ title, subtitle, actions, badge }: { title: string; subtitle?: ReactNode; actions?: ReactNode; badge?: ReactNode }) {
+export function PageHeader({ title, subtitle, actions, badge, back = true, hideActionsOnMobile }: { title: string; subtitle?: ReactNode; actions?: ReactNode; badge?: ReactNode; back?: boolean; hideActionsOnMobile?: boolean }) {
+  const nav = useNavigate();
   return (
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold text-navy tracking-tight">{title}</h1>{badge}</div>
-        {subtitle && <p className="text-muted mt-1 text-[15px]">{subtitle}</p>}
+    <header className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {back && (
+            <button type="button" onClick={() => (window.history.length > 1 ? nav(-1) : nav('/'))} className="-ml-2 grid size-10 shrink-0 place-items-center rounded-full text-ink hover:bg-white lg:hidden" aria-label="Go back">
+              <ArrowLeft className="size-5" aria-hidden />
+            </button>
+          )}
+          <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">{title}</h1>
+          {badge}
+        </div>
+        {actions && <div className={cx('flex-wrap gap-2', hideActionsOnMobile ? 'hidden sm:flex' : 'flex')}>{actions}</div>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {subtitle && <p className="text-[15px] text-muted">{subtitle}</p>}
     </header>
   );
 }
@@ -166,8 +175,8 @@ export function PageHeader({ title, subtitle, actions, badge }: { title: string;
 export function SectionHeader({ title, to, linkLabel = 'See all', icon }: { title: string; to?: string; linkLabel?: string; icon?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 mb-3">
-      <h2 className="flex items-center gap-2 text-lg font-bold text-navy">{icon}{title}</h2>
-      {to && <Link to={to} className="text-sm font-semibold text-teal hover:underline">{linkLabel} →</Link>}
+      <h2 className="flex items-center gap-2 text-lg font-bold text-ink">{icon}{title}</h2>
+      {to && <Link to={to} className="text-sm font-semibold text-brand hover:underline">{linkLabel}</Link>}
     </div>
   );
 }
