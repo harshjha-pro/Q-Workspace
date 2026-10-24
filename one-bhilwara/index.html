@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>One Bhilwara</title>
+  <meta name="description" content="One Bhilwara — your city companion: emergency numbers, directory, places to visit, transport and e-services. Works offline.">
+  <meta name="theme-color" content="#c2410c" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1410" media="(prefers-color-scheme: dark)">
+  <meta name="application-name" content="One Bhilwara">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="One Bhilwara">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="#/home" aria-label="One Bhilwara home">
+      <img src="icons/icon-192.png" alt="" width="32" height="32">
+      <span data-i18n="appName">One Bhilwara</span>
+    </a>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-search" aria-label="Search" data-i18n-label="search">🔍</button>
+      <button class="icon-btn" id="btn-lang" aria-label="Switch language">हि</button>
+      <button class="icon-btn" id="btn-theme" aria-label="Toggle dark mode">🌙</button>
+    </div>
+  </header>
+
+  <div class="offline-banner" id="offline-banner" hidden data-i18n="offline">You are offline — saved content is still available.</div>
+
+  <main id="main" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a href="#/home" data-route="home"><span aria-hidden="true">🏠</span><b data-i18n="tabHome">Home</b></a>
+    <a href="#/explore" data-route="explore"><span aria-hidden="true">🧭</span><b data-i18n="tabExplore">Explore</b></a>
+    <a href="#/directory" data-route="directory"><span aria-hidden="true">📇</span><b data-i18n="tabDirectory">Directory</b></a>
+    <a href="#/services" data-route="services"><span aria-hidden="true">🧾</span><b data-i18n="tabServices">Services</b></a>
+    <a href="#/sos" data-route="sos" class="tab-sos"><span aria-hidden="true">🆘</span><b data-i18n="tabSos">SOS</b></a>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <noscript><p style="padding:16px">One Bhilwara needs JavaScript. In an emergency dial <a href="tel:112">112</a>.</p></noscript>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
