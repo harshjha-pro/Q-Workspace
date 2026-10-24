@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #13243a;
+  --color-navy-deep: #0b1728;
+  --color-navy-50: #eef2f7;
+  --color-navy-100: #dbe3ee;
+  --color-teal: #0f766e;
+  --color-teal-50: #ecfdf8;
+  --color-teal-100: #ccf3e9;
+  --color-amber: #f59e0b;
+  --color-amber-50: #fff8eb;
+  --color-amber-700: #b45309;
+  --color-page: #f5f7fa;
+  --color-ink: #182230;
+  --color-muted: #667085;
+  --color-line: #e4e7ec;
+  --color-danger: #b42318;
+  --color-danger-50: #fef3f2;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Devanagari', sans-serif;
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-page text-ink antialiased; font-family: var(--font-sans); }
+  :focus-visible { outline: 3px solid var(--color-amber); outline-offset: 2px; border-radius: 6px; }
+  button, [role='button'] { cursor: pointer; }
+  /* Grid items default to min-width:auto; horizontal scrollers inside them would widen the page. */
+  .grid > * { min-width: 0; }
+  button:disabled { cursor: not-allowed; }
+  h1, h2, h3 { text-wrap: balance; }
+}
+
+@layer components {
+  .card { @apply bg-white border border-line rounded-[var(--radius-card)]; box-shadow: var(--shadow-card); }
+  .input { @apply w-full min-h-11 rounded-lg border border-line bg-white px-3 text-[15px] text-ink placeholder:text-muted/80 focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/15 disabled:bg-page; }
+  .label { @apply block text-sm font-medium text-ink mb-1.5; }
+  .chip { @apply inline-flex items-center gap-1.5 min-h-9 px-3 rounded-full border border-line bg-white text-sm font-medium text-ink whitespace-nowrap hover:border-navy/40 transition-colors; }
+  .chip[aria-pressed='true'] { @apply bg-navy text-white border-navy; }
+  .scroll-x { @apply flex gap-2 overflow-x-auto pb-1; scrollbar-width: none; }
+  .scroll-x::-webkit-scrollbar { display: none; }
+  .skeleton { @apply bg-navy-100/60 rounded animate-pulse; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

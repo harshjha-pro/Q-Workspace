@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Offline · One Bhilwara</title>
+  <meta name="theme-color" content="#13243A">
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#F5F7FA;color:#182230;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:16px}
+    main{max-width:420px;background:#fff;border:1px solid #E4E7EC;border-radius:16px;padding:24px;text-align:center}
+    img{border-radius:14px}
+    h1{font-size:1.3rem;margin:12px 0 4px}
+    p{color:#667085;margin:0 0 16px}
+    a,button{display:inline-block;margin:4px;padding:10px 16px;border-radius:10px;border:0;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+    .primary{background:#13243A;color:#fff}.sos{background:#B42318;color:#fff}
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/icons/icon-192.png" alt="One Bhilwara" width="64" height="64">
+    <h1>You're offline</h1>
+    <p>This page hasn't been saved for offline use yet. Pages you've opened before still work. We'll reconnect automatically.</p>
+    <button class="primary" onclick="location.reload()">Try again</button>
+    <a class="sos" href="tel:112">Emergency: call 112</a>
+  </main>
+  <script>addEventListener('online', function () { location.reload(); });</script>
+</body>
+</html>
