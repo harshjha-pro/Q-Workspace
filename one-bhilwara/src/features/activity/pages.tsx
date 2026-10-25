@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Bookmark, Briefcase, CalendarDays, ChevronRight, ClipboardList, Globe, House, Landmark, LayoutGrid, MessageSquare, MessagesSquare, Newspaper, Plus, Sparkles, Vote, Wrench } from 'lucide-react';
+import { Bell, Bookmark, Briefcase, CalendarDays, ChevronRight, ClipboardList, House, Landmark, LayoutGrid, MessageSquare, MessagesSquare, Newspaper, Plus, Sparkles, Vote, Wrench } from 'lucide-react';
 import { useCurrentUser, useDB, useDocumentTitle, useSession, useT } from '@/hooks/useStore';
 import { serviceName } from '@/config/catalog';
 import { Avatar, Button, cx, EmptyState, LinkButton, PageHeader, SectionHeader, StatusPill } from '@/components/ui/primitives';
@@ -15,7 +15,6 @@ const REC_STYLE: Record<RecKind, { I: typeof Wrench; tint: string; label: string
   property: { I: House, tint: 'bg-purple-50 text-purple-600', label: 'Property' },
   scheme: { I: Landmark, tint: 'bg-amber-50 text-amber-700', label: 'Scheme' },
   news: { I: Newspaper, tint: 'bg-rose-50 text-rose-600', label: 'News' },
-  media: { I: Globe, tint: 'bg-sky-50 text-sky-600', label: 'Channel' },
   module: { I: LayoutGrid, tint: 'bg-slate-100 text-ink', label: 'Explore' }
 };
 
@@ -130,7 +129,7 @@ export function ActivityPage() {
             })}
           </ul>
         )}
-        <p className="mt-2 text-xs text-muted">Based only on your interests, localities, followed channels and activity in this app.</p>
+        <p className="mt-2 text-xs text-muted">Based only on your interests, localities and activity in this app.</p>
       </section>
       <PostSheet open={post} onClose={() => setPost(false)} />
     </div>

@@ -1,204 +1,272 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronRight, ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, Siren, Trophy } from 'lucide-react';
-import type { CivicAlert, Match, Podcast } from '@/types/models';
-import { LOCALITIES, localityName, NEWS_CATEGORIES, newsCategoryName } from '@/config/catalog';
+import { Bookmark, BookmarkCheck, Check, CheckCheck, ChevronDown, ChevronRight, ChevronsUp, ChevronUp, ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, RotateCcw, Share2, Siren, SlidersHorizontal, Trophy } from 'lucide-react';
+import type { Article, CivicAlert, Match, Podcast } from '@/types/models';
+import { LOCALITIES, localityName, newsCategoryName } from '@/config/catalog';
 import { matches as seedMatches, podcasts as seedPodcasts, prices as seedPrices } from '@/data/seed/content';
-import { useDB, useDocumentTitle, useLoading, useNow, useSession } from '@/hooks/useStore';
+import { useDB, useDocumentTitle, useLang, useLoading, useNow, useSession } from '@/hooks/useStore';
+import { isSaved, toggleSave } from '@/services/domain/common';
 import { repo } from '@/services/store';
 import { ArticleCard } from '@/components/cards';
 import { CityScene } from '@/components/illustrations';
-import { CommentsThread, LoadMore, ReportButton, SaveButton, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
-import { Badge, Button, cx, DemoBadge, EmptyState, MetaLine, Notice, PageHeader, SectionHeader, SkeletonList, StatusPill } from '@/components/ui/primitives';
-import { Dialog, Tabs } from '@/components/ui/overlay';
+import { CommentsThread, ReportButton, SaveButton, ShareButton, useRequireAuth } from '@/components/shared';
+import { Badge, Button, cx, DemoBadge, EmptyState, LinkButton, MetaLine, Notice, PageHeader, Skeleton, StatusPill } from '@/components/ui/primitives';
+import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
 import { durationMMSS, formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
 import NotFound from '@/app/NotFound';
-import { Icon } from '@/components/ui/Icon';
 import { sessionStore } from '@/services/session';
-import { MEDIA_CHANNELS, MEDIA_KINDS, MEDIA_SCOPES, monogram, type MediaChannel, type MediaKind, type MediaScope } from '@/config/media';
 
 const isLive = (publishedAt: string, status: string) => status === 'published' || (status === 'scheduled' && Date.parse(publishedAt) <= Date.now());
 
+/** News sections. Local = city/district desks; Rajasthan = state; Global = India + world. */
+const SECTIONS = [
+  { id: 'local', label: 'Local', labelHi: 'स्थानीय', match: (c: string) => !['rajasthan', 'india', 'world'].includes(c) },
+  { id: 'rajasthan', label: 'Rajasthan', labelHi: 'राजस्थान', match: (c: string) => c === 'rajasthan' },
+  { id: 'global', label: 'Global', labelHi: 'देश-दुनिया', match: (c: string) => c === 'india' || c === 'world' }
+] as const;
+type SectionId = (typeof SECTIONS)[number]['id'];
+
+const SWIPE_PX = 60;
+
+function useReadArticles() {
+  const { prefs } = useSession();
+  const read = prefs.readArticles ?? [];
+  const set = (ids: string[]) => sessionStore.setPrefs({ readArticles: ids });
+  return {
+    read,
+    markRead: (id: string) => { if (!read.includes(id)) set([...read, id]); },
+    toggle: (id: string) => set(read.includes(id) ? read.filter((x) => x !== id) : [...read, id]),
+    markAll: (ids: string[]) => set([...new Set([...read, ...ids])]),
+    clear: (ids: string[]) => set(read.filter((x) => !ids.includes(x)))
+  };
+}
+
+/** Inshorts-style news: one short story per screen, swipe up for the next. */
 export function NewsPage() {
-  useDocumentTitle('News & Media');
+  useDocumentTitle('News');
+  const lang = useLang();
   const [params, setParams] = useSearchParams();
-  const scope = (MEDIA_SCOPES.find((x) => x.id === params.get('scope'))?.id ?? 'local') as MediaScope;
-  const setScope = (v: MediaScope) => { const p = new URLSearchParams(); if (v !== 'local') p.set('scope', v); setParams(p, { replace: true }); };
+  const section = SECTIONS.find((x) => x.id === params.get('section')) ?? SECTIONS[0];
+  const setSection = (id: SectionId) => { const p = new URLSearchParams(); if (id !== 'local') p.set('section', id); setParams(p, { replace: true }); };
+  const now = useNow();
+  const loading = useLoading();
+  const articles = useDB((s) => s.articles);
+  const activeAlerts = useDB((s) => s.alerts.filter((x) => x.status !== 'resolved' && Date.parse(x.expiresAt) > now && Date.parse(x.startsAt) <= now).length);
+  const { read, markRead, toggle, markAll, clear } = useReadArticles();
+  const readRef = useRef(read);
+  readRef.current = read;
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [deckKey, setDeckKey] = useState(0);
+  const [options, setOptions] = useState(false);
+
+  // The deck is a snapshot: marking stories read while swiping must not reshuffle it.
+  const deck = useMemo(() => {
+    const live = articles.filter((x) => isLive(x.publishedAt, x.status) && section.match(x.category));
+    const ids = new Set(readRef.current);
+    return live.filter((x) => !unreadOnly || !ids.has(x.id)).sort((x, y) => y.publishedAt.localeCompare(x.publishedAt));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articles, section.id, unreadOnly, deckKey]);
+  const sectionIds = useMemo(() => articles.filter((x) => isLive(x.publishedAt, x.status) && section.match(x.category)).map((x) => x.id), [articles, section]);
+  const unreadCount = sectionIds.filter((id) => !read.includes(id)).length;
+
+  const [i, setI] = useState(0);
+  const [dy, setDy] = useState(0);
+  useEffect(() => { setI(0); setDy(0); }, [deck]);
+  const go = useCallback((to: number) => {
+    setI((cur) => {
+      const next = Math.max(0, Math.min(deck.length, to));
+      if (next > cur && deck[cur]) markRead(deck[cur].id); // swiping past a story marks it read
+      return next;
+    });
+    setDy(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck, read]);
+
+  // Keyboard: ↓ / j next, ↑ / k previous.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, textarea, select, [role="dialog"]')) return;
+      if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); go(i + 1); }
+      if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); go(i - 1); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [go, i]);
+
+  // Touch / mouse drag.
+  const start = useRef<{ x: number; y: number; vertical?: boolean } | null>(null);
+  const onPointerDown = (e: React.PointerEvent) => { if ((e.target as HTMLElement).closest('a, button')) return; start.current = { x: e.clientX, y: e.clientY }; };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const st = start.current; if (!st) return;
+    const ddx = e.clientX - st.x, ddy = e.clientY - st.y;
+    if (st.vertical === undefined && Math.abs(ddx) + Math.abs(ddy) > 8) st.vertical = Math.abs(ddy) > Math.abs(ddx);
+    if (st.vertical) setDy(ddy);
+  };
+  const onPointerUp = () => {
+    const st = start.current; start.current = null;
+    if (!st?.vertical) { setDy(0); return; }
+    if (dy < -SWIPE_PX) go(i + 1); else if (dy > SWIPE_PX) go(i - 1); else setDy(0);
+  };
+  // Mouse wheel / trackpad: one story per gesture.
+  const wheelLock = useRef(0);
+  const onWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaY) < 25 || Date.now() < wheelLock.current) return;
+    wheelLock.current = Date.now() + 650;
+    go(i + (e.deltaY > 0 ? 1 : -1));
+  };
+
+  const atEnd = i >= deck.length;
+  const label = (x: (typeof SECTIONS)[number]) => (lang === 'hi' ? x.labelHi : x.label);
+
   return (
-    <div className="grid gap-5">
-      <PageHeader title="News & Media" subtitle="Local, state and national news channels in one place." />
-      <div role="tablist" aria-label="News coverage" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-white p-1 shadow-sm">
-        {MEDIA_SCOPES.map((m) => (
-          <button key={m.id} type="button" role="tab" aria-selected={scope === m.id} onClick={() => setScope(m.id)}
-            className={cx('flex min-h-12 flex-col items-center justify-center rounded-xl px-2 text-sm font-bold transition-colors', scope === m.id ? 'bg-brand text-white shadow' : 'text-ink hover:bg-page')}>
-            {m.label}<span className={cx('text-[11px] font-medium', scope === m.id ? 'text-white/80' : 'text-muted')}>{m.blurb}</span>
-          </button>
-        ))}
+    <div className="mx-auto grid w-full max-w-md gap-3">
+      <h1 className="sr-only">News</h1>
+      <div className="flex items-center gap-2">
+        <div role="tablist" aria-label="News sections" className="grid flex-1 grid-cols-3 gap-1 rounded-full border border-line bg-white p-1 shadow-sm">
+          {SECTIONS.map((x) => (
+            <button key={x.id} type="button" role="tab" aria-selected={section.id === x.id} onClick={() => setSection(x.id)}
+              className={cx('min-h-10 rounded-full text-sm font-bold transition-colors', section.id === x.id ? 'bg-brand text-white shadow' : 'text-ink hover:bg-page')}>{label(x)}</button>
+          ))}
+        </div>
+        <button type="button" onClick={() => setOptions(true)} className="relative grid size-11 shrink-0 place-items-center rounded-full border border-line bg-white shadow-sm hover:border-brand/40" aria-label="News options" aria-haspopup="dialog">
+          <SlidersHorizontal className="size-5" aria-hidden />
+          {unreadOnly && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-brand ring-2 ring-white" aria-hidden />}
+        </button>
       </div>
-      <FollowedChannels />
-      <MediaDirectory scope={scope} />
-      {scope === 'local' ? <CityNewsFeed /> : (
-        <Notice tone="info" title="Headlines from these outlets">Stories open on each outlet’s own website. In-app headlines appear once a news feed the publisher permits is connected (see docs/INTEGRATIONS.md) — One Bhilwara doesn’t copy publishers’ content.</Notice>
+      <div className="flex items-center justify-between px-1 text-xs text-muted">
+        <span aria-live="polite">{deck.length ? (atEnd ? 'All caught up' : `Story ${i + 1} of ${deck.length}`) : ''}{unreadOnly ? ' · unread only' : ''}</span>
+        <span>{unreadCount} unread</span>
+      </div>
+
+      {loading ? <Skeleton className="h-[calc(100dvh-15rem)] min-h-[440px] rounded-3xl" /> : (
+        <section aria-roledescription="carousel" aria-label={`${section.label} news`}
+          className="relative h-[calc(100dvh-15rem)] min-h-[440px] touch-none select-none overflow-hidden rounded-3xl lg:h-[min(calc(100dvh-12rem),760px)]"
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
+          {deck.map((a, idx) => Math.abs(idx - i) > 1 ? null : (
+            <div key={a.id} className={cx('absolute inset-0', dy === 0 && 'transition-transform duration-300 ease-out')}
+              style={{ transform: `translateY(calc(${(idx - i) * 100}% + ${idx - i >= -1 && idx - i <= 1 ? dy : 0}px))`, zIndex: 10 - Math.abs(idx - i) }}
+              aria-hidden={idx !== i} inert={idx !== i ? true : undefined}>
+              <StoryCard a={a} isRead={read.includes(a.id)} onToggleRead={() => toggle(a.id)} lang={lang} />
+            </div>
+          ))}
+          <div className={cx('absolute inset-0', dy === 0 && 'transition-transform duration-300 ease-out')} style={{ transform: `translateY(calc(${(deck.length - i) * 100}% + ${dy}px))` }} aria-hidden={!atEnd} inert={!atEnd ? true : undefined}>
+            <CaughtUp
+              empty={deck.length === 0}
+              unreadOnly={unreadOnly}
+              others={SECTIONS.filter((x) => x.id !== section.id).map((x) => ({ id: x.id, label: label(x) }))}
+              onRestart={() => go(0)}
+              onShowRead={() => { setUnreadOnly(false); setDeckKey((k) => k + 1); }}
+              onSection={setSection}
+              alerts={activeAlerts}
+            />
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden justify-end gap-2 p-3 lg:flex">
+            <button type="button" onClick={() => go(i - 1)} disabled={i === 0} className="pointer-events-auto grid size-10 place-items-center rounded-full bg-white/90 shadow-md disabled:opacity-40" aria-label="Previous story"><ChevronUp className="size-5" aria-hidden /></button>
+            <button type="button" onClick={() => go(i + 1)} disabled={atEnd} className="pointer-events-auto grid size-10 place-items-center rounded-full bg-brand text-white shadow-md disabled:opacity-40" aria-label="Next story"><ChevronDown className="size-5" aria-hidden /></button>
+          </div>
+        </section>
       )}
+      {!atEnd && deck.length > 0 && (
+        <p className="flex items-center justify-center gap-1 text-xs font-medium text-muted lg:hidden" aria-hidden><ChevronUp className="size-4 animate-bounce" />Swipe up for next story</p>
+      )}
+      <button type="button" onClick={() => go(i + 1)} className="sr-only focus:not-sr-only focus:rounded-lg focus:bg-white focus:p-2">Next story</button>
+
+      <Dialog open={options} onClose={() => setOptions(false)} title="News options" description={`${label(section)} · ${unreadCount} of ${sectionIds.length} unread`}>
+        <div className="grid gap-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted">Show</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" aria-pressed={!unreadOnly} onClick={() => { setUnreadOnly(false); setOptions(false); }} className={cx('min-h-11 rounded-xl border text-sm font-semibold', !unreadOnly ? 'border-brand bg-brand-50 text-brand' : 'border-line')}>All stories</button>
+            <button type="button" aria-pressed={unreadOnly} onClick={() => { setUnreadOnly(true); setDeckKey((k) => k + 1); setOptions(false); }} className={cx('min-h-11 rounded-xl border text-sm font-semibold', unreadOnly ? 'border-brand bg-brand-50 text-brand' : 'border-line')}>Unread only</button>
+          </div>
+          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-muted">Actions</p>
+          <OptionRow I={CheckCheck} label="Mark all as read" hint={`Every story in ${section.label}`} onClick={() => { markAll(sectionIds); setOptions(false); }} />
+          <OptionRow I={RotateCcw} label="Mark all as unread" hint="Start this section fresh" onClick={() => { clear(sectionIds); setDeckKey((k) => k + 1); setOptions(false); }} />
+          <OptionRow I={ChevronsUp} label="Back to first story" onClick={() => { go(0); setOptions(false); }} />
+          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-muted">More</p>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/alerts" className="chip"><Siren className="size-4" aria-hidden />Civic alerts{activeAlerts ? ` (${activeAlerts})` : ''}</Link>
+            <Link to="/podcasts" className="chip"><Headphones className="size-4" aria-hidden />Podcasts</Link>
+            <Link to="/sports" className="chip"><Trophy className="size-4" aria-hidden />Sports</Link>
+            <Link to="/prices" className="chip"><Fuel className="size-4" aria-hidden />Fuel & gold</Link>
+            <Link to="/profile?tab=saved" className="chip"><Bookmark className="size-4" aria-hidden />Saved stories</Link>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
 
-function useFollowedMedia() {
-  const { prefs } = useSession();
-  const followed = prefs.followedMedia ?? [];
-  const toggle = (id: string) => sessionStore.setPrefs({ followedMedia: followed.includes(id) ? followed.filter((x) => x !== id) : [...followed, id] });
-  return { followed, toggle };
-}
-
-function ChannelMark({ c, size = 'md' }: { c: MediaChannel; size?: 'sm' | 'md' }) {
-  return <span className={cx('grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br font-extrabold text-white shadow-sm', c.tint, size === 'sm' ? 'size-12 text-sm' : 'size-14 text-base')} aria-hidden>{monogram(c.name)}</span>;
-}
-
-function FollowedChannels() {
-  const { followed } = useFollowedMedia();
-  const list = MEDIA_CHANNELS.filter((c) => followed.includes(c.id));
-  if (!list.length) return null;
+function OptionRow({ I, label, hint, onClick }: { I: typeof Bookmark; label: string; hint?: string; onClick: () => void }) {
   return (
-    <section aria-labelledby="following-h">
-      <h2 id="following-h" className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">Your channels</h2>
-      <ul className="scroll-x">
-        {list.map((c) => (
-          <li key={c.id} className="w-20 shrink-0">
-            <a href={c.url} target="_blank" rel="noopener noreferrer" className="grid justify-items-center gap-1 text-center" aria-label={`${c.name} (opens the outlet’s website)`}>
-              <ChannelMark c={c} size="sm" /><span className="line-clamp-2 text-[11px] font-medium leading-tight text-ink">{c.name.replace(/ — .*/, '')}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <button type="button" onClick={onClick} className="flex min-h-12 items-center gap-3 rounded-xl border border-line px-3 text-left hover:border-brand/40">
+      <I className="size-5 text-brand" aria-hidden /><span><span className="block text-sm font-semibold text-ink">{label}</span>{hint && <span className="block text-xs text-muted">{hint}</span>}</span>
+    </button>
   );
 }
 
-function MediaDirectory({ scope }: { scope: MediaScope }) {
-  const { followed, toggle } = useFollowedMedia();
-  const [kind, setKind] = useState<MediaKind | 'all'>('all');
-  useEffect(() => setKind('all'), [scope]);
-  const inScope = MEDIA_CHANNELS.filter((c) => c.scope === scope);
-  const kinds = (Object.keys(MEDIA_KINDS) as MediaKind[]).filter((k) => inScope.some((c) => c.kind === k));
-  const shown = kinds.filter((k) => kind === 'all' || k === kind);
-  const label = MEDIA_SCOPES.find((m) => m.id === scope)!;
+function StoryCard({ a, isRead, onToggleRead, lang }: { a: Article; isRead: boolean; onToggleRead: () => void; lang: 'en' | 'hi' }) {
+  const { userId } = useSession();
+  const guard = useRequireAuth();
+  const { toast } = useUI();
+  useDB((s) => s.saved.length);
+  const saved = isSaved('article', a.id);
+  const liked = !!userId && a.likedBy.includes(userId);
+  const headline = lang === 'hi' ? a.titleHi ?? a.title : a.titleHi ?? a.title;
+  const sub = a.titleHi ? a.title : undefined;
+  const text = a.summary.length < 140 && a.body[0] ? `${a.summary} ${a.body[0]}` : a.summary;
+  const share = async () => {
+    const url = `${window.location.origin}/news/${a.id}`;
+    try { if (navigator.share) { await navigator.share({ title: a.title, url }); return; } await navigator.clipboard.writeText(url); toast('Link copied'); }
+    catch (err) { if ((err as Error).name !== 'AbortError') toast('Could not share. Copy the link from the story page.', 'error'); }
+  };
+  const act = 'flex flex-col items-center gap-0.5 rounded-xl px-2 py-1 text-[11px] font-semibold text-muted hover:text-brand';
   return (
-    <section aria-labelledby="media-h" className="grid gap-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 id="media-h" className="text-lg font-bold text-ink">{label.label} media channels</h2>
-        <span className="text-xs text-muted">{inScope.length} channels</span>
-      </div>
-      <div className="scroll-x" role="group" aria-label="Channel type">
-        <button type="button" className="chip" aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
-        {kinds.map((k) => <button key={k} type="button" className="chip" aria-pressed={kind === k} onClick={() => setKind(k)}><Icon name={MEDIA_KINDS[k].icon} className="size-4" />{MEDIA_KINDS[k].label}</button>)}
-      </div>
-      {shown.map((k) => (
-        <div key={k} className="grid gap-2">
-          <h3 className="flex items-center gap-1.5 text-sm font-bold text-muted"><Icon name={MEDIA_KINDS[k].icon} className="size-4" />{MEDIA_KINDS[k].label}</h3>
-          <ul className="grid gap-2 lg:grid-cols-2">
-            {inScope.filter((c) => c.kind === k).map((c) => {
-              const on = followed.includes(c.id);
-              return (
-                <li key={c.id} className="card flex items-center gap-3 p-3">
-                  <ChannelMark c={c} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold leading-snug text-ink">{c.name}</p>
-                    {c.nameHi && <p className="truncate text-xs text-muted">{c.nameHi}</p>}
-                    <p className="mt-0.5 flex flex-wrap gap-1">{c.languages.map((l) => <Badge key={l}>{l}</Badge>)}{c.note && <span className="text-xs text-muted">{c.note}</span>}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <button type="button" aria-pressed={on} onClick={() => toggle(c.id)} aria-label={`${on ? 'Unfollow' : 'Follow'} ${c.name}`}
-                      className={cx('min-h-8 rounded-full px-3 text-xs font-bold', on ? 'bg-brand text-white' : 'border border-brand/40 text-brand hover:bg-brand-50')}>{on ? 'Following' : 'Follow'}</button>
-                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-ink hover:text-brand" aria-label={`Visit ${c.name} website (opens in a new tab)`}>Visit<ExternalLink className="size-3.5" aria-hidden /></a>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+    <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
+      <div className="relative h-[34%] shrink-0">
+        <CityScene seed={a.id} className="size-full" />
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
+          <span className="flex flex-wrap gap-1.5"><Badge tone="navy" className="bg-white/90">{newsCategoryName(a.category)}</Badge>{a.demo && <DemoBadge label="Sample" />}</span>
+          {isRead && <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-teal"><Check className="size-3.5" aria-hidden />Read</span>}
         </div>
-      ))}
-      <p className="text-xs text-muted">Names and links point to each outlet’s official website. One Bhilwara is not affiliated with these outlets and does not show their logos or content.</p>
-    </section>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-4">
+        <h2 className="text-lg font-extrabold leading-snug text-ink">{headline}</h2>
+        {sub && <p className="-mt-1 text-sm font-semibold text-ink/60">{sub}</p>}
+        <p className="line-clamp-[8] text-[15px] leading-relaxed text-ink/80">{text}</p>
+        <p className="mt-auto text-xs text-muted">short by <span className="font-semibold text-ink/70">{a.source}</span> · {timeAgo(a.publishedAt)}{a.localityId ? ` · ${localityName(a.localityId)}` : ''}</p>
+      </div>
+      <div className="flex items-center justify-between gap-1 border-t border-line bg-page/60 px-2 py-1.5">
+        <Link to={`/news/${a.id}`} className="ml-1 inline-flex min-h-10 items-center gap-1 text-sm font-bold text-brand">Read full story<ChevronRight className="size-4" aria-hidden /></Link>
+        <div className="flex">
+          <button type="button" className={act} aria-pressed={liked} onClick={() => guard(() => repo.at('articles').mutate(a.id, (cur) => ({ likedBy: liked ? cur.likedBy.filter((x) => x !== userId) : [...cur.likedBy, userId!] })))}>
+            <Heart className={cx('size-5', liked && 'fill-rose-500 text-rose-500')} aria-hidden />{a.likedBy.length || 'Like'}
+          </button>
+          <button type="button" className={act} aria-pressed={saved} onClick={() => guard(() => toast(toggleSave('article', a.id) ? 'Saved to your profile' : 'Removed from saved'))}>
+            {saved ? <BookmarkCheck className="size-5 text-teal" aria-hidden /> : <Bookmark className="size-5" aria-hidden />}{saved ? 'Saved' : 'Save'}
+          </button>
+          <button type="button" className={act} onClick={share}><Share2 className="size-5" aria-hidden />Share</button>
+          <button type="button" className={act} aria-pressed={isRead} onClick={onToggleRead}><CheckCheck className={cx('size-5', isRead && 'text-teal')} aria-hidden />{isRead ? 'Read' : 'Mark read'}</button>
+        </div>
+      </div>
+    </article>
   );
 }
 
-function CityNewsFeed() {
-  const [params, setParams] = useSearchParams();
-  const cat = params.get('category') ?? 'all';
-  const loc = params.get('locality') ?? '';
-  const sort = params.get('sort') ?? 'newest';
-  const { prefs } = useSession();
-  const loading = useLoading();
-  const now = useNow();
-  const articles = useDB((s) => s.articles.filter((a) => isLive(a.publishedAt, a.status)));
-  const alerts = useDB((s) => s.alerts.filter((a) => a.status !== 'resolved' && Date.parse(a.expiresAt) > now && Date.parse(a.startsAt) <= now));
-  const list = useMemo(() => {
-    let l = articles.filter((a) => (cat === 'all' || a.category === cat) && (!loc || a.localityId === loc));
-    if (sort === 'local') l = [...l].sort((a, b) => Number(b.localityId === prefs.localityId) - Number(a.localityId === prefs.localityId));
-    else l = [...l].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-    return l;
-  }, [articles, cat, loc, sort, prefs.localityId]);
-  const { visible, hasMore, more } = usePaged(list, 8);
-  const set = (k: string, v: string) => { const p = new URLSearchParams(params); if (v && v !== 'all') p.set(k, v); else p.delete(k); setParams(p, { replace: true }); };
-  const resetFeed = () => { const p = new URLSearchParams(); if (params.get('scope')) p.set('scope', params.get('scope')!); setParams(p, { replace: true }); };
-
+function CaughtUp({ empty, unreadOnly, others, onRestart, onShowRead, onSection, alerts }: { empty: boolean; unreadOnly: boolean; others: { id: SectionId; label: string }[]; onRestart: () => void; onShowRead: () => void; onSection: (id: SectionId) => void; alerts: number }) {
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-ink">One Bhilwara city desk</h2><DemoBadge label="Demo newsroom" /></div>
-      <Tabs label="News categories" value={cat} onChange={(v) => set('category', v)} tabs={[{ id: 'all', label: 'All' }, ...NEWS_CATEGORIES.map((c) => ({ id: c.id, label: c.name }))]} />
-      <div className="flex flex-wrap gap-2">
-        <label className="sr-only" htmlFor="n-loc">Locality</label>
-        <select id="n-loc" className="chip w-auto max-w-[48%]" value={loc} onChange={(e) => set('locality', e.target.value)}>
-          <option value="">All localities</option>{LOCALITIES.filter((l) => l.id !== 'all').map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        <label className="sr-only" htmlFor="n-sort">Sort</label>
-        <select id="n-sort" className="chip w-auto max-w-[48%]" value={sort} onChange={(e) => set('sort', e.target.value)}>
-          <option value="newest">Newest first</option><option value="local">My locality first</option>
-        </select>
-        {(cat !== 'all' || loc) && <Button variant="ghost" size="sm" onClick={resetFeed}>Reset</Button>}
+    <div className="flex h-full flex-col items-center justify-center gap-4 rounded-3xl border border-line bg-gradient-to-b from-brand-50 to-white p-6 text-center shadow-lg">
+      <span className="grid size-16 place-items-center rounded-full bg-teal/10 text-teal"><CheckCheck className="size-8" aria-hidden /></span>
+      <div>
+        <h2 className="text-xl font-extrabold text-ink">{empty ? (unreadOnly ? 'No unread stories here' : 'No stories yet') : 'You’re all caught up!'}</h2>
+        <p className="mt-1 text-sm text-muted">{empty ? 'Check another section or come back later.' : 'You’ve seen every story in this section.'}</p>
       </div>
-      {loading ? <SkeletonList rows={4} /> : list.length === 0 ? (
-        <EmptyState title="No stories here yet" text="Try another category or locality." action={<Button variant="secondary" onClick={resetFeed}>Show all news</Button>} />
-      ) : (
-        <>
-          <div className="grid gap-3 lg:grid-cols-2">{visible.map((a) => <ArticleCard key={a.id} a={a} />)}</div>
-          <LoadMore hasMore={hasMore} onMore={more} />
-        </>
-      )}
-
-      <section className="mt-2">
-        <SectionHeader title="Civic Alerts" to="/alerts" linkLabel="View All" />
-        {alerts.length === 0 ? <p className="text-sm text-muted">No active alerts right now.</p> : (
-          <ul className="grid gap-3 lg:grid-cols-2">
-            {alerts.slice(0, 3).map((a) => (
-              <li key={a.id}>
-                <Link to="/alerts" className={cx('flex gap-3 rounded-2xl border p-4', a.severity === 'warning' || a.severity === 'critical' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50')}>
-                  <span className={cx('grid size-10 shrink-0 place-items-center rounded-full', a.severity === 'warning' || a.severity === 'critical' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-700')}><Siren className="size-5" aria-hidden /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className={cx('block font-bold', a.severity === 'warning' || a.severity === 'critical' ? 'text-rose-700' : 'text-amber-800')}>{a.title}</span>
-                    <span className="block text-sm text-ink/75">{a.description}</span>
-                    <span className="mt-1 block text-xs text-muted">{a.localityId ? localityName(a.localityId) : 'Citywide'} · {a.source}</span>
-                  </span>
-                  <ChevronRight className="size-5 shrink-0 self-center text-rose-400" aria-hidden />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-bold text-ink">More from One Bhilwara</h2>
-        <div className="scroll-x">
-          <Link to="/community" className="chip">Community</Link>
-          <Link to="/polls" className="chip">Polls</Link>
-          <Link to="/podcasts" className="chip"><Headphones className="size-4" aria-hidden />Podcasts</Link>
-          <Link to="/sports" className="chip"><Trophy className="size-4" aria-hidden />Sports</Link>
-          <Link to="/prices" className="chip"><Fuel className="size-4" aria-hidden />Fuel & gold</Link>
-          <Link to="/agriculture" className="chip">Mandi</Link>
-        </div>
-      </section>
+      <div className="grid w-full max-w-xs gap-2">
+        {!empty && <Button onClick={onRestart} icon={<ChevronsUp className="size-4" aria-hidden />}>Back to first story</Button>}
+        {unreadOnly && <Button variant="secondary" onClick={onShowRead}>Show read stories too</Button>}
+        {others.map((o) => <Button key={o.id} variant="secondary" onClick={() => onSection(o.id)}>Read {o.label} news</Button>)}
+        {alerts > 0 && <LinkButton variant="ghost" to="/alerts" icon={<Siren className="size-4 text-danger" aria-hidden />}>{alerts} active civic alert{alerts === 1 ? '' : 's'}</LinkButton>}
+      </div>
     </div>
   );
 }

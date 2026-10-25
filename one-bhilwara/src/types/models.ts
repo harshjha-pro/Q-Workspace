@@ -61,7 +61,8 @@ export interface Preferences {
   homeSections: string[];
   notifyCategories: string[];
   pushAsked: boolean;
-  followedMedia: string[];
+  /** Stories the user has swiped past or marked read in the News feed. */
+  readArticles: string[];
 }
 
 export interface Business extends Base {

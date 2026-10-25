@@ -26,7 +26,7 @@ export const defaultPrefs = (): Preferences => ({
   homeSections: ['alerts', 'news', 'community', 'services', 'jobs', 'property', 'marketplace', 'events', 'mandi', 'government', 'businesses', 'offers', 'recommended'],
   notifyCategories: ['alert', 'job', 'service', 'comment', 'event', 'news', 'property', 'poll', 'booking', 'business', 'job_match', 'campaign', 'account'],
   pushAsked: false,
-  followedMedia: ['patrika-bhilwara', 'district-bhilwara']
+  readArticles: []
 });
 
 const initial = (): Session => ({ userId: DEMO_USER_ID, role: 'resident', prefs: defaultPrefs(), demoBannerDismissed: false });
