@@ -46,6 +46,10 @@
   .scroll-x { @apply flex gap-2 overflow-x-auto pb-1; scrollbar-width: none; }
   .scroll-x::-webkit-scrollbar { display: none; }
   .skeleton { @apply bg-navy-100/60 rounded animate-pulse; }
+  /* Glassmorphism: frosted panels for the Services section. */
+  .glass { background: rgb(255 255 255 / 0.62); -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%); border: 1px solid rgb(255 255 255 / 0.7); box-shadow: 0 8px 32px rgb(15 29 64 / 0.10), inset 0 1px 0 rgb(255 255 255 / 0.6); }
+  .glass-dark { background: rgb(15 23 42 / 0.28); -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); border: 1px solid rgb(255 255 255 / 0.28); color: #fff; }
+  .glass-backdrop { background: radial-gradient(60% 50% at 10% 0%, rgb(29 95 224 / 0.22), transparent 70%), radial-gradient(50% 40% at 100% 20%, rgb(168 85 247 / 0.18), transparent 70%), radial-gradient(60% 50% at 50% 100%, rgb(20 184 166 / 0.16), transparent 70%); }
   .input-pill { @apply w-full min-h-12 rounded-2xl border border-line bg-white px-4 text-[15px] text-ink placeholder:text-muted/80 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15; }
 }
 

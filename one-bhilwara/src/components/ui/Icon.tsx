@@ -1,13 +1,13 @@
 import {
   AirVent, Bike, Briefcase, BriefcaseBusiness, Bug, Building2, Bus, Car, Flower2, GraduationCap, Hammer, HandHelping, HardHat, Heart, HeartPulse,
   House, Landmark, Newspaper, PaintRoller, PartyPopper, Scale, Scissors, ShoppingBag, Smartphone, Sparkles, SprayCan, Store, Truck,
-  UtensilsCrossed, WashingMachine, Wheat, Wrench, Zap, type LucideIcon
+  UtensilsCrossed, WashingMachine, Wheat, Wrench, Zap, Tv, Radio, Globe, Rss, type LucideIcon
 } from 'lucide-react';
 
 const MAP: Record<string, LucideIcon> = {
   AirVent, Bike, Briefcase, BriefcaseBusiness, Bug, Building2, Bus, Car, Flower2, GraduationCap, Hammer, HandHelping, HardHat, Heart, HeartPulse,
   House, Landmark, Newspaper, PaintRoller, PartyPopper, Scale, Scissors, ShoppingBag, Smartphone, Sparkles, SprayCan, Store, Truck,
-  UtensilsCrossed, WashingMachine, Wheat, Wrench, Zap
+  UtensilsCrossed, WashingMachine, Wheat, Wrench, Zap, Tv, Radio, Globe, Rss
 };
 
 /** Renders a lucide icon from a config string (used by catalog-driven tiles). */

@@ -79,8 +79,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Hashed build assets never change: cache first.
-  if (url.pathname.startsWith('/assets/')) {
+  // Hashed build assets and proxied category photos never change: cache first.
+  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/img/')) {
     event.respondWith(caches.match(req, MATCH).then((hit) => hit || fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;

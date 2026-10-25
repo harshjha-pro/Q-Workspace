@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bell, Bot, Briefcase, Building2, BusFront, CalendarDays, ChartNoAxesColumn, Compass, Factory, FlaskConical, Gift, GraduationCap, HandCoins, HeartHandshake,
+  Activity, Bell, Bot, Briefcase, Building2, BusFront, CalendarDays, ChartNoAxesColumn, Compass, Factory, FlaskConical, Gift, GraduationCap, HandCoins, HeartHandshake,
   HeartPulse, Home, House, Landmark, LayoutDashboard, MapPin, Megaphone, MessagesSquare, Newspaper, PhoneCall, Scale, Search, Settings, ShieldCheck,
   Menu, Plus, ShoppingBag, Siren, Store, User, Vote, Wheat, Wifi, WifiOff, Wrench, X
 } from 'lucide-react';
@@ -115,6 +115,7 @@ function Header() {
   const [q, setQ] = useState('');
   const [locOpen, setLocOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [post, setPost] = useState(false);
   const isHome = loc.pathname === '/';
   return (
     <header className={cx('sticky top-0 z-30 border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur', !isHome && 'hidden lg:block')}>
@@ -138,6 +139,7 @@ function Header() {
           </div>
         </form>
         <div className="ml-auto flex items-center gap-1 md:ml-2">
+          <button type="button" onClick={() => setPost(true)} className="grid size-10 place-items-center rounded-full bg-brand text-white shadow hover:bg-brand-600" aria-label="Create a post or listing" aria-haspopup="dialog"><Plus className="size-5" aria-hidden /></button>
           <Link to="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-page" aria-label={`${t('notifications')}${unread ? `, ${unread} unread` : ''}`}>
             <Bell className="size-6 text-ink" aria-hidden />
             {unread > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-danger ring-2 ring-white" />}
@@ -154,6 +156,7 @@ function Header() {
         </div>
       </div>
       <LocalityDialog open={locOpen} onClose={() => setLocOpen(false)} />
+      <PostSheet open={post} onClose={() => setPost(false)} />
       <MobileMenu open={menu} onClose={() => setMenu(false)} onLocality={() => { setMenu(false); setLocOpen(true); }} />
     </header>
   );
@@ -243,12 +246,16 @@ function useNavGroups(): { title: string; items: NavItem[] }[] {
   const t = useT();
   const i = (C: typeof Home) => <C className="size-[18px]" aria-hidden />;
   return [
+    { title: 'Main', items: [
+      { to: '/', label: t('navHome'), icon: i(Home) }, { to: '/services', label: t('navServices'), icon: i(Wrench) }, { to: '/activity', label: t('navActivity'), icon: i(Activity) },
+      { to: '/news', label: t('navNews'), icon: i(Newspaper) }, { to: '/profile', label: t('navProfile'), icon: i(User) }
+    ] },
     { title: 'City', items: [
-      { to: '/', label: t('navHome'), icon: i(Home) }, { to: '/news', label: t('navNews'), icon: i(Newspaper) }, { to: '/alerts', label: t('alerts'), icon: i(Siren) },
+      { to: '/alerts', label: t('alerts'), icon: i(Siren) },
       { to: '/community', label: t('community'), icon: i(MessagesSquare) }, { to: '/polls', label: t('polls'), icon: i(Vote) }, { to: '/discover', label: t('navDiscover'), icon: i(Compass) }, { to: '/ai', label: t('navAI'), icon: i(Bot) }
     ] },
     { title: 'Everyday', items: [
-      { to: '/services', label: t('services'), icon: i(Wrench) }, { to: '/jobs', label: t('jobs'), icon: i(Briefcase) }, { to: '/property', label: t('property'), icon: i(House) },
+      { to: '/jobs', label: t('jobs'), icon: i(Briefcase) }, { to: '/property', label: t('property'), icon: i(House) },
       { to: '/marketplace', label: t('marketplace'), icon: i(ShoppingBag) }, { to: '/businesses', label: t('businesses'), icon: i(Store) }, { to: '/offers', label: t('offers'), icon: i(Gift) }
     ] },
     { title: 'Life & citizen', items: [
@@ -291,35 +298,37 @@ function Sidebar() {
   );
 }
 
-function BottomNav() {
+/** The five primary sections. Everything else lives in the menu drawer / sidebar. */
+function usePrimaryNav() {
   const t = useT();
+  return [
+    { to: '/', label: t('navHome'), I: Home },
+    { to: '/services', label: t('navServices'), I: Wrench },
+    { to: '/activity', label: t('navActivity'), I: Activity },
+    { to: '/news', label: t('navNewsShort'), I: Newspaper },
+    { to: '/profile', label: t('navProfile'), I: User }
+  ];
+}
+
+function BottomNav() {
+  const items = usePrimaryNav();
   const unread = useUnread();
-  const [post, setPost] = useState(false);
-  const item = (to: string, label: string, I: typeof Home, badge = 0) => (
-    <li>
-      <NavLink to={to} end={to === '/'} className={({ isActive }) => cx('relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold', isActive ? 'text-brand' : 'text-muted')}>
-        <I className="size-[22px]" aria-hidden />{label}
-        {badge > 0 && <span className="absolute right-[calc(50%-18px)] top-2.5 size-2.5 rounded-full bg-danger ring-2 ring-white" aria-label={`${badge} unread`} />}
-      </NavLink>
-    </li>
-  );
   return (
-    <>
-      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(16_24_40/0.06)] lg:hidden">
-        <ul className="grid grid-cols-5">
-          {item('/', t('navHome'), Home)}
-          {item('/discover', t('navExplore'), Compass)}
-          <li className="flex justify-center">
-            <button type="button" onClick={() => setPost(true)} className="flex h-16 flex-col items-center justify-end gap-0.5 pb-1.5 text-[11px] font-semibold text-brand" aria-label="Post something" aria-haspopup="dialog">
-              <span className="-mt-5 grid size-12 place-items-center rounded-full bg-brand text-white shadow-lg ring-4 ring-white"><Plus className="size-6" aria-hidden /></span>{t('navPost')}
-            </button>
+    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(16_24_40/0.06)] backdrop-blur lg:hidden">
+      <ul className="grid grid-cols-5">
+        {items.map(({ to, label, I }) => (
+          <li key={to}>
+            <NavLink to={to} end={to === '/'} className={({ isActive }) => cx('relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold', isActive ? 'text-brand' : 'text-muted')}>
+              {({ isActive }) => (<>
+                <span className={cx('grid h-8 w-14 place-items-center rounded-full transition-colors', isActive && 'bg-brand-50')}><I className="size-[22px]" aria-hidden /></span>
+                <span className="max-w-full truncate px-0.5">{label}</span>
+                {to === '/activity' && unread > 0 && <span className="absolute right-[calc(50%-20px)] top-2 size-2.5 rounded-full bg-danger ring-2 ring-white" aria-label={`${unread} unread`} />}
+              </>)}
+            </NavLink>
           </li>
-          {item('/notifications', t('navActivity'), Bell, unread)}
-          {item('/profile', t('navProfile'), User)}
-        </ul>
-      </nav>
-      <PostSheet open={post} onClose={() => setPost(false)} />
-    </>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -333,7 +342,7 @@ const POST_OPTIONS = [
   { to: '/polls/new', label: 'Suggest a poll', desc: 'Ask the city', I: Vote, tint: 'bg-sky-50 text-sky-600' }
 ];
 
-function PostSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PostSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const nav = useNavigate();
   return (
     <Dialog open={open} onClose={onClose} title="Create" description="What would you like to post?">

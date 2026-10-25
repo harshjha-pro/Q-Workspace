@@ -6,7 +6,7 @@ import { mandi } from '@/data/seed/content';
 import { useDB, useDocumentTitle, useLang, useLoading, useNow, useSession, useT } from '@/hooks/useStore';
 import { getWeather, type Weather } from '@/services/adapters/weather';
 import { participation, pollPhase } from '@/services/domain/polls';
-import { rankProviders } from '@/services/domain/serviceMatching';
+import { recommend } from '@/features/activity/recommend';
 import { sessionStore } from '@/services/session';
 import { usePWA } from '@/app/pwa';
 import { ArticleCard, BusinessCard, ClassifiedCard, EventCard, JobCard, OfferCard, PropertyCard, ProviderCard } from '@/components/cards';
@@ -361,25 +361,17 @@ function OffersSection() {
   return (<section><SectionHeader title={t('offers')} to="/offers" linkLabel={t('seeAll')} /><div className="grid gap-3 sm:grid-cols-3">{offers.map((o) => <Link key={o.id} to={`/offers?id=${o.id}`}><OfferCard o={o} /></Link>)}</div></section>);
 }
 
-/** Recommendations use only interests and locality the user chose — no inferred sensitive attributes. */
+/** Recommendations use only interests, localities and in-app activity the user chose — no inferred sensitive attributes. */
 function RecommendedSection() {
   const t = useT();
-  const { prefs } = useSession();
+  const { prefs, userId } = useSession();
   const db = useDB((s) => s);
-  const recs = useMemo(() => {
-    const out: { label: string; link: string; why: string }[] = [];
-    if (prefs.interests.includes('Jobs')) db.jobs.filter((j) => j.status === 'open' && (prefs.jobCategories.length === 0 || prefs.jobCategories.includes(j.category))).slice(0, 2).forEach((j) => out.push({ label: j.title, link: `/jobs/${j.id}`, why: 'Because you follow Jobs' }));
-    if (prefs.interests.includes('Services')) rankProviders({ category: 'electrician', localityId: prefs.localityId, urgency: 'normal' }, db.providers).slice(0, 1).forEach((r) => out.push({ label: r.provider.name, link: `/service-providers/${r.provider.id}`, why: `Near ${localityName(prefs.localityId)}` }));
-    if (prefs.interests.includes('Events')) db.events.filter((e) => e.status === 'published').slice(0, 1).forEach((e) => out.push({ label: e.title, link: `/events/${e.id}`, why: 'Because you follow Events' }));
-    if (prefs.interests.includes('Agriculture')) out.push({ label: 'Mandi price dashboard', link: '/agriculture', why: 'Because you follow Agriculture' });
-    if (prefs.interests.includes('Education')) out.push({ label: 'Coaching & libraries', link: '/education', why: 'Because you follow Education' });
-    return out.slice(0, 6);
-  }, [db, prefs]);
+  const recs = useMemo(() => recommend(db, prefs, userId, 4), [db, prefs, userId]);
   return (
     <section>
-      <SectionHeader title={t('recommended')} to="/settings#personalisation" linkLabel="Edit interests" />
+      <SectionHeader title={t('recommended')} to="/activity" linkLabel={t('seeAll')} />
       {recs.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2">{recs.map((r) => <li key={r.link}><Link to={r.link} className="card block p-3 hover:border-brand/30"><p className="font-semibold">{r.label}</p><p className="text-xs text-muted">{r.why}</p></Link></li>)}</ul>
+        <ul className="grid gap-2 sm:grid-cols-2">{recs.map((r) => <li key={r.id}><Link to={r.link} className="card block p-3 hover:border-brand/30"><p className="truncate font-semibold">{r.title}</p><p className="text-xs text-muted">{r.why}</p></Link></li>)}</ul>
       ) : <p className="text-sm text-muted">Choose interests in Settings to get recommendations.</p>}
     </section>
   );

@@ -13,11 +13,117 @@ import { Badge, Button, cx, DemoBadge, EmptyState, MetaLine, Notice, PageHeader,
 import { Dialog, Tabs } from '@/components/ui/overlay';
 import { durationMMSS, formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
 import NotFound from '@/app/NotFound';
+import { Icon } from '@/components/ui/Icon';
+import { sessionStore } from '@/services/session';
+import { MEDIA_CHANNELS, MEDIA_KINDS, MEDIA_SCOPES, monogram, type MediaChannel, type MediaKind, type MediaScope } from '@/config/media';
 
 const isLive = (publishedAt: string, status: string) => status === 'published' || (status === 'scheduled' && Date.parse(publishedAt) <= Date.now());
 
 export function NewsPage() {
-  useDocumentTitle('News');
+  useDocumentTitle('News & Media');
+  const [params, setParams] = useSearchParams();
+  const scope = (MEDIA_SCOPES.find((x) => x.id === params.get('scope'))?.id ?? 'local') as MediaScope;
+  const setScope = (v: MediaScope) => { const p = new URLSearchParams(); if (v !== 'local') p.set('scope', v); setParams(p, { replace: true }); };
+  return (
+    <div className="grid gap-5">
+      <PageHeader title="News & Media" subtitle="Local, state and national news channels in one place." />
+      <div role="tablist" aria-label="News coverage" className="grid grid-cols-3 gap-1 rounded-2xl border border-line bg-white p-1 shadow-sm">
+        {MEDIA_SCOPES.map((m) => (
+          <button key={m.id} type="button" role="tab" aria-selected={scope === m.id} onClick={() => setScope(m.id)}
+            className={cx('flex min-h-12 flex-col items-center justify-center rounded-xl px-2 text-sm font-bold transition-colors', scope === m.id ? 'bg-brand text-white shadow' : 'text-ink hover:bg-page')}>
+            {m.label}<span className={cx('text-[11px] font-medium', scope === m.id ? 'text-white/80' : 'text-muted')}>{m.blurb}</span>
+          </button>
+        ))}
+      </div>
+      <FollowedChannels />
+      <MediaDirectory scope={scope} />
+      {scope === 'local' ? <CityNewsFeed /> : (
+        <Notice tone="info" title="Headlines from these outlets">Stories open on each outlet’s own website. In-app headlines appear once a news feed the publisher permits is connected (see docs/INTEGRATIONS.md) — One Bhilwara doesn’t copy publishers’ content.</Notice>
+      )}
+    </div>
+  );
+}
+
+function useFollowedMedia() {
+  const { prefs } = useSession();
+  const followed = prefs.followedMedia ?? [];
+  const toggle = (id: string) => sessionStore.setPrefs({ followedMedia: followed.includes(id) ? followed.filter((x) => x !== id) : [...followed, id] });
+  return { followed, toggle };
+}
+
+function ChannelMark({ c, size = 'md' }: { c: MediaChannel; size?: 'sm' | 'md' }) {
+  return <span className={cx('grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br font-extrabold text-white shadow-sm', c.tint, size === 'sm' ? 'size-12 text-sm' : 'size-14 text-base')} aria-hidden>{monogram(c.name)}</span>;
+}
+
+function FollowedChannels() {
+  const { followed } = useFollowedMedia();
+  const list = MEDIA_CHANNELS.filter((c) => followed.includes(c.id));
+  if (!list.length) return null;
+  return (
+    <section aria-labelledby="following-h">
+      <h2 id="following-h" className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">Your channels</h2>
+      <ul className="scroll-x">
+        {list.map((c) => (
+          <li key={c.id} className="w-20 shrink-0">
+            <a href={c.url} target="_blank" rel="noopener noreferrer" className="grid justify-items-center gap-1 text-center" aria-label={`${c.name} (opens the outlet’s website)`}>
+              <ChannelMark c={c} size="sm" /><span className="line-clamp-2 text-[11px] font-medium leading-tight text-ink">{c.name.replace(/ — .*/, '')}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function MediaDirectory({ scope }: { scope: MediaScope }) {
+  const { followed, toggle } = useFollowedMedia();
+  const [kind, setKind] = useState<MediaKind | 'all'>('all');
+  useEffect(() => setKind('all'), [scope]);
+  const inScope = MEDIA_CHANNELS.filter((c) => c.scope === scope);
+  const kinds = (Object.keys(MEDIA_KINDS) as MediaKind[]).filter((k) => inScope.some((c) => c.kind === k));
+  const shown = kinds.filter((k) => kind === 'all' || k === kind);
+  const label = MEDIA_SCOPES.find((m) => m.id === scope)!;
+  return (
+    <section aria-labelledby="media-h" className="grid gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 id="media-h" className="text-lg font-bold text-ink">{label.label} media channels</h2>
+        <span className="text-xs text-muted">{inScope.length} channels</span>
+      </div>
+      <div className="scroll-x" role="group" aria-label="Channel type">
+        <button type="button" className="chip" aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
+        {kinds.map((k) => <button key={k} type="button" className="chip" aria-pressed={kind === k} onClick={() => setKind(k)}><Icon name={MEDIA_KINDS[k].icon} className="size-4" />{MEDIA_KINDS[k].label}</button>)}
+      </div>
+      {shown.map((k) => (
+        <div key={k} className="grid gap-2">
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-muted"><Icon name={MEDIA_KINDS[k].icon} className="size-4" />{MEDIA_KINDS[k].label}</h3>
+          <ul className="grid gap-2 lg:grid-cols-2">
+            {inScope.filter((c) => c.kind === k).map((c) => {
+              const on = followed.includes(c.id);
+              return (
+                <li key={c.id} className="card flex items-center gap-3 p-3">
+                  <ChannelMark c={c} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold leading-snug text-ink">{c.name}</p>
+                    {c.nameHi && <p className="truncate text-xs text-muted">{c.nameHi}</p>}
+                    <p className="mt-0.5 flex flex-wrap gap-1">{c.languages.map((l) => <Badge key={l}>{l}</Badge>)}{c.note && <span className="text-xs text-muted">{c.note}</span>}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <button type="button" aria-pressed={on} onClick={() => toggle(c.id)} aria-label={`${on ? 'Unfollow' : 'Follow'} ${c.name}`}
+                      className={cx('min-h-8 rounded-full px-3 text-xs font-bold', on ? 'bg-brand text-white' : 'border border-brand/40 text-brand hover:bg-brand-50')}>{on ? 'Following' : 'Follow'}</button>
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-ink hover:text-brand" aria-label={`Visit ${c.name} website (opens in a new tab)`}>Visit<ExternalLink className="size-3.5" aria-hidden /></a>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+      <p className="text-xs text-muted">Names and links point to each outlet’s official website. One Bhilwara is not affiliated with these outlets and does not show their logos or content.</p>
+    </section>
+  );
+}
+
+function CityNewsFeed() {
   const [params, setParams] = useSearchParams();
   const cat = params.get('category') ?? 'all';
   const loc = params.get('locality') ?? '';
@@ -35,10 +141,11 @@ export function NewsPage() {
   }, [articles, cat, loc, sort, prefs.localityId]);
   const { visible, hasMore, more } = usePaged(list, 8);
   const set = (k: string, v: string) => { const p = new URLSearchParams(params); if (v && v !== 'all') p.set(k, v); else p.delete(k); setParams(p, { replace: true }); };
+  const resetFeed = () => { const p = new URLSearchParams(); if (params.get('scope')) p.set('scope', params.get('scope')!); setParams(p, { replace: true }); };
 
   return (
     <div className="grid gap-4">
-      <PageHeader title="News" badge={<DemoBadge label="Demo newsroom" />} />
+      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-ink">One Bhilwara city desk</h2><DemoBadge label="Demo newsroom" /></div>
       <Tabs label="News categories" value={cat} onChange={(v) => set('category', v)} tabs={[{ id: 'all', label: 'All' }, ...NEWS_CATEGORIES.map((c) => ({ id: c.id, label: c.name }))]} />
       <div className="flex flex-wrap gap-2">
         <label className="sr-only" htmlFor="n-loc">Locality</label>
@@ -49,10 +156,10 @@ export function NewsPage() {
         <select id="n-sort" className="chip w-auto max-w-[48%]" value={sort} onChange={(e) => set('sort', e.target.value)}>
           <option value="newest">Newest first</option><option value="local">My locality first</option>
         </select>
-        {(cat !== 'all' || loc) && <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>Reset</Button>}
+        {(cat !== 'all' || loc) && <Button variant="ghost" size="sm" onClick={resetFeed}>Reset</Button>}
       </div>
       {loading ? <SkeletonList rows={4} /> : list.length === 0 ? (
-        <EmptyState title="No stories here yet" text="Try another category or locality." action={<Button variant="secondary" onClick={() => setParams({})}>Show all news</Button>} />
+        <EmptyState title="No stories here yet" text="Try another category or locality." action={<Button variant="secondary" onClick={resetFeed}>Show all news</Button>} />
       ) : (
         <>
           <div className="grid gap-3 lg:grid-cols-2">{visible.map((a) => <ArticleCard key={a.id} a={a} />)}</div>

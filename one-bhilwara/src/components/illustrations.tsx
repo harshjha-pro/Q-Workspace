@@ -1,6 +1,8 @@
 /* Original vector illustrations used instead of photos (no stock or real-place photos are
    presented as Bhilwara). Deterministic variations come from a string seed. */
+import { useState } from 'react';
 import { cx } from './ui/primitives';
+import { photoUrl } from '@/config/servicePhotos';
 
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
@@ -94,5 +96,17 @@ export function WorkerPortrait({ seed = 'w', className, tool = '🔧' }: { seed?
       <path d="M44 53 Q50 57 56 53" stroke="#1f2937" strokeWidth="2" fill="none" strokeLinecap="round" />
       <text x="78" y="92" fontSize="20" textAnchor="middle">{tool}</text>
     </svg>
+  );
+}
+
+/** Category photo with a graceful gradient fallback when the image can't load (offline, removed). */
+export function Photo({ id, alt, w = 640, h, className, fallback = 'from-brand to-indigo-700', eager }: { id?: string; alt: string; w?: number; h?: number; className?: string; fallback?: string; eager?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className={cx(/\babsolute\b/.test(className ?? '') ? '' : 'relative', 'block overflow-hidden bg-gradient-to-br', fallback, className)}>
+      {id && !failed && (
+        <img src={photoUrl(id, w, h)} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
+      )}
+    </span>
   );
 }

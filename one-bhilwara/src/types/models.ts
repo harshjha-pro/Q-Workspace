@@ -61,6 +61,7 @@ export interface Preferences {
   homeSections: string[];
   notifyCategories: string[];
   pushAsked: boolean;
+  followedMedia: string[];
 }
 
 export interface Business extends Base {

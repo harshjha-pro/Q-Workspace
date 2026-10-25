@@ -34,6 +34,7 @@ const rewards = () => import('@/features/rewards/pages');
 const account = () => import('@/features/account/pages');
 const insights = () => import('@/features/insights/pages');
 const admin = () => import('@/features/admin/pages');
+const activity = () => import('@/features/activity/pages');
 
 const P = {
   News: lz(news, 'NewsPage'), Article: lz(news, 'ArticlePage'), Alerts: lz(news, 'AlertsPage'), Podcasts: lz(news, 'PodcastsPage'), Sports: lz(news, 'SportsPage'), Prices: lz(news, 'PricesPage'),
@@ -55,7 +56,7 @@ const P = {
   AI: lz(ai, 'AIPage'), Notifications: lz(notif, 'NotificationsPage'), Offers: lz(rewards, 'OffersPage'), Rewards: lz(rewards, 'RewardsPage'),
   Profile: lz(account, 'ProfilePage'), Settings: lz(account, 'SettingsPage'), SignIn: lz(account, 'SignInPage'), Help: lz(account, 'HelpPage'), Policy: lz(account, 'PolicyPage'),
   Pricing: lz(account, 'PricingPage'), Checkout: lz(account, 'CheckoutPage'), Payments: lz(account, 'PaymentsPage'),
-  Insights: lz(insights, 'InsightsPage'), Admin: lz(admin, 'AdminPage')
+  Insights: lz(insights, 'InsightsPage'), Admin: lz(admin, 'AdminPage'), Activity: lz(activity, 'ActivityPage')
 };
 
 const auth = (n: ReactNode) => <RequireAuth>{n}</RequireAuth>;
@@ -140,6 +141,7 @@ export default function App() {
               <Route path="advertise" element={<P.Advertise />} />
               <Route path="b2b" element={<P.B2B />} />
               <Route path="ai" element={<P.AI />} />
+              <Route path="activity" element={<P.Activity />} />
               <Route path="notifications" element={auth(<P.Notifications />)} />
               <Route path="offers" element={<P.Offers />} />
               <Route path="rewards" element={<P.Rewards />} />

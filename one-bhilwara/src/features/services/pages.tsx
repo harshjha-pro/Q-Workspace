@@ -9,16 +9,18 @@ import { confirmProvider, isActiveWithin, rankProviders } from '@/services/domai
 import { repo, store } from '@/services/store';
 import { ProviderCard } from '@/components/cards';
 import { CallButton, EnquiryButton, FilterBar, LoadMore, LOCALITY_OPTIONS, ReportButton, ReviewsSection, SaveButton, SectionCard, ShareButton, useRequireAuth, usePaged } from '@/components/shared';
-import { Badge, Button, cx, DemoBadge, EmptyState, SectionHeader, ImagePlaceholder, KeyValue, LinkButton, Notice, PageHeader, Rating, SkeletonList, StatusPill, StarInput, VerificationBadge } from '@/components/ui/primitives';
+import { Badge, Button, DemoBadge, EmptyState, SectionHeader, ImagePlaceholder, KeyValue, LinkButton, Notice, PageHeader, Rating, SkeletonList, StatusPill, StarInput, VerificationBadge } from '@/components/ui/primitives';
 import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
 import { Checkbox, FilePicker, RadioCards, Select, TextArea, TextField } from '@/components/ui/form';
 import { Icon } from '@/components/ui/Icon';
 import { formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
 import { nowIso, uid } from '@/utils/ids';
 import NotFound from '@/app/NotFound';
+import { Photo } from '@/components/illustrations';
+import { HERO_PHOTO, PHOTO_CREDIT, SERVICE_PHOTOS } from '@/config/servicePhotos';
 
-const CIRCLE_TINTS = ['bg-sky-100 text-sky-600', 'bg-amber-100 text-amber-600', 'bg-indigo-100 text-indigo-600', 'bg-fuchsia-100 text-fuchsia-600', 'bg-emerald-100 text-emerald-600', 'bg-rose-100 text-rose-600', 'bg-orange-100 text-orange-600', 'bg-teal-100 text-teal-700'];
-const FEATURED_SERVICES = ['plumber', 'electrician', 'ac', 'cleaning'];
+const FEATURED_SERVICES = ['plumber', 'electrician', 'ac', 'cleaning', 'carpenter', 'painter', 'mechanic', 'beautician'];
+const TILE_FALLBACK = ['from-sky-500 to-blue-700', 'from-amber-400 to-orange-600', 'from-indigo-500 to-violet-700', 'from-fuchsia-500 to-pink-700', 'from-emerald-500 to-teal-700', 'from-rose-500 to-red-700'];
 
 export function ServicesPage() {
   useDocumentTitle('Local services');
@@ -29,53 +31,108 @@ export function ServicesPage() {
   const [q, setQ] = useState('');
   const [all, setAll] = useState(false);
   const top = useMemo(() => providers.filter((p) => p.verification === 'verified' && (!area || p.localityId === area)).sort((a, b) => b.rating - a.rating).slice(0, 4), [providers, area]);
+  const stats = useMemo(() => {
+    const m: Record<string, { count: number; from?: number }> = {};
+    for (const p of providers) {
+      if (p.verification === 'suspended') continue;
+      const e = (m[p.category] ??= { count: 0 });
+      e.count++;
+      if (p.priceFrom !== undefined) e.from = Math.min(e.from ?? Infinity, p.priceFrom);
+    }
+    return m;
+  }, [providers]);
   const cats = all ? SERVICE_CATEGORIES : FEATURED_SERVICES.map((id) => SERVICE_CATEGORIES.find((c) => c.id === id)!);
-  const shortName: Record<string, string> = { plumber: 'Plumber', electrician: 'Electrician', ac: 'AC Repair', cleaning: 'Cleaning' };
+  const shortName: Record<string, string> = { plumber: 'Plumbing', electrician: 'Electrical', ac: 'AC Repair', cleaning: 'Home Cleaning', carpenter: 'Carpentry', painter: 'Painting', mechanic: 'Car & Bike', beautician: 'Beauty at Home' };
+  const quick = [
+    { to: '/services/all?available=1', label: 'Available today', I: CalendarClock },
+    { to: '/services/all?emergency=1', label: 'Urgent / same-day', I: CircleAlert },
+    { to: '/services/all?seasonal=1', label: 'Festival help', I: Sparkles }
+  ];
   return (
-    <div className="grid gap-5">
-      <PageHeader title="Local Services" hideActionsOnMobile actions={<LinkButton variant="secondary" size="sm" to="/service-requests" icon={<ClipboardList className="size-4" aria-hidden />}>My requests</LinkButton>} />
-      <form role="search" className="flex items-center gap-2 rounded-2xl border border-line bg-white px-3 shadow-sm" onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(); if (q) p.set('q', q); if (area) p.set('locality', area); nav(`/services/all?${p}`); }}>
-        <MapPin className="size-5 shrink-0 text-brand" aria-hidden />
-        <label htmlFor="svc-area" className="sr-only">Area</label>
-        <select id="svc-area" value={area} onChange={(e) => setArea(e.target.value)} className="min-h-12 max-w-[42%] bg-transparent text-sm font-semibold text-ink outline-none">
-          <option value="">All Areas</option>{LOCALITY_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-        </select>
-        <span className="h-6 w-px bg-line" aria-hidden />
-        <label htmlFor="svc-q" className="sr-only">Search services</label>
-        <input id="svc-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="min-h-12 min-w-0 flex-1 bg-transparent text-[15px] outline-none" />
-        <button type="submit" className="grid size-9 place-items-center rounded-full text-ink hover:bg-page" aria-label="Search"><Search className="size-5" aria-hidden /></button>
-      </form>
-      <ul className={cx('grid gap-y-4', all ? 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8' : 'grid-cols-5')}>
-        {cats.map((c, i) => (
-          <li key={c.id}><Link to={`/services/${c.id}`} className="flex flex-col items-center gap-1.5 text-center text-xs font-medium text-ink">
-            <span className={cx('grid size-14 place-items-center rounded-full', CIRCLE_TINTS[i % CIRCLE_TINTS.length])}><Icon name={c.icon} className="size-6" /></span>{shortName[c.id] ?? c.name}
-          </Link></li>
-        ))}
-        <li><button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="flex w-full flex-col items-center gap-1.5 text-center text-xs font-medium text-ink">
-          <span className="grid size-14 place-items-center rounded-full bg-slate-100 text-ink"><LayoutGrid className="size-6" aria-hidden /></span>{all ? 'Less' : 'More'}
-        </button></li>
-      </ul>
+    <div className="relative grid gap-6">
+      <div className="glass-backdrop pointer-events-none absolute -inset-x-4 -top-4 bottom-0 -z-10 lg:-inset-x-6" aria-hidden />
+      <PageHeader title="Services" hideActionsOnMobile actions={<LinkButton variant="secondary" size="sm" to="/service-requests" icon={<ClipboardList className="size-4" aria-hidden />}>My requests</LinkButton>} />
 
-      <section>
-        <SectionHeader title="Top Rated Service Providers" to={`/services/all${area ? `?locality=${area}` : ''}`} linkLabel="View All" />
-        {top.length === 0 ? <EmptyState title="No verified providers in this area yet" action={<LinkButton to="/service-requests/new">Post a request</LinkButton>} /> : <div className="grid gap-3 lg:grid-cols-2">{top.map((p) => <ProviderCard key={p.id} p={p} />)}</div>}
+      <section className="relative overflow-hidden rounded-3xl shadow-xl" aria-labelledby="svc-hero">
+        <Photo id={HERO_PHOTO.id} alt="" w={1200} h={640} eager className="absolute inset-0" fallback="from-brand to-indigo-800" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/45 to-slate-900/10" aria-hidden />
+        <div className="relative grid gap-4 p-5 pt-16 sm:p-8 sm:pt-24">
+          <div>
+            <p className="glass-dark inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"><UserCheck className="size-3.5" aria-hidden />Verified local professionals</p>
+            <h2 id="svc-hero" className="mt-2 text-2xl font-extrabold leading-tight text-white sm:text-3xl">Expert help at your doorstep</h2>
+            <p className="text-sm text-white/85">Compare ratings, availability and prices — then book or post a request.</p>
+          </div>
+          <form role="search" className="glass flex items-center gap-2 rounded-2xl px-3" onSubmit={(e) => { e.preventDefault(); const p = new URLSearchParams(); if (q) p.set('q', q); if (area) p.set('locality', area); nav(`/services/all?${p}`); }}>
+            <MapPin className="size-5 shrink-0 text-brand" aria-hidden />
+            <label htmlFor="svc-area" className="sr-only">Area</label>
+            <select id="svc-area" value={area} onChange={(e) => setArea(e.target.value)} className="min-h-12 max-w-[40%] bg-transparent text-sm font-semibold text-ink outline-none">
+              <option value="">All Areas</option>{LOCALITY_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
+            <span className="h-6 w-px bg-ink/15" aria-hidden />
+            <label htmlFor="svc-q" className="sr-only">Search services</label>
+            <input id="svc-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Plumber, AC repair…" className="min-h-12 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink/55" />
+            <button type="submit" className="grid size-10 place-items-center rounded-xl bg-brand text-white hover:bg-brand-600" aria-label="Search"><Search className="size-5" aria-hidden /></button>
+          </form>
+        </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4">
-        <div><p className="font-bold text-brand">Need a different service?</p><p className="text-sm text-muted">Post your request and get multiple quotes</p></div>
-        <LinkButton to="/service-requests/new" size="sm">Post Request</LinkButton>
+      <div className="scroll-x -mt-2">
+        {quick.map(({ to, label, I }) => <Link key={to} to={to} className="glass inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-ink hover:text-brand"><I className="size-4 text-brand" aria-hidden />{label}</Link>)}
+      </div>
+
+      <section aria-labelledby="svc-popular">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 id="svc-popular" className="text-lg font-bold text-ink">{all ? 'All services' : 'Popular services'}</h2>
+          <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"><LayoutGrid className="size-4" aria-hidden />{all ? 'Show less' : 'All services'}</button>
+        </div>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {cats.map((c, i) => {
+            const photo = SERVICE_PHOTOS[c.id];
+            const st = stats[c.id];
+            return (
+              <li key={c.id}>
+                <Link to={`/services/${c.id}`} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl shadow-md ring-1 ring-black/5">
+                  <Photo id={photo?.id} alt={photo?.alt ?? ''} w={480} h={360} className="absolute inset-0 transition-transform duration-500 group-hover:scale-105" fallback={TILE_FALLBACK[i % TILE_FALLBACK.length]} />
+                  {!photo && <span className="absolute inset-0 grid place-items-center text-white/85" aria-hidden><Icon name={c.icon} className="size-12" /></span>}
+                  <span className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
+                  <span className="glass-dark absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl px-2.5 py-2">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/25"><Icon name={c.icon} className="size-4" /></span>
+                    <span className="min-w-0 leading-tight">
+                      <span className="block truncate text-sm font-bold">{shortName[c.id] ?? c.name}</span>
+                      <span className="block truncate text-[11px] text-white/85">{st ? `${st.count} pro${st.count === 1 ? '' : 's'}${st.from ? ` · from ${formatINR(st.from)}` : ''}` : 'Post a request'}</span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section>
+        <SectionHeader title="Top Rated Professionals" to={`/services/all${area ? `?locality=${area}` : ''}`} linkLabel="View All" />
+        {top.length === 0 ? <EmptyState title="No verified providers in this area yet" action={<LinkButton to="/service-requests/new">Post a request</LinkButton>} /> : <div className="grid gap-3 lg:grid-cols-2">{top.map((p) => <ProviderCard key={p.id} p={p} glass />)}</div>}
+      </section>
+
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-indigo-600 to-violet-600 p-5 text-white shadow-lg">
+        <span className="absolute -right-10 -top-10 size-40 rounded-full bg-white/15 blur-2xl" aria-hidden />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div><p className="text-lg font-bold">Need a different service?</p><p className="text-sm text-white/85">Post your request and get quotes from local pros.</p></div>
+          <Link to="/service-requests/new" className="glass-dark inline-flex min-h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-bold hover:bg-white/25"><Plus className="size-4" aria-hidden />Post Request</Link>
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Link to="/assistance" className="card flex gap-3 p-4 hover:border-brand/30"><Headset className="size-7 shrink-0 text-brand" aria-hidden /><span><span className="block font-bold">One Bhilwara Assistance</span><span className="text-sm text-muted">Let a coordinator arrange it for you.</span></span></Link>
-        <Link to="/labour" className="card flex gap-3 p-4 hover:border-brand/30"><HardHat className="size-7 shrink-0 text-brand" aria-hidden /><span><span className="block font-bold">Contractor & labour connect</span><span className="text-sm text-muted">Post requirements or find work.</span></span></Link>
-        <Link to="/services/all?emergency=1" className="card flex gap-3 p-4 hover:border-brand/30"><CircleAlert className="size-7 shrink-0 text-danger" aria-hidden /><span><span className="block font-bold">Same-day & urgent</span><span className="text-sm text-muted">Providers who take urgent jobs.</span></span></Link>
+        <Link to="/assistance" className="glass flex gap-3 rounded-2xl p-4 hover:-translate-y-0.5 transition-transform"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand"><Headset className="size-6" aria-hidden /></span><span><span className="block font-bold">One Bhilwara Assistance</span><span className="text-sm text-muted">Let a coordinator arrange it for you.</span></span></Link>
+        <Link to="/labour" className="glass flex gap-3 rounded-2xl p-4 hover:-translate-y-0.5 transition-transform"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber/15 text-amber-700"><HardHat className="size-6" aria-hidden /></span><span><span className="block font-bold">Contractor & labour connect</span><span className="text-sm text-muted">Post requirements or find work.</span></span></Link>
+        <Link to="/service-requests" className="glass flex gap-3 rounded-2xl p-4 hover:-translate-y-0.5 transition-transform"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal"><ClipboardList className="size-6" aria-hidden /></span><span><span className="block font-bold">My requests</span><span className="text-sm text-muted">Track quotes and bookings.</span></span></Link>
       </div>
       <section>
         <SectionHeader title="Festival & seasonal help" to="/services/all?seasonal=1" linkLabel="View All" icon={<Sparkles className="size-5 text-amber" aria-hidden />} />
         <p className="mb-3 text-sm text-muted">Diwali cleaning, temporary helpers, event setup, wedding helpers, loading and unloading. Per-day prices are illustrative and set by each provider.</p>
-        <div className="grid gap-3 lg:grid-cols-2">{seasonal.slice(0, 4).map((p) => <ProviderCard key={p.id} p={p} />)}</div>
+        <div className="grid gap-3 lg:grid-cols-2">{seasonal.slice(0, 4).map((p) => <ProviderCard key={p.id} p={p} glass />)}</div>
       </section>
+      <p className="text-center text-xs text-muted">Category photos illustrate the type of service, not the listed providers. <a href={PHOTO_CREDIT.url} target="_blank" rel="noopener noreferrer" className="underline">{PHOTO_CREDIT.label}</a></p>
     </div>
   );
 }

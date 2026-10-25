@@ -47,12 +47,12 @@ export function ArticleCard({ a, variant = 'list' }: { a: Article; variant?: 'li
 
 const TOOL: Record<string, string> = { plumber: '🔧', electrician: '⚡', ac: '❄️', cleaning: '🧽', carpenter: '🪚', painter: '🖌️', mechanic: '🛠️', salon: '✂️', beautician: '💄', tutor: '📘', gardener: '🌿', pest: '🪲', movers: '📦', 'device-repair': '📱', appliance: '🔌' };
 
-export function ProviderCard({ p }: { p: Provider }) {
+export function ProviderCard({ p, glass }: { p: Provider; glass?: boolean }) {
   const now = useNow(60_000);
   const availability = { available: ['Available today', 'text-teal'], busy: ['Busy right now', 'text-amber-700'], offline: ['Not available', 'text-muted'] } as const;
   const [label, tone] = availability[p.availability];
   return (
-    <article className="card relative flex gap-3 p-3">
+    <article className={cx('relative flex gap-3 p-3', glass ? 'glass rounded-2xl' : 'card')}>
       <WorkerPortrait seed={p.id} tool={TOOL[p.category] ?? '🧰'} className="size-[88px] shrink-0 rounded-xl" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <Link to={`/service-providers/${p.id}`} className="font-bold leading-snug text-ink hover:text-brand">{p.name}</Link>
