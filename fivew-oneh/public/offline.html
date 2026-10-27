@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CareLens — Offline</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #FAF8F3; color: #1E2420; font-family: Inter, system-ui, sans-serif; text-align: center; padding: 24px; box-sizing: border-box; }
+  .card { max-width: 340px; }
+  h1 { font-size: 22px; margin: 16px 0 8px; }
+  p { color: #5E6660; font-size: 14px; line-height: 1.6; }
+  button { margin-top: 16px; min-height: 44px; padding: 0 22px; border: 0; border-radius: 12px; background: #1C4A31; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="icons/icon.svg" width="72" height="72" alt="" />
+    <h1>You're offline</h1>
+    <p>CareLens couldn't load this page. Once the app has been opened online, its built-in database, saved items and tools work offline.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "id": "fivew-oneh-carelens",
+  "name": "CareLens — Personal Care Intelligence",
+  "short_name": "CareLens",
+  "description": "Understand personal-care products, ingredients, comparisons and safety with evidence-labelled 5W1H explanations for Indian consumers.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FAF8F3",
+  "theme_color": "#1C4A31",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["health", "lifestyle", "education"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Search", "url": "./search", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Ingredient analyser", "url": "./analyse", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Compare", "url": "./compare", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
