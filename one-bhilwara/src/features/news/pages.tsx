@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Bookmark, BookmarkCheck, Check, CheckCheck, ChevronDown, ChevronRight, ChevronsUp, ChevronUp, ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, RotateCcw, Share2, Siren, SlidersHorizontal, Trophy } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Car, Check, CheckCheck, CloudSun, Construction, Droplets, Landmark, Thermometer, Wind, Zap, ChevronDown, ChevronRight, ChevronsUp, ChevronUp, ExternalLink, Fuel, Headphones, Heart, Mic, Pause, Play, Radio, RotateCcw, Share2, Siren, SlidersHorizontal, Trophy } from 'lucide-react';
 import type { Article, CivicAlert, Match, Podcast } from '@/types/models';
 import { LOCALITIES, localityName, newsCategoryName } from '@/config/catalog';
 import { matches as seedMatches, podcasts as seedPodcasts, prices as seedPrices } from '@/data/seed/content';
@@ -12,9 +12,25 @@ import { CityScene } from '@/components/illustrations';
 import { CommentsThread, ReportButton, SaveButton, ShareButton, useRequireAuth } from '@/components/shared';
 import { Badge, Button, cx, DemoBadge, EmptyState, LinkButton, MetaLine, Notice, PageHeader, Skeleton, StatusPill } from '@/components/ui/primitives';
 import { Dialog, Tabs, useUI } from '@/components/ui/overlay';
-import { durationMMSS, formatDate, formatDateTime, formatINR, timeAgo } from '@/utils/format';
+import { durationMMSS, formatDate, formatDateTime, formatINR, formatTime, timeAgo } from '@/utils/format';
+import { aqiBand, getConditions, type Conditions } from '@/services/adapters/weather';
 import NotFound from '@/app/NotFound';
 import { sessionStore } from '@/services/session';
+
+const CIVIC_FILTERS: { id: string; label: string; I: typeof Zap; types: CivicAlert['type'][] }[] = [
+  { id: 'electricity', label: 'Electricity', I: Zap, types: ['electricity'] },
+  { id: 'water', label: 'Water', I: Droplets, types: ['water'] },
+  { id: 'vip', label: 'VIP visit & traffic', I: Car, types: ['vip', 'traffic'] },
+  { id: 'road', label: 'Roads', I: Construction, types: ['road'] },
+  { id: 'weather', label: 'Weather', I: CloudSun, types: ['weather'] },
+  { id: 'notice', label: 'Notices & camps', I: Landmark, types: ['notice', 'municipal'] },
+  { id: 'emergency', label: 'Emergency', I: Siren, types: ['emergency'] }
+];
+const CIVIC_STYLE: Record<CivicAlert['type'], { I: typeof Zap; tint: string }> = {
+  electricity: { I: Zap, tint: 'bg-amber-100 text-amber-700' }, water: { I: Droplets, tint: 'bg-sky-100 text-sky-700' }, vip: { I: Car, tint: 'bg-violet-100 text-violet-700' },
+  traffic: { I: Car, tint: 'bg-orange-100 text-orange-700' }, road: { I: Construction, tint: 'bg-yellow-100 text-yellow-800' }, weather: { I: CloudSun, tint: 'bg-cyan-100 text-cyan-700' },
+  notice: { I: Landmark, tint: 'bg-slate-100 text-slate-700' }, municipal: { I: Landmark, tint: 'bg-slate-100 text-slate-700' }, emergency: { I: Siren, tint: 'bg-rose-100 text-rose-700' }
+};
 
 const isLive = (publishedAt: string, status: string) => status === 'published' || (status === 'scheduled' && Date.parse(publishedAt) <= Date.now());
 
@@ -22,7 +38,8 @@ const isLive = (publishedAt: string, status: string) => status === 'published' |
 const SECTIONS = [
   { id: 'local', label: 'Local', labelHi: 'स्थानीय', match: (c: string) => !['rajasthan', 'india', 'world'].includes(c) },
   { id: 'rajasthan', label: 'Rajasthan', labelHi: 'राजस्थान', match: (c: string) => c === 'rajasthan' },
-  { id: 'global', label: 'Global', labelHi: 'देश-दुनिया', match: (c: string) => c === 'india' || c === 'world' }
+  { id: 'global', label: 'Global', labelHi: 'देश-दुनिया', match: (c: string) => c === 'india' || c === 'world' },
+  { id: 'civic', label: 'Civic', labelHi: 'नागरिक', match: () => false }
 ] as const;
 type SectionId = (typeof SECTIONS)[number]['id'];
 
@@ -123,10 +140,10 @@ export function NewsPage() {
     <div className="mx-auto grid w-full max-w-md gap-3">
       <h1 className="sr-only">News</h1>
       <div className="flex items-center gap-2">
-        <div role="tablist" aria-label="News sections" className="grid flex-1 grid-cols-3 gap-1 rounded-full border border-line bg-white p-1 shadow-sm">
+        <div role="tablist" aria-label="News sections" className="grid flex-1 grid-cols-4 gap-1 rounded-full border border-line bg-white p-1 shadow-sm">
           {SECTIONS.map((x) => (
             <button key={x.id} type="button" role="tab" aria-selected={section.id === x.id} onClick={() => setSection(x.id)}
-              className={cx('min-h-10 rounded-full text-sm font-bold transition-colors', section.id === x.id ? 'bg-brand text-white shadow' : 'text-ink hover:bg-page')}>{label(x)}</button>
+              className={cx('min-h-10 rounded-full text-[13px] font-bold transition-colors', section.id === x.id ? 'bg-brand text-white shadow' : 'text-ink hover:bg-page')}>{label(x)}</button>
           ))}
         </div>
         <button type="button" onClick={() => setOptions(true)} className="relative grid size-11 shrink-0 place-items-center rounded-full border border-line bg-white shadow-sm hover:border-brand/40" aria-label="News options" aria-haspopup="dialog">
@@ -135,11 +152,11 @@ export function NewsPage() {
         </button>
       </div>
       <div className="flex items-center justify-between px-1 text-xs text-muted">
-        <span aria-live="polite">{deck.length ? (atEnd ? 'All caught up' : `Story ${i + 1} of ${deck.length}`) : ''}{unreadOnly ? ' · unread only' : ''}</span>
-        <span>{unreadCount} unread</span>
+        <span aria-live="polite">{section.id === 'civic' ? 'Civic alerts & city updates' : deck.length ? (atEnd ? 'All caught up' : `Story ${i + 1} of ${deck.length}`) : ''}{unreadOnly ? ' · unread only' : ''}</span>
+        {section.id !== 'civic' && <span>{unreadCount} unread</span>}
       </div>
 
-      {loading ? <Skeleton className="h-[calc(100dvh-15rem)] min-h-[440px] rounded-3xl" /> : (
+      {section.id === 'civic' ? <CivicUpdates /> : loading ? <Skeleton className="h-[calc(100dvh-15rem)] min-h-[440px] rounded-3xl" /> : (
         <section aria-roledescription="carousel" aria-label={`${section.label} news`}
           className="relative h-[calc(100dvh-15rem)] min-h-[440px] touch-none select-none overflow-hidden rounded-3xl lg:h-[min(calc(100dvh-12rem),760px)]"
           onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
@@ -154,7 +171,7 @@ export function NewsPage() {
             <CaughtUp
               empty={deck.length === 0}
               unreadOnly={unreadOnly}
-              others={SECTIONS.filter((x) => x.id !== section.id).map((x) => ({ id: x.id, label: label(x) }))}
+              others={SECTIONS.filter((x) => x.id !== section.id && x.id !== 'civic').map((x) => ({ id: x.id, label: label(x) }))}
               onRestart={() => go(0)}
               onShowRead={() => { setUnreadOnly(false); setDeckKey((k) => k + 1); }}
               onSection={setSection}
@@ -167,7 +184,7 @@ export function NewsPage() {
           </div>
         </section>
       )}
-      {!atEnd && deck.length > 0 && (
+      {section.id !== 'civic' && !atEnd && deck.length > 0 && (
         <p className="flex items-center justify-center gap-1 text-xs font-medium text-muted lg:hidden" aria-hidden><ChevronUp className="size-4 animate-bounce" />Swipe up for next story</p>
       )}
       <button type="button" onClick={() => go(i + 1)} className="sr-only focus:not-sr-only focus:rounded-lg focus:bg-white focus:p-2">Next story</button>
@@ -185,7 +202,7 @@ export function NewsPage() {
           <OptionRow I={ChevronsUp} label="Back to first story" onClick={() => { go(0); setOptions(false); }} />
           <p className="mt-2 text-xs font-bold uppercase tracking-wide text-muted">More</p>
           <div className="flex flex-wrap gap-2">
-            <Link to="/alerts" className="chip"><Siren className="size-4" aria-hidden />Civic alerts{activeAlerts ? ` (${activeAlerts})` : ''}</Link>
+            <Link to="/news?section=civic" onClick={() => setOptions(false)} className="chip"><Siren className="size-4" aria-hidden />Civic alerts{activeAlerts ? ` (${activeAlerts})` : ''}</Link>
             <Link to="/podcasts" className="chip"><Headphones className="size-4" aria-hidden />Podcasts</Link>
             <Link to="/sports" className="chip"><Trophy className="size-4" aria-hidden />Sports</Link>
             <Link to="/prices" className="chip"><Fuel className="size-4" aria-hidden />Fuel & gold</Link>
@@ -265,9 +282,107 @@ function CaughtUp({ empty, unreadOnly, others, onRestart, onShowRead, onSection,
         {!empty && <Button onClick={onRestart} icon={<ChevronsUp className="size-4" aria-hidden />}>Back to first story</Button>}
         {unreadOnly && <Button variant="secondary" onClick={onShowRead}>Show read stories too</Button>}
         {others.map((o) => <Button key={o.id} variant="secondary" onClick={() => onSection(o.id)}>Read {o.label} news</Button>)}
-        {alerts > 0 && <LinkButton variant="ghost" to="/alerts" icon={<Siren className="size-4 text-danger" aria-hidden />}>{alerts} active civic alert{alerts === 1 ? '' : 's'}</LinkButton>}
+        {alerts > 0 && <LinkButton variant="ghost" to="/news?section=civic" icon={<Siren className="size-4 text-danger" aria-hidden />}>{alerts} active civic alert{alerts === 1 ? '' : 's'}</LinkButton>}
       </div>
     </div>
+  );
+}
+
+/** Civic alerts & city updates: live conditions (temperature, AQI) plus electricity, water, VIP-visit, road and notice updates. */
+function CivicUpdates() {
+  const now = useNow();
+  const { prefs } = useSession();
+  const [filter, setFilter] = useState('');
+  const [nearMe, setNearMe] = useState(false);
+  const [showPast, setShowPast] = useState(false);
+  const alerts = useDB((s) => s.alerts);
+  const list = alerts
+    .map((a) => ({ ...a, status: (a.status === 'resolved' || Date.parse(a.expiresAt) < now ? 'resolved' : Date.parse(a.startsAt) > now ? 'scheduled' : 'active') as CivicAlert['status'] }))
+    .filter((a) => !filter || CIVIC_FILTERS.find((f) => f.id === filter)!.types.includes(a.type))
+    .filter((a) => !nearMe || !a.localityId || a.localityId === prefs.localityId || prefs.localities.includes(a.localityId));
+  const sev = (a: CivicAlert) => ['critical', 'warning', 'advisory', 'info'].indexOf(a.severity);
+  const groups = [
+    { id: 'active', title: 'Happening now', items: list.filter((a) => a.status === 'active').sort((a, b) => sev(a) - sev(b)) },
+    { id: 'scheduled', title: 'Coming up', items: list.filter((a) => a.status === 'scheduled').sort((a, b) => a.startsAt.localeCompare(b.startsAt)) },
+    { id: 'resolved', title: 'Resolved recently', items: list.filter((a) => a.status === 'resolved').sort((a, b) => b.expiresAt.localeCompare(a.expiresAt)) }
+  ];
+  return (
+    <div className="grid gap-4">
+      <ConditionsPanel />
+      <div className="scroll-x" role="group" aria-label="Update type">
+        <button type="button" className="chip" aria-pressed={!filter} onClick={() => setFilter('')}>All</button>
+        {CIVIC_FILTERS.map(({ id, label, I }) => <button key={id} type="button" className="chip" aria-pressed={filter === id} onClick={() => setFilter(filter === id ? '' : id)}><I className="size-4" aria-hidden />{label}</button>)}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <label className="inline-flex items-center gap-2 text-sm font-medium text-ink"><input type="checkbox" className="size-4 accent-brand" checked={nearMe} onChange={(e) => setNearMe(e.target.checked)} />Only {localityName(prefs.localityId)} & citywide</label>
+        <Link to="/settings#notifications" className="text-xs font-semibold text-brand hover:underline">Alert settings</Link>
+      </div>
+      {groups.map((g) => g.id === 'resolved' && !showPast ? (
+        g.items.length > 0 && <Button key={g.id} variant="ghost" size="sm" className="justify-self-start" onClick={() => setShowPast(true)}>Show {g.items.length} resolved update{g.items.length === 1 ? '' : 's'}</Button>
+      ) : g.items.length > 0 && (
+        <section key={g.id} aria-labelledby={`civic-${g.id}`} className="grid gap-2">
+          <h2 id={`civic-${g.id}`} className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">{g.id === 'active' && <span className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />}{g.title}<span className="font-semibold normal-case tracking-normal">({g.items.length})</span></h2>
+          <ul className="grid gap-2">
+            {g.items.map((a) => {
+              const st = CIVIC_STYLE[a.type];
+              return (
+                <li key={a.id} className={cx('card flex gap-3 p-3', g.id === 'resolved' && 'opacity-70')}>
+                  <span className={cx('grid size-11 shrink-0 place-items-center rounded-2xl', st.tint)}><st.I className="size-5" aria-hidden /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-muted">{ALERT_ICON[a.type]}</span>
+                      {(a.severity === 'warning' || a.severity === 'critical') && g.id !== 'resolved' && <Badge tone="red" className="capitalize">{a.severity}</Badge>}
+                      {a.demo && <DemoBadge label="Simulated" />}
+                    </div>
+                    <p className="font-bold leading-snug text-ink">{a.title}</p>
+                    <p className="text-sm text-ink/75">{a.description}</p>
+                    <p className="mt-1 text-xs text-muted">{a.localityId ? localityName(a.localityId) : 'Citywide'} · {g.id === 'scheduled' ? `Starts ${formatDateTime(a.startsAt)}` : g.id === 'active' ? `Until ${formatDateTime(a.expiresAt)}` : `Ended ${formatDateTime(a.expiresAt)}`}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+      {list.length === 0 && <EmptyState title="No updates of this type" text="Nothing to report right now." action={<Button variant="secondary" onClick={() => { setFilter(''); setNearMe(false); }}>Show all updates</Button>} />}
+      <Notice tone="danger" title="In an emergency">Call <a className="font-bold underline" href="tel:112">112</a> (police, fire, ambulance) or <a className="font-bold underline" href="tel:108">108</a>. Don’t rely on this feed for emergencies.</Notice>
+      <p className="text-xs text-muted">Electricity, water, VIP-visit, road and notice updates are simulated until connected to official sources (power discom, PHED, district administration, traffic police).</p>
+    </div>
+  );
+}
+
+function ConditionsPanel() {
+  const [c, setC] = useState<Conditions | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const ctl = new AbortController();
+    getConditions(ctl.signal).then(setC).catch((e) => { if ((e as Error).name !== 'AbortError') setFailed(true); });
+    return () => ctl.abort();
+  }, []);
+  if (failed) return <Notice tone="info" title="Live conditions unavailable">Temperature and air quality couldn’t be loaded right now. Check your connection and try again later.</Notice>;
+  if (!c) return <div className="grid grid-cols-2 gap-3"><Skeleton className="h-36 rounded-2xl" /><Skeleton className="h-36 rounded-2xl" /></div>;
+  const band = c.aqi !== null ? aqiBand(c.aqi) : null;
+  return (
+    <section aria-label="Current conditions in Bhilwara" className="grid gap-2">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 p-4 text-white shadow-md">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-white/80"><Thermometer className="size-4" aria-hidden />Temperature</p>
+          <p className="mt-1 text-4xl font-extrabold leading-none">{Math.round(c.tempC)}°<span className="text-xl">C</span></p>
+          <p className="mt-1 text-sm text-white/90">{c.label} · feels {Math.round(c.feelsC)}°</p>
+          <p className="text-xs text-white/80">H {Math.round(c.maxC)}° · L {Math.round(c.minC)}° · UV {Math.round(c.uv)}</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-white p-4 shadow-md">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted"><Wind className="size-4" aria-hidden />Air quality</p>
+          {band && c.aqi !== null ? (<>
+            <p className="mt-1 flex items-baseline gap-2"><span className="text-4xl font-extrabold leading-none text-ink">{Math.round(c.aqi)}</span><span className="text-xs font-semibold text-muted">AQI (US)</span></p>
+            <p className={cx('mt-1 flex items-center gap-1.5 text-sm font-bold', band.text)}><span className={cx('size-2.5 rounded-full', band.tone)} aria-hidden />{band.label}</p>
+            <p className="text-xs text-muted">{c.pm25 !== null && `PM2.5 ${Math.round(c.pm25)}`}{c.pm10 !== null && ` · PM10 ${Math.round(c.pm10)}`} µg/m³</p>
+          </>) : <p className="mt-2 text-sm text-muted">AQI not available right now.</p>}
+        </div>
+      </div>
+      {band && <p className="rounded-xl bg-page px-3 py-2 text-xs text-ink/80"><b>Air tip:</b> {band.tip}</p>}
+      <p className="text-[11px] text-muted">{c.live ? `Live · ${c.source} · updated ${formatTime(c.at)}` : <><DemoBadge label="Demo" /> {c.source}. Turn on live weather to see real readings.</>}</p>
+    </section>
   );
 }
 
@@ -309,7 +424,7 @@ export function ArticlePage() {
   );
 }
 
-const ALERT_ICON: Record<CivicAlert['type'], string> = { road: 'Road closure', water: 'Water supply', electricity: 'Electricity', notice: 'Public notice', traffic: 'Traffic', weather: 'Weather', municipal: 'Municipal', emergency: 'Emergency' };
+const ALERT_ICON: Record<CivicAlert['type'], string> = { road: 'Road closure', water: 'Water supply', electricity: 'Electricity', notice: 'Public notice', traffic: 'Traffic', vip: 'VIP visit', weather: 'Weather', municipal: 'Municipal', emergency: 'Emergency' };
 
 export function AlertsPage() {
   useDocumentTitle('Civic alerts');

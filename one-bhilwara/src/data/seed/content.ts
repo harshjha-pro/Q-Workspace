@@ -54,7 +54,13 @@ export const alerts = (): CivicAlert[] => [
   al('al-3', 'traffic', 'info', 'Evening traffic diversion near market (simulated)', 'Simulated: use alternate route 6–9 pm.', 'bhopalganj', -1, 5),
   al('al-4', 'weather', 'advisory', 'Heat advisory (simulated)', 'Simulated: stay hydrated and avoid afternoon sun.', undefined, -3, 30),
   al('al-5', 'road', 'warning', 'Road repair work (simulated)', 'Simulated: one lane closed for resurfacing.', 'rc-vyas', -24, 48),
-  al('al-6', 'municipal', 'info', 'Property-tax camp (simulated)', 'Simulated: assistance camp at ward office.', 'azad-nagar', -48, 2, 'resolved')
+  al('al-6', 'municipal', 'info', 'Property-tax camp (simulated)', 'Simulated: assistance camp at ward office.', 'azad-nagar', -48, 2, 'resolved'),
+  al('al-7', 'electricity', 'warning', 'Unplanned power cut (simulated)', 'Simulated: fault on the local feeder; crews are on site and supply is expected back by evening.', 'pur', -1, 5),
+  al('al-8', 'vip', 'warning', 'VIP visit: traffic restrictions (simulated)', 'Simulated: some roads on the route may be closed for short periods between 11 am and 1 pm. Plan extra time and follow traffic police instructions.', undefined, 2, 3, 'scheduled'),
+  al('al-9', 'water', 'advisory', 'Low-pressure water supply tomorrow morning (simulated)', 'Simulated: tank cleaning may reduce pressure during the morning supply. Store water tonight.', 'subhash-nagar', 14, 6, 'scheduled'),
+  al('al-10', 'electricity', 'advisory', 'Planned shutdown for line maintenance (simulated)', 'Simulated: scheduled maintenance; supply off for about 3 hours.', 'kashipuri', 26, 3, 'scheduled'),
+  al('al-11', 'notice', 'info', 'Health camp at community hall (simulated)', 'Simulated: free BP and sugar check-up camp, 9 am–1 pm. Carry an ID card.', 'sanganer', 40, 4, 'scheduled'),
+  al('al-12', 'water', 'info', 'Water supply restored (simulated)', 'Simulated: supply back to normal after pipeline repair.', 'bhopalganj', -30, 6, 'resolved')
 ];
 
 export const posts = (): Post[] => [

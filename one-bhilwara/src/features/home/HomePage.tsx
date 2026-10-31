@@ -172,7 +172,7 @@ function AlertStrip() {
   return (
     <section aria-label={t('breaking')} className="grid gap-2">
       {alerts.slice(0, 2).map((a) => (
-        <Link key={a.id} to="/alerts" className={cx('flex items-center gap-3 rounded-xl border p-3 text-sm', a.severity === 'warning' || a.severity === 'critical' ? 'border-danger/30 bg-danger-50' : 'border-amber/30 bg-amber-50')}>
+        <Link key={a.id} to="/news?section=civic" className={cx('flex items-center gap-3 rounded-xl border p-3 text-sm', a.severity === 'warning' || a.severity === 'critical' ? 'border-danger/30 bg-danger-50' : 'border-amber/30 bg-amber-50')}>
           <Siren className={cx('size-5 shrink-0', a.severity === 'warning' || a.severity === 'critical' ? 'text-danger' : 'text-amber-700')} aria-hidden />
           <span className="flex-1"><span className="font-semibold">{a.title}</span> <span className="text-muted">· {a.localityId ? localityName(a.localityId) : 'Citywide'}</span></span>
           <DemoBadge label="Simulated" />

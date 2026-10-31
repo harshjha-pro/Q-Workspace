@@ -332,7 +332,7 @@ export interface Article extends Base {
 export interface CivicAlert extends Base {
   title: string;
   description: string;
-  type: 'road' | 'water' | 'electricity' | 'notice' | 'traffic' | 'weather' | 'municipal' | 'emergency';
+  type: 'road' | 'water' | 'electricity' | 'notice' | 'traffic' | 'vip' | 'weather' | 'municipal' | 'emergency';
   severity: 'info' | 'advisory' | 'warning' | 'critical';
   localityId?: ID;
   startsAt: ISODate;

@@ -29,20 +29,7 @@ export function ServicesPage() {
   const providers = useDB((s) => s.providers);
   const [area, setArea] = useState('');
   const [q, setQ] = useState('');
-  const [all, setAll] = useState(false);
   const top = useMemo(() => providers.filter((p) => p.verification === 'verified' && (!area || p.localityId === area)).sort((a, b) => b.rating - a.rating).slice(0, 4), [providers, area]);
-  const stats = useMemo(() => {
-    const m: Record<string, { count: number; from?: number }> = {};
-    for (const p of providers) {
-      if (p.verification === 'suspended') continue;
-      const e = (m[p.category] ??= { count: 0 });
-      e.count++;
-      if (p.priceFrom !== undefined) e.from = Math.min(e.from ?? Infinity, p.priceFrom);
-    }
-    return m;
-  }, [providers]);
-  const cats = all ? SERVICE_CATEGORIES : FEATURED_SERVICES.map((id) => SERVICE_CATEGORIES.find((c) => c.id === id)!);
-  const shortName: Record<string, string> = { plumber: 'Plumbing', electrician: 'Electrical', ac: 'AC Repair', cleaning: 'Home Cleaning', carpenter: 'Carpentry', painter: 'Painting', mechanic: 'Car & Bike', beautician: 'Beauty at Home' };
   const quick = [
     { to: '/services/all?available=1', label: 'Available today', I: CalendarClock },
     { to: '/services/all?emergency=1', label: 'Urgent / same-day', I: CircleAlert },
@@ -80,34 +67,7 @@ export function ServicesPage() {
         {quick.map(({ to, label, I }) => <Link key={to} to={to} className="glass inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-ink hover:text-brand"><I className="size-4 text-brand" aria-hidden />{label}</Link>)}
       </div>
 
-      <section aria-labelledby="svc-popular">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 id="svc-popular" className="text-lg font-bold text-ink">{all ? 'All services' : 'Popular services'}</h2>
-          <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"><LayoutGrid className="size-4" aria-hidden />{all ? 'Show less' : 'All services'}</button>
-        </div>
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {cats.map((c, i) => {
-            const photo = SERVICE_PHOTOS[c.id];
-            const st = stats[c.id];
-            return (
-              <li key={c.id}>
-                <Link to={`/services/${c.id}`} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl shadow-md ring-1 ring-black/5">
-                  <Photo id={photo?.id} alt={photo?.alt ?? ''} w={480} h={360} className="absolute inset-0 transition-transform duration-500 group-hover:scale-105" fallback={TILE_FALLBACK[i % TILE_FALLBACK.length]} />
-                  {!photo && <span className="absolute inset-0 grid place-items-center text-white/85" aria-hidden><Icon name={c.icon} className="size-12" /></span>}
-                  <span className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
-                  <span className="glass-dark absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl px-2.5 py-2">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/25"><Icon name={c.icon} className="size-4" /></span>
-                    <span className="min-w-0 leading-tight">
-                      <span className="block truncate text-sm font-bold">{shortName[c.id] ?? c.name}</span>
-                      <span className="block truncate text-[11px] text-white/85">{st ? `${st.count} pro${st.count === 1 ? '' : 's'}${st.from ? ` · from ${formatINR(st.from)}` : ''}` : 'Post a request'}</span>
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <ServiceTiles />
 
       <section>
         <SectionHeader title="Top Rated Professionals" to={`/services/all${area ? `?locality=${area}` : ''}`} linkLabel="View All" />
@@ -134,6 +94,55 @@ export function ServicesPage() {
       </section>
       <p className="text-center text-xs text-muted">Category photos illustrate the type of service, not the listed providers. <a href={PHOTO_CREDIT.url} target="_blank" rel="noopener noreferrer" className="underline">{PHOTO_CREDIT.label}</a></p>
     </div>
+  );
+}
+
+/** Photo tiles for home services (shared by Services and Discover). */
+export function ServiceTiles({ title = 'Popular services', limit }: { title?: string; limit?: number }) {
+  const providers = useDB((s) => s.providers);
+  const [all, setAll] = useState(false);
+  const stats = useMemo(() => {
+    const m: Record<string, { count: number; from?: number }> = {};
+    for (const p of providers) {
+      if (p.verification === 'suspended') continue;
+      const e = (m[p.category] ??= { count: 0 });
+      e.count++;
+      if (p.priceFrom !== undefined) e.from = Math.min(e.from ?? Infinity, p.priceFrom);
+    }
+    return m;
+  }, [providers]);
+  const cats = all ? SERVICE_CATEGORIES : (limit ? FEATURED_SERVICES.slice(0, limit) : FEATURED_SERVICES).map((id) => SERVICE_CATEGORIES.find((c) => c.id === id)!);
+  const shortName: Record<string, string> = { plumber: 'Plumbing', electrician: 'Electrical', ac: 'AC Repair', cleaning: 'Home Cleaning', carpenter: 'Carpentry', painter: 'Painting', mechanic: 'Car & Bike', beautician: 'Beauty at Home' };
+  return (
+      <section aria-labelledby="svc-popular">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 id="svc-popular" className="text-lg font-bold text-ink">{all ? 'All services' : title}</h2>
+          <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"><LayoutGrid className="size-4" aria-hidden />{all ? 'Show less' : 'All services'}</button>
+        </div>
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {cats.map((c, i) => {
+            const photo = SERVICE_PHOTOS[c.id];
+            const st = stats[c.id];
+            return (
+              <li key={c.id}>
+                <Link to={`/services/${c.id}`} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl shadow-md ring-1 ring-black/5">
+                  <Photo id={photo?.id} alt={photo?.alt ?? ''} w={480} h={360} className="absolute inset-0 transition-transform duration-500 group-hover:scale-105" fallback={TILE_FALLBACK[i % TILE_FALLBACK.length]} />
+                  {!photo && <span className="absolute inset-0 grid place-items-center text-white/85" aria-hidden><Icon name={c.icon} className="size-12" /></span>}
+                  <span className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
+                  <span className="glass-dark absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl px-2.5 py-2">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/25"><Icon name={c.icon} className="size-4" /></span>
+                    <span className="min-w-0 leading-tight">
+                      <span className="block truncate text-sm font-bold">{shortName[c.id] ?? c.name}</span>
+                      <span className="block truncate text-[11px] text-white/85">{st ? `${st.count} pro${st.count === 1 ? '' : 's'}${st.from ? ` · from ${formatINR(st.from)}` : ''}` : 'Post a request'}</span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
   );
 }
 

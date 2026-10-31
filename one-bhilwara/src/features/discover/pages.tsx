@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Clock, Search, SearchX, TrendingUp, X } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Bot, Briefcase, BusFront, CalendarDays, Clock, GraduationCap, Gift, HandCoins, HeartHandshake, HeartPulse, House, Landmark, MessagesSquare, Newspaper, Plus, Scale, Search, SearchX, ShoppingBag, Siren, Store, TrendingUp, Vote, Wheat, Wrench, X } from 'lucide-react';
 import { DISCOVER, LOCALITIES } from '@/config/catalog';
 import { useDB, useDocumentTitle, useLoading, useSession } from '@/hooks/useStore';
 import { addRecentSearch } from '@/services/domain/common';
@@ -8,26 +8,100 @@ import { buildIndex, POPULAR_SEARCHES, search, SEARCH_TYPES, suggestions, type S
 import { store } from '@/services/store';
 import { BusinessCard, EventCard, JobCard, OfferCard, PropertyCard, ProviderCard } from '@/components/cards';
 import { Badge, Button, LinkButton, PageHeader, SkeletonList, VerificationBadge } from '@/components/ui/primitives';
-import { Icon } from '@/components/ui/Icon';
 import { LoadMore, usePaged } from '@/components/shared';
 import NotFound from '@/app/NotFound';
+import { Photo } from '@/components/illustrations';
+import { HERO_PHOTO, PHOTO_CREDIT } from '@/config/servicePhotos';
+import { ServiceTiles } from '@/features/services/pages';
+import { cx } from '@/components/ui/primitives';
+
+/** Every section of the app, grouped like the home screen and the menu. */
+const MODULE_GROUPS: { title: string; items: { to: string; label: string; I: typeof Wrench; g: string }[] }[] = [
+  { title: 'Everyday', items: [
+    { to: '/services', label: 'Local Services', I: Wrench, g: 'from-sky-400 to-blue-600' },
+    { to: '/jobs', label: 'Jobs', I: Briefcase, g: 'from-emerald-400 to-emerald-600' },
+    { to: '/property', label: 'Property & PG', I: House, g: 'from-violet-400 to-violet-600' },
+    { to: '/marketplace', label: 'Buy & Sell', I: ShoppingBag, g: 'from-rose-400 to-rose-600' },
+    { to: '/businesses', label: 'Shops & Food', I: Store, g: 'from-orange-400 to-orange-600' },
+    { to: '/offers', label: 'Offers', I: Gift, g: 'from-pink-400 to-fuchsia-600' }
+  ] },
+  { title: 'City & community', items: [
+    { to: '/news', label: 'News', I: Newspaper, g: 'from-indigo-400 to-indigo-600' },
+    { to: '/news?section=civic', label: 'Civic alerts', I: Siren, g: 'from-red-400 to-rose-600' },
+    { to: '/community', label: 'Community', I: MessagesSquare, g: 'from-purple-400 to-purple-600' },
+    { to: '/polls', label: 'Polls', I: Vote, g: 'from-cyan-400 to-sky-600' },
+    { to: '/events', label: 'Events', I: CalendarDays, g: 'from-amber-400 to-orange-500' },
+    { to: '/ai', label: 'AI Assistant', I: Bot, g: 'from-slate-600 to-slate-800' }
+  ] },
+  { title: 'Life & citizen', items: [
+    { to: '/government', label: 'Govt & e-Mitra', I: Landmark, g: 'from-slate-500 to-slate-700' },
+    { to: '/education', label: 'Education', I: GraduationCap, g: 'from-teal-400 to-teal-600' },
+    { to: '/healthcare', label: 'Healthcare', I: HeartPulse, g: 'from-rose-400 to-red-600' },
+    { to: '/agriculture', label: 'Agriculture', I: Wheat, g: 'from-lime-500 to-green-600' },
+    { to: '/weddings', label: 'Weddings', I: HeartHandshake, g: 'from-pink-400 to-rose-500' },
+    { to: '/transport', label: 'Travel', I: BusFront, g: 'from-cyan-500 to-blue-600' },
+    { to: '/finance', label: 'Finance', I: HandCoins, g: 'from-emerald-500 to-teal-700' },
+    { to: '/professionals', label: 'Professionals', I: Scale, g: 'from-blue-500 to-indigo-700' }
+  ] }
+];
 
 export function DiscoverPage() {
   useDocumentTitle('Discover');
+  const nav = useNavigate();
+  const [q, setQ] = useState('');
+  const top = useDB((s) => s.providers.filter((p) => p.verification === 'verified').sort((a, b) => b.rating - a.rating).slice(0, 2));
   return (
-    <div className="grid gap-6">
-      <PageHeader title="Discover Bhilwara" subtitle="Browse every part of the city in one place." />
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {DISCOVER.map((c) => (
-          <li key={c.slug}>
-            <Link to={`/discover/${c.slug}`} className="card flex h-full flex-col gap-3 p-4 hover:border-brand/30">
-              <span className="grid size-11 place-items-center rounded-xl bg-brand text-white"><Icon name={c.icon} /></span>
-              <span className="font-semibold leading-tight text-ink">{c.name}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="relative grid gap-6">
+      <div className="glass-backdrop pointer-events-none absolute -inset-x-4 -top-4 bottom-0 -z-10 lg:-inset-x-6" aria-hidden />
+      <PageHeader title="Discover" subtitle="Everything in Bhilwara, in one place." />
+
+      <section className="relative overflow-hidden rounded-3xl shadow-xl" aria-labelledby="disc-hero">
+        <Photo id={HERO_PHOTO.id} alt="" w={1200} h={640} eager className="absolute inset-0" fallback="from-brand to-indigo-800" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/45 to-slate-900/10" aria-hidden />
+        <div className="relative grid gap-3 p-5 pt-14 sm:p-8 sm:pt-20">
+          <h2 id="disc-hero" className="text-2xl font-extrabold leading-tight text-white sm:text-3xl">What do you need today?</h2>
+          <form role="search" className="glass flex items-center gap-2 rounded-2xl px-3" onSubmit={(e) => { e.preventDefault(); nav(`/search?q=${encodeURIComponent(q)}`); }}>
+            <Search className="size-5 shrink-0 text-brand" aria-hidden />
+            <label htmlFor="disc-q" className="sr-only">Search everything</label>
+            <input id="disc-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Services, jobs, PG, schemes…" className="min-h-12 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink/55" />
+            <button type="submit" className="grid size-10 place-items-center rounded-xl bg-brand text-white hover:bg-brand-600" aria-label="Search"><Search className="size-5" aria-hidden /></button>
+          </form>
+        </div>
+      </section>
+
+      {MODULE_GROUPS.map((g) => (
+        <section key={g.title} aria-label={g.title}>
+          <h2 className="mb-3 text-lg font-bold text-ink">{g.title}</h2>
+          <ul className="glass grid grid-cols-4 gap-x-1 gap-y-4 rounded-3xl p-4 sm:grid-cols-6 lg:grid-cols-8">
+            {g.items.map(({ to, label, I, g: grad }) => (
+              <li key={to}>
+                <Link to={to} className="group flex flex-col items-center gap-1.5 text-center text-[12px] font-semibold leading-tight text-ink">
+                  <span className={cx('grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-md ring-1 ring-white/40 transition-transform group-hover:-translate-y-0.5', grad)}><I className="size-6" aria-hidden /></span>
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      <ServiceTiles title="Home services" />
+
+      <section>
+        <div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-lg font-bold text-ink">Top rated professionals</h2><Link to="/services" className="text-sm font-semibold text-brand hover:underline">All services</Link></div>
+        <div className="grid gap-3 lg:grid-cols-2">{top.map((p) => <ProviderCard key={p.id} p={p} glass />)}</div>
+      </section>
+
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-indigo-600 to-violet-600 p-5 text-white shadow-lg">
+        <span className="absolute -right-10 -top-10 size-40 rounded-full bg-white/15 blur-2xl" aria-hidden />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div><p className="text-lg font-bold">Can’t find what you need?</p><p className="text-sm text-white/85">Post a request and get quotes from local pros.</p></div>
+          <Link to="/service-requests/new" className="glass-dark inline-flex min-h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-bold hover:bg-white/25"><Plus className="size-4" aria-hidden />Post Request</Link>
+        </div>
+      </div>
+
       <Collections />
+      <p className="text-center text-xs text-muted">Category photos illustrate the type of service, not the listed providers. <a href={PHOTO_CREDIT.url} target="_blank" rel="noopener noreferrer" className="underline">{PHOTO_CREDIT.label}</a></p>
     </div>
   );
 }
@@ -43,7 +117,7 @@ function Collections() {
   return (
     <section className="grid gap-4 md:grid-cols-2">
       {cols.map((c) => (
-        <div key={c.title} className="card p-4">
+        <div key={c.title} className="glass rounded-2xl p-4">
           <div className="mb-2 flex items-center justify-between"><h2 className="font-bold text-navy">{c.title}</h2><Link to={c.link} className="text-sm font-semibold text-brand">See all →</Link></div>
           <ul className="divide-y divide-line">{c.items.map((i) => <li key={i.id}><Link to={i.to} className="block py-2 text-sm hover:text-brand">{i.label}</Link></li>)}</ul>
         </div>
@@ -67,7 +141,7 @@ export function CategoryLandingPage() {
       case 'food-shopping': return { lead: 'Restaurants, groceries, clothing, electronics and local offers.', body: <><div className="grid gap-3 md:grid-cols-3">{db.businesses.filter((b) => ['Grocery', 'Restaurants & cafes', 'Clothing', 'Electronics', 'Retail', 'Jewellery'].includes(b.category)).map((b) => <BusinessCard key={b.id} b={b} />)}</div><h2 className="mt-6 mb-3 text-lg font-bold text-navy">Offers</h2><div className="grid gap-3 sm:grid-cols-3">{db.offers.filter((o) => o.status === 'active').map((o) => <Link key={o.id} to={`/offers?id=${o.id}`}><OfferCard o={o} /></Link>)}</div></> };
       case 'directory': return { lead: 'Every listed local business, by category.', body: <div className="grid gap-3 md:grid-cols-3">{db.businesses.slice(0, 9).map((b) => <BusinessCard key={b.id} b={b} />)}</div> };
       case 'weddings-events': return { lead: 'Venues, vendors and what’s on in the city.', body: <div className="grid gap-3 md:grid-cols-3">{db.events.slice(0, 6).map((e) => <EventCard key={e.id} e={e} />)}</div> };
-      case 'news-community': return { lead: 'Local news, civic alerts, discussions and polls.', body: <div className="grid gap-2 sm:grid-cols-2">{[['Local news', '/news'], ['Civic alerts', '/alerts'], ['Community', '/community'], ['Polls', '/polls'], ['Podcasts', '/podcasts'], ['Sports', '/sports']].map(([l, to]) => <Link key={to} to={to} className="card p-4 font-semibold hover:border-brand/30">{l} →</Link>)}</div> };
+      case 'news-community': return { lead: 'Local news, civic alerts, discussions and polls.', body: <div className="grid gap-2 sm:grid-cols-2">{[['Local news', '/news'], ['Civic alerts', '/news?section=civic'], ['Community', '/community'], ['Polls', '/polls'], ['Podcasts', '/podcasts'], ['Sports', '/sports']].map(([l, to]) => <Link key={to} to={to} className="card p-4 font-semibold hover:border-brand/30">{l} →</Link>)}</div> };
       default: return { lead: 'Open the full section to browse, filter and take action.', body: null };
     }
   })();

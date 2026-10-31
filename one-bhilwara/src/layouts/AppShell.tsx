@@ -247,15 +247,15 @@ function useNavGroups(): { title: string; items: NavItem[] }[] {
   const i = (C: typeof Home) => <C className="size-[18px]" aria-hidden />;
   return [
     { title: 'Main', items: [
-      { to: '/', label: t('navHome'), icon: i(Home) }, { to: '/services', label: t('navServices'), icon: i(Wrench) }, { to: '/activity', label: t('navActivity'), icon: i(Activity) },
+      { to: '/', label: t('navHome'), icon: i(Home) }, { to: '/discover', label: t('navDiscover'), icon: i(Compass) }, { to: '/activity', label: t('navActivity'), icon: i(Activity) },
       { to: '/news', label: t('navNews'), icon: i(Newspaper) }, { to: '/profile', label: t('navProfile'), icon: i(User) }
     ] },
     { title: 'City', items: [
       { to: '/alerts', label: t('alerts'), icon: i(Siren) },
-      { to: '/community', label: t('community'), icon: i(MessagesSquare) }, { to: '/polls', label: t('polls'), icon: i(Vote) }, { to: '/discover', label: t('navDiscover'), icon: i(Compass) }, { to: '/ai', label: t('navAI'), icon: i(Bot) }
+      { to: '/community', label: t('community'), icon: i(MessagesSquare) }, { to: '/polls', label: t('polls'), icon: i(Vote) }, { to: '/ai', label: t('navAI'), icon: i(Bot) }
     ] },
     { title: 'Everyday', items: [
-      { to: '/jobs', label: t('jobs'), icon: i(Briefcase) }, { to: '/property', label: t('property'), icon: i(House) },
+      { to: '/services', label: t('services'), icon: i(Wrench) }, { to: '/jobs', label: t('jobs'), icon: i(Briefcase) }, { to: '/property', label: t('property'), icon: i(House) },
       { to: '/marketplace', label: t('marketplace'), icon: i(ShoppingBag) }, { to: '/businesses', label: t('businesses'), icon: i(Store) }, { to: '/offers', label: t('offers'), icon: i(Gift) }
     ] },
     { title: 'Life & citizen', items: [
@@ -303,7 +303,7 @@ function usePrimaryNav() {
   const t = useT();
   return [
     { to: '/', label: t('navHome'), I: Home },
-    { to: '/services', label: t('navServices'), I: Wrench },
+    { to: '/discover', label: t('navDiscover'), I: Compass },
     { to: '/activity', label: t('navActivity'), I: Activity },
     { to: '/news', label: t('navNewsShort'), I: Newspaper },
     { to: '/profile', label: t('navProfile'), I: User }
