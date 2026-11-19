@@ -1,5 +1,5 @@
 import { ALLOWED_EXTENSIONS, type FileCategory } from '../../shared/schema';
-import { api, apiBlob, uploadForm, ApiError, isNetworkError } from './api';
+import { api, uploadForm, uploadParts, fetchBinary, getTransferChunk, ApiError, isNetworkError } from './api';
 import { idb, metaGet, metaSet } from './idb';
 import { seal, open, sealBytes, openBytes, type Sealed } from './crypto';
 import { store, uuid, type PendingFile } from './store';
@@ -64,6 +64,10 @@ export async function processUploads(): Promise<void> {
       if (!rec) { store.pendingFiles.delete(p.versionId); continue; }
       const bytes = await openBytes(key, rec.blob as Sealed);
       const original = await open<string>(key, rec.original);
+      const fields: Record<string, string> = { version_id: p.versionId };
+      if (p.target_file_id) { fields.target_file_id = p.target_file_id; fields.bump = p.bump || 'minor'; }
+      else Object.assign(fields, { file_id: p.id, project_id: p.project_id, category: p.category, name: p.name, description: p.description, prompt_ids: JSON.stringify(p.prompt_ids) });
+      if (p.note) fields.note = p.note;
       const form = new FormData();
       form.append('version_id', p.versionId);
       if (p.target_file_id) { form.append('target_file_id', p.target_file_id); form.append('bump', p.bump || 'minor'); }
@@ -72,7 +76,12 @@ export async function processUploads(): Promise<void> {
       form.append('file', new Blob([bytes], { type: p.mime }), original);
       p.status = 'uploading'; store.notify();
       try {
-        const res = await uploadForm<{ file: any; version: any }>('/api/files/upload', form, (f) => { p.progress = f; store.notify(); });
+        let res: { file: any; version: any };
+        if (getTransferChunk()) {
+          // Platform caps request size: send the bytes in parts, then finalise.
+          const up = await uploadParts(new Blob([bytes], { type: p.mime }), (f) => { p.progress = f * 0.95; store.notify(); });
+          res = await api('/api/files/upload', { body: { ...fields, ...up, filename: original } });
+        } else res = await uploadForm<{ file: any; version: any }>('/api/files/upload', form, (f) => { p.progress = f; store.notify(); });
         store.ingest('files', [res.file]);
         store.ingest('file_versions', [res.version]);
         await cacheBlob(res.version.id, bytes, true);
@@ -134,7 +143,7 @@ export async function getVersionBlob(versionId: string, mime: string): Promise<B
   const up = await db.get('uploads', versionId);
   if (up) return new Blob([await openBytes(key, up.blob)], { type: mime });
   if (!navigator.onLine) throw new Error('This file is not available offline yet. Open it once while online, or mark it “Available offline”.');
-  const blob = await apiBlob(`/api/files/versions/${versionId}/download`);
+  const blob = await fetchBinary(`/api/files/versions/${versionId}/download`, mime);
   void cacheBlob(versionId, await blob.arrayBuffer());
   return new Blob([blob], { type: mime });
 }

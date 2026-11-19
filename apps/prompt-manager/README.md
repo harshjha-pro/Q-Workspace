@@ -39,12 +39,15 @@ For development, run `npm run dev`. This starts the API on :8787 and Vite on :51
 | Storage | Local-only, self-hosted or private cloud (S3-compatible), with verified migration between them |
 | Backup | Passphrase-encrypted backups, scheduled backups, checksum-verified restore with an automatic safety backup, JSON export |
 
-See [`docs/INSTALL.md`](docs/INSTALL.md) for deployment, configuration, storage modes and maintenance,
+Deploy it on your own machine or server (SQLite), or on **Vercel with a MySQL database such as Hostinger**
+(see section 4b of the guide). See [`docs/INSTALL.md`](docs/INSTALL.md) for deployment, configuration, storage modes and maintenance,
 and [`docs/DESIGN.md`](docs/DESIGN.md) for the screen inventory and design system.
 
 ## Tests
 
 ```bash
 npm test          # API test suite: auth, sync and conflicts, files, import, templates, backup and restore
+PPM_TEST_DATABASE_URL=mysql://user:pass@127.0.0.1/testdb npm test   # same suite on MySQL/MariaDB
+PPM_TEST_SERVERLESS=1 npm test                                      # Vercel code paths
 npm run typecheck
 ```

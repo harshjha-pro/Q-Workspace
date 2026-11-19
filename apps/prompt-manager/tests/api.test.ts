@@ -1,14 +1,15 @@
 import './_env';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { buildApp } from '../server/index';
-import { db, setSetting } from '../server/db';
+import { q, setSetting } from '../server/db';
 import { hashPassword } from '../server/auth';
 
 const uid = () => crypto.randomUUID();
 const app = await buildApp();
-setSetting('storage_mode', 'self_hosted'); // inject() uses 127.0.0.1 anyway
+after(async () => { await app.close(); await q.close(); });
+await setSetting('storage_mode', 'self_hosted'); // inject() uses 127.0.0.1 anyway
 
 let cookie = '';
 let csrf = '';
@@ -36,8 +37,8 @@ async function upload(url: string, fields: Record<string, string>, file: { name:
 const push = (mutations: any[]) => call('POST', '/api/sync/push', { mutations: mutations.map((m) => ({ mid: uid(), ...m })) });
 
 test('authentication: setup, rate limit, forced password change, csrf', async () => {
-  db.prepare(`INSERT INTO users (id, username, password_hash, must_change_password, created_at, security_stamp) VALUES (?,?,?,1,?,?)`)
-    .run(uid(), 'ayushporwal', await hashPassword('Temp-Passw0rd!'), new Date().toISOString(), uid());
+  await q.run(`INSERT INTO users (id, username, password_hash, must_change_password, created_at, security_stamp) VALUES (?,?,?,1,?,?)`,
+    uid(), 'ayushporwal', await hashPassword('Temp-Passw0rd!'), new Date().toISOString(), uid());
   assert.equal((await call('GET', '/api/sync/pull')).status, 401);
   assert.equal((await call('POST', '/api/auth/login', { username: 'ayushporwal', password: 'wrong' })).status, 401);
   // Brute force from another IP gets locked.
@@ -58,7 +59,7 @@ test('authentication: setup, rate limit, forced password change, csrf', async ()
   assert.equal(changed.status, 200);
   csrf = changed.json.csrf;
   assert.equal((await call('GET', '/api/sync/pull')).status, 200);
-  const h = (db.prepare(`SELECT password_hash FROM users`).get() as any).password_hash;
+  const h = ((await q.get(`SELECT password_hash FROM users`)) as any).password_hash;
   assert.match(h, /^\$argon2id\$/);
 });
 
@@ -101,15 +102,15 @@ test('sync: create, version history, field-level conflicts, cascade delete & res
   await call('POST', '/api/sync/push', { mutations: [m] });
   const again = await call('POST', '/api/sync/push', { mutations: [m] });
   assert.equal(again.json.results[0].status, 'ok');
-  assert.equal((db.prepare(`SELECT COUNT(*) n FROM tasks`).get() as any).n, 1);
+  assert.equal(((await q.get(`SELECT COUNT(*) n FROM tasks`)) as any).n, 1);
 
   // Cascade delete and restore.
   await push([{ entity: 'projects', op: 'delete', id: projectId }]);
-  assert.equal((db.prepare(`SELECT deleted FROM prompts WHERE id=?`).get(promptId) as any).deleted, 1);
+  assert.equal(((await q.get(`SELECT deleted FROM prompts WHERE id=?`, promptId)) as any).deleted, 1);
   const trash = await call('GET', '/api/trash');
   const batch = trash.json.find((t: any) => t.id === projectId).batch;
   await call('POST', `/api/trash/${batch}/restore`);
-  assert.equal((db.prepare(`SELECT deleted FROM prompts WHERE id=?`).get(promptId) as any).deleted, 0);
+  assert.equal(((await q.get(`SELECT deleted FROM prompts WHERE id=?`, promptId)) as any).deleted, 0);
 });
 
 let fileId = '';
@@ -127,10 +128,12 @@ test('files: validation, encryption at rest, versions, extraction, search', asyn
   const v3 = await upload('/api/files/upload', { target_file_id: fileId, bump: 'major' }, { name: 'Business Plan.md', content: '# Final' });
   assert.equal(v3.json.version.label, '2.0');
   // Stored bytes are encrypted.
-  const key = (db.prepare(`SELECT storage_key FROM version_blobs WHERE version_id=?`).get(up.json.version.id) as any).storage_key;
-  const fs = await import('node:fs');
-  const { config } = await import('../server/config');
-  const stored = fs.readFileSync(`${config.blobDir}/${key}`);
+  const key = ((await q.get(`SELECT storage_key FROM version_blobs WHERE version_id=?`, up.json.version.id)) as any).storage_key;
+  const { driverByName } = await import('../server/storage');
+  const drv = ((await q.get(`SELECT driver FROM blobs WHERE blob_key=?`, key)) as any).driver;
+  const chunks: Buffer[] = [];
+  for await (const c of await driverByName(drv).get(key)) chunks.push(c as Buffer);
+  const stored = Buffer.concat(chunks);
   assert.ok(stored.subarray(0, 8).toString() === 'PPMENC01' && !stored.toString().includes('Zanzibar'));
   // Old version still downloadable and intact.
   const dl = await call('GET', `/api/files/versions/${up.json.version.id}/download`);
@@ -169,12 +172,12 @@ test('bulk import: preview, validation, duplicates, collections, error report', 
   assert.equal(c.json.imported, 3);
   assert.equal(c.json.failed, 3);
   assert.equal(c.json.collections, 1);
-  const steps = db.prepare(`SELECT p.title FROM collection_steps s JOIN prompts p ON p.id=s.prompt_id ORDER BY s.sort`).all() as any[];
+  const steps = (await q.all(`SELECT p.title FROM collection_steps s JOIN prompts p ON p.id=s.prompt_id ORDER BY s.sort`)) as any[];
   assert.deepEqual(steps.map((s) => s.title), ['Industry Research', 'Competitor Analysis']);
   const rep = await call('GET', `/api/import/${c.json.jobId}/error-report`);
   assert.match(rep.raw.body, /Invalid classification/);
   // Original never overwritten.
-  assert.equal((db.prepare(`SELECT content FROM prompts WHERE id=?`).get(promptId) as any).content, 'Research {company_name} in {industry}.');
+  assert.equal(((await q.get(`SELECT content FROM prompts WHERE id=?`, promptId)) as any).content, 'Research {company_name} in {industry}.');
   // Templates download
   const t = await call('GET', '/api/import/template?kind=advanced&format=xlsx');
   assert.equal(t.status, 200);
@@ -189,12 +192,12 @@ test('templates: insert creates an independent copy', async () => {
   const r = await call('POST', `/api/templates/${tid}/insert`, { project_id: projectId, fill: true, values: { company_name: 'Acme' } });
   assert.equal(r.json.prompt.content, 'SWOT for Acme');
   await push([{ entity: 'prompts', op: 'update', id: r.json.prompt.id, data: { content: 'Changed' } }]);
-  assert.equal((db.prepare(`SELECT content FROM templates WHERE id=?`).get(tid) as any).content, 'SWOT for {company_name}');
+  assert.equal(((await q.get(`SELECT content FROM templates WHERE id=?`, tid)) as any).content, 'SWOT for {company_name}');
 });
 
 test('duplicate project copies the hierarchy', async () => {
   const r = await call('POST', `/api/projects/${projectId}/duplicate`, {});
-  const subs = db.prepare(`SELECT COUNT(*) n FROM projects WHERE parent_id=? AND deleted=0`).get(r.json.id) as any;
+  const subs = (await q.get(`SELECT COUNT(*) n FROM projects WHERE parent_id=? AND deleted=0`, r.json.id)) as any;
   assert.equal(subs.n, 1);
 });
 
@@ -207,10 +210,42 @@ test('backup: encrypted create, wrong passphrase rejected, restore verifies and 
   assert.equal(wrong.status, 400);
   const ok = await call('POST', '/api/backups/restore', { name: b.json.name, passphrase: 'correct horse battery' });
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
-  assert.equal((db.prepare(`SELECT COUNT(*) n FROM projects WHERE name='After backup'`).get() as any).n, 0);
-  const versions = db.prepare(`SELECT id FROM file_versions WHERE file_id=? ORDER BY major, minor`).all(fileId) as any[];
+  assert.equal(((await q.get(`SELECT COUNT(*) n FROM projects WHERE name='After backup'`)) as any).n, 0);
+  const versions = (await q.all(`SELECT id FROM file_versions WHERE file_id=? ORDER BY major, minor`, fileId)) as any[];
   const dl = await call('GET', `/api/files/versions/${versions[0].id}/download`);
   assert.match(dl.raw.body, /Zanzibar/);
   // Still logged in with the current password after restore.
   assert.equal((await call('GET', '/api/sync/pull')).status, 200);
+});
+
+
+test('serverless transfer: chunked upload, partial download, setup & cron guards', async () => {
+  const { config } = await import('../server/config');
+  const chunk = config.transferChunk || 256 * 1024;
+  // ~700 KB random-ish payload as a .txt-compatible UTF-8 body
+  const big = Buffer.from(Array.from({ length: 700_000 }, (_, i) => String.fromCharCode(97 + (i * 7919) % 26)).join(''));
+  const uploadId = uid();
+  const parts = Math.ceil(big.length / chunk);
+  for (let n = 0; n < parts; n++) {
+    const r = await app.inject({ method: 'PUT', url: `/api/uploads/${uploadId}/${n}`, payload: big.subarray(n * chunk, (n + 1) * chunk), headers: { 'content-type': 'application/octet-stream', cookie, 'x-ppm-csrf': csrf } });
+    assert.equal(r.statusCode, 200, r.body);
+  }
+  const fin = await call('POST', '/api/files/upload', { upload_id: uploadId, parts, filename: 'big.txt', project_id: subId, category: 'additional' });
+  assert.equal(fin.status, 200, JSON.stringify(fin.json));
+  const vid = fin.json.version.id;
+  if (config.transferChunk) {
+    const got: Buffer[] = [];
+    for (let n = 0; ; n++) {
+      const r = await app.inject({ method: 'GET', url: `/api/files/versions/${vid}/download?part=${n}`, headers: { cookie } });
+      got.push(r.rawPayload);
+      if (n + 1 >= Number(r.headers['x-ppm-parts'])) break;
+    }
+    assert.ok(Buffer.concat(got).equals(big), 'reassembled download matches');
+  } else {
+    const r = await app.inject({ method: 'GET', url: `/api/files/versions/${vid}/download`, headers: { cookie } });
+    assert.ok(r.rawPayload.equals(big));
+  }
+  // Setup endpoint refuses once an account exists; cron refuses without the secret.
+  assert.equal((await call('POST', '/api/setup', { token: 'x', username: 'someone', password: 'Another-Long-Pass-1' })).status, 404);
+  assert.equal((await call('GET', '/api/cron')).status, 401);
 });

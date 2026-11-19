@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Upload, Download, FileSpreadsheet, FileJson, FileText, ClipboardPaste, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Copy, ShieldCheck, Library, FolderKanban, RefreshCw, CloudOff, FileUp, ArrowRight } from 'lucide-react';
 import { useStoreVersion, store } from '../lib/store';
-import { api, apiUrl, downloadUrl, ApiError } from '../lib/api';
+import { api, apiUrl, downloadUrl, ApiError, uploadParts, getTransferChunk } from '../lib/api';
 import { topProjects, projectLabel } from '../lib/data';
 import { plural, useIsMobile, useOnline, cx } from '../lib/util';
 import { Button, Card, CardHead, Field, Input, Select, Stepper, Segmented, Chip, Textarea, Badge, EmptyState } from '../components/ui';
@@ -53,9 +53,14 @@ export default function BulkImport() {
       let p: Preview;
       if (mode === 'file') {
         if (!file) throw new Error('Choose a file to upload.');
-        const form = new FormData();
-        form.append('destination', dest); form.append('project_id', projectId); form.append('default_type', t); form.append('file', file);
-        p = await api<Preview>('/api/import/preview', { body: form });
+        if (getTransferChunk()) {
+          const up = await uploadParts(file);
+          p = await api<Preview>('/api/import/preview', { body: { destination: dest, project_id: projectId, default_type: t, filename: file.name, ...up } });
+        } else {
+          const form = new FormData();
+          form.append('destination', dest); form.append('project_id', projectId); form.append('default_type', t); form.append('file', file);
+          p = await api<Preview>('/api/import/preview', { body: form });
+        }
       } else {
         if (!paste.trim()) throw new Error('Paste at least one prompt.');
         p = await api<Preview>('/api/import/preview', { body: { destination: dest, project_id: projectId, default_type: t, paste } });

@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import Papa from 'papaparse';
-import { db, uuid, UUID_RE, getRow, insertRow, now } from './db';
+import { q, uuid, UUID_RE, getRow, insertRow, now } from './db';
 import { createRecord } from './sync';
 import { logActivity } from './activity';
+import { assembleUpload } from './files';
+import fsp from 'node:fs/promises';
 import { detectVariables } from '../shared/variables';
 
 type PType = 'mandatory' | 'optional';
@@ -168,10 +170,10 @@ function parsePaste(text: string) {
 const normText = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 const splitList = (v: unknown): string[] => Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : String(v ?? '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
 
-function validate(recs: RawRec[], defaultType: PType, destination: 'library' | 'project', projectId: string | null): PreviewRow[] {
+async function validate(recs: RawRec[], defaultType: PType, destination: 'library' | 'project', projectId: string | null): Promise<PreviewRow[]> {
   const existing = destination === 'library'
-    ? (db.prepare(`SELECT title, content FROM templates WHERE deleted=0`).all() as { title: string; content: string }[])
-    : (db.prepare(`SELECT title, content FROM prompts WHERE project_id=? AND deleted=0`).all(projectId) as { title: string; content: string }[]);
+    ? await q.all<{ title: string; content: string }>(`SELECT title, content FROM templates WHERE deleted=0`)
+    : await q.all<{ title: string; content: string }>(`SELECT title, content FROM prompts WHERE project_id=? AND deleted=0`, projectId);
   const exTitles = new Map(existing.map((e) => [normText(e.title), e.title]));
   const exContent = new Map(existing.map((e) => [normText(e.content), e.title]));
   const seenTitles = new Map<string, number>();
@@ -257,6 +259,21 @@ export async function importRoutes(app: FastifyInstance) {
       else if (ext === 'json') parsed = parseJson(buf.toString('utf8'));
       else if (ext === 'xls') return reply.code(415).send({ error: 'Old .xls workbooks are not supported. In Excel choose File → Save As → Excel Workbook (.xlsx).' });
       else return reply.code(415).send({ error: 'Upload a .csv, .xlsx or .json file.' });
+    } else if ((req.body as any)?.upload_id) {
+      // File sent in parts (platforms that cap request size).
+      fields = req.body as Record<string, string>;
+      if (!UUID_RE.test(String(fields.upload_id))) return reply.code(400).send({ error: 'Invalid upload' });
+      const a = await assembleUpload(String(fields.upload_id), Number(fields.parts), 25 * 1024 * 1024);
+      try {
+        filename = String(fields.filename || 'import').replace(/[\u0000-\u001f]/g, '').slice(0, 200);
+        const ext = (filename.split('.').pop() || '').toLowerCase();
+        format = ext;
+        const buf = await fsp.readFile(a.file);
+        if (ext === 'csv' || ext === 'tsv' || ext === 'txt') parsed = parseCsv(buf.toString('utf8'), ext === 'tsv' ? '\t' : undefined);
+        else if (ext === 'xlsx') parsed = await parseXlsx(buf);
+        else if (ext === 'json') parsed = parseJson(buf.toString('utf8'));
+        else return reply.code(415).send({ error: 'Upload a .csv, .xlsx or .json file.' });
+      } finally { await fsp.rm(a.file, { force: true }); }
     } else {
       fields = (req.body as Record<string, string>) || {};
       parsed = parsePaste(String(fields.paste || '').slice(0, 2_000_000));
@@ -264,28 +281,28 @@ export async function importRoutes(app: FastifyInstance) {
     const destination = fields.destination === 'library' ? 'library' : 'project';
     const projectId = destination === 'project' ? fields.project_id : null;
     if (destination === 'project') {
-      const p = projectId && UUID_RE.test(projectId) ? getRow<any>('projects', projectId) : null;
+      const p = projectId && UUID_RE.test(projectId) ? await getRow<any>('projects', projectId) : null;
       if (!p || p.deleted) return reply.code(400).send({ error: 'Choose a project or subproject to import into.' });
     }
     const defaultType: PType = fields.default_type === 'mandatory' ? 'mandatory' : 'optional';
-    const rows = parsed.structure.length && !parsed.recs.length ? [] : validate(parsed.recs, defaultType, destination, projectId);
+    const rows = parsed.structure.length && !parsed.recs.length ? [] : await validate(parsed.recs, defaultType, destination, projectId);
     if (!parsed.structure.length && !rows.length) parsed.structure.push('No prompts were found in the file.');
     if (parsed.recs.length > 5000) parsed.structure.push(`Only the first 5,000 of ${parsed.recs.length} records are shown.`);
     const id = uuid();
-    db.prepare(`DELETE FROM import_previews WHERE created_at < ?`).run(Date.now() - 24 * 3600_000);
-    db.prepare(`INSERT INTO import_previews (id, payload, created_at) VALUES (?,?,?)`).run(id, JSON.stringify({ rows, destination, projectId, defaultType, filename, format }), Date.now());
+    await q.run(`DELETE FROM import_previews WHERE created_at < ?`, Date.now() - 24 * 3600_000);
+    await q.run(`INSERT INTO import_previews (id, payload, created_at) VALUES (?,?,?)`, id, JSON.stringify({ rows, destination, projectId, defaultType, filename, format }), Date.now());
     const summary = { total: rows.length, valid: rows.filter((r) => r.status === 'ok').length, duplicates: rows.filter((r) => r.status === 'duplicate').length, errors: rows.filter((r) => r.status === 'error').length };
     return { previewId: id, filename, format, destination, projectId, defaultType, structureErrors: parsed.structure, rows, summary };
   });
 
   app.post('/api/import/commit', async (req, reply) => {
     const body = req.body as { previewId: string; decisions?: Record<string, 'import' | 'skip' | 'rename'>; renames?: Record<string, string>; overrides?: Record<string, { type?: PType }> };
-    const p = db.prepare(`SELECT payload FROM import_previews WHERE id=?`).get(body.previewId) as { payload: string } | undefined;
+    const p = await q.get<{ payload: string }>(`SELECT payload FROM import_previews WHERE id=?`, body.previewId);
     if (!p) return reply.code(410).send({ error: 'This preview has expired. Upload the file again.' });
     const { rows, destination, projectId, defaultType, filename, format } = JSON.parse(p.payload) as { rows: PreviewRow[]; destination: 'library' | 'project'; projectId: string | null; defaultType: PType; filename: string; format: string };
     const decisions = body.decisions || {}; const renames = body.renames || {}; const overrides = body.overrides || {};
     const jobId = uuid();
-    const result = db.transaction(() => {
+    const result = await q.tx(async () => {
       let imported = 0, skipped = 0, failed = 0, duplicates = 0;
       const records: { row: number; status: string; title: string; reason: string; prompt_id: string | null; raw: string }[] = [];
       const collCache = new Map<string, string>();
@@ -303,9 +320,9 @@ export async function importRoutes(app: FastifyInstance) {
         try {
           if (destination === 'library') {
             const tags = [...new Set([...r.tags, ...(r.collection ? [r.collection] : [])])];
-            createRecord('templates', id, { title, content: r.content, type, description: r.description, tags, variables: r.variables }, { silent: true, extra: { import_job_id: jobId } });
+            await createRecord('templates', id, { title, content: r.content, type, description: r.description, tags, variables: r.variables }, { silent: true, extra: { import_job_id: jobId } });
           } else {
-            createRecord('prompts', id, { project_id: projectId, title, content: r.content, type, description: r.description, tags: r.tags, variables: r.variables }, { silent: true, note: `Imported from ${filename}`, extra: { import_job_id: jobId } });
+            await createRecord('prompts', id, { project_id: projectId, title, content: r.content, type, description: r.description, tags: r.tags, variables: r.variables }, { silent: true, note: `Imported from ${filename}`, extra: { import_job_id: jobId } });
             if (r.collection) stepsToAdd.push({ coll: r.collection, promptId: id, seq: r.sequence, row: r.row });
           }
           imported++;
@@ -319,27 +336,30 @@ export async function importRoutes(app: FastifyInstance) {
         const key = s.coll.toLowerCase();
         let cid = collCache.get(key);
         if (!cid) {
-          const ex = db.prepare(`SELECT id FROM collections WHERE project_id=? AND lower(name)=? AND deleted=0`).get(projectId, key) as { id: string } | undefined;
-          cid = ex?.id ?? createRecord('collections', uuid(), { project_id: projectId, name: s.coll, description: `Created by import from ${filename}` }, { silent: true }).id as string;
+          const ex = await q.get<{ id: string }>(`SELECT id FROM collections WHERE project_id=? AND lower(name)=? AND deleted=0`, projectId, key);
+          cid = ex?.id ?? ((await createRecord('collections', uuid(), { project_id: projectId, name: s.coll, description: `Created by import from ${filename}` }, { silent: true })).id as string);
           collCache.set(key, cid);
         }
-        createRecord('collection_steps', uuid(), { collection_id: cid, prompt_id: s.promptId }, { silent: true });
+        await createRecord('collection_steps', uuid(), { collection_id: cid, prompt_id: s.promptId }, { silent: true });
       }
-      insertRow('import_jobs', { id: jobId, destination, project_id: projectId, format, filename, default_type: defaultType, total: rows.length, imported, skipped, failed, duplicates, status: 'completed' });
-      const ins = db.prepare(`INSERT INTO import_records (id, job_id, row_no, status, title, reason, prompt_id, raw) VALUES (?,?,?,?,?,?,?,?)`);
-      for (const r of records) ins.run(uuid(), jobId, r.row, r.status, r.title, r.reason, r.prompt_id, r.raw);
-      logActivity(projectId, destination === 'library' ? 'templates' : 'prompts', jobId, 'imported', `Imported ${imported} ${destination === 'library' ? 'template' : 'prompt'}${imported === 1 ? '' : 's'} from ${filename}${collCache.size ? ` into ${collCache.size} collection${collCache.size === 1 ? '' : 's'}` : ''}`);
+      await insertRow('import_jobs', { id: jobId, destination, project_id: projectId, format, filename, default_type: defaultType, total: rows.length, imported, skipped, failed, duplicates, status: 'completed' });
+      for (let i = 0; i < records.length; i += 50) {
+        const batch = records.slice(i, i + 50);
+        await q.run(`INSERT INTO import_records (id, job_id, row_no, status, title, reason, prompt_id, raw) VALUES ${batch.map(() => '(?,?,?,?,?,?,?,?)').join(',')}`,
+          ...batch.flatMap((r) => [uuid(), jobId, r.row, r.status, r.title, r.reason, r.prompt_id, r.raw]));
+      }
+      await logActivity(projectId, destination === 'library' ? 'templates' : 'prompts', jobId, 'imported', `Imported ${imported} ${destination === 'library' ? 'template' : 'prompt'}${imported === 1 ? '' : 's'} from ${filename}${collCache.size ? ` into ${collCache.size} collection${collCache.size === 1 ? '' : 's'}` : ''}`);
       return { jobId, total: rows.length, imported, skipped, failed, duplicates, collections: collCache.size };
-    })();
-    db.prepare(`DELETE FROM import_previews WHERE id=?`).run(body.previewId);
+    });
+    await q.run(`DELETE FROM import_previews WHERE id=?`, body.previewId);
     return result;
   });
 
   app.get('/api/import/:jobId/error-report', async (req, reply) => {
     const { jobId } = req.params as { jobId: string };
-    const job = getRow<any>('import_jobs', jobId);
+    const job = await getRow<any>('import_jobs', jobId);
     if (!job) return reply.code(404).send({ error: 'Import not found' });
-    const rows = db.prepare(`SELECT row_no, status, title, reason FROM import_records WHERE job_id=? AND status<>'imported' ORDER BY row_no`).all(jobId) as any[];
+    const rows = await q.all<any>(`SELECT row_no, status, title, reason FROM import_records WHERE job_id=? AND status<>'imported' ORDER BY row_no`, jobId);
     const csv = Papa.unparse([['Row', 'Prompt Title', 'Result', 'Reason'], ...rows.map((r) => [r.row_no, r.title, r.status.replace('_', ' '), r.reason])], { newline: '\r\n' });
     reply.header('Content-Type', 'text/csv; charset=utf-8').header('Content-Disposition', `attachment; filename="import-errors-${now().slice(0, 10)}.csv"`).header('Cache-Control', 'no-store');
     return reply.send('﻿' + csv);

@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react';
-import { api, ApiError, isNetworkError, setCsrf, onAuthEvent, hasCsrf } from './api';
+import { api, ApiError, isNetworkError, setCsrf, onAuthEvent, hasCsrf, setTransferChunk } from './api';
 import { metaGet, metaSet, metaDel, wipeLocalData, clearReplica, idb } from './idb';
 import { generateDek, wrapWithPassword, unwrapWithPassword, wrapWithSession, unwrapWithSession, type Wrapped } from './crypto';
 import { store } from './store';
 import { restorePendingUploads } from './files';
 
-export type Phase = 'boot' | 'login' | 'change_password' | 'unlock' | 'ready';
+export type Phase = 'boot' | 'setup' | 'login' | 'change_password' | 'unlock' | 'ready';
 interface SessionState {
   phase: Phase;
   username: string;
@@ -16,10 +16,13 @@ interface SessionState {
   reauth: boolean;
   message: string | null;
   storageMode: string;
+  capabilities: Capabilities;
+  setupAvailable: boolean;
 }
-interface ServerSession { authenticated: boolean; user?: { username: string }; mustChangePassword?: boolean; csrf?: string; localKey?: string; idleMinutes?: number; storageMode?: string }
+export interface Capabilities { serverless: boolean; transferChunk: number; database: string }
+interface ServerSession { authenticated: boolean; user?: { username: string }; mustChangePassword?: boolean; csrf?: string; localKey?: string; idleMinutes?: number; storageMode?: string; capabilities?: Capabilities; setupRequired?: boolean; setupAvailable?: boolean }
 
-let state: SessionState = { phase: 'boot', username: '', idleMinutes: 30, offline: false, needOldPassword: false, reauth: false, message: null, storageMode: 'local' };
+let state: SessionState = { phase: 'boot', username: '', idleMinutes: 30, offline: false, needOldPassword: false, reauth: false, message: null, storageMode: 'local', capabilities: { serverless: false, transferChunk: 0, database: 'sqlite' }, setupAvailable: false };
 const subs = new Set<() => void>();
 const set = (p: Partial<SessionState>) => { state = { ...state, ...p }; subs.forEach((s) => s()); };
 export const useSession = () => useSyncExternalStore((l) => { subs.add(l); return () => subs.delete(l); }, () => state);
@@ -28,8 +31,15 @@ export const getSession = () => state;
 let dek: CryptoKey | null = null;
 let pendingPassword: string | null = null; // only held between login and forced password change
 
+function applyCaps(c?: Capabilities) {
+  if (!c) return;
+  setTransferChunk(c.transferChunk);
+  set({ capabilities: c });
+  void metaSet('capabilities', c);
+}
 function applyServer(s: ServerSession) {
   if (s.csrf) setCsrf(s.csrf);
+  applyCaps(s.capabilities);
   set({ username: s.user?.username ?? state.username, idleMinutes: s.idleMinutes ?? state.idleMinutes, storageMode: s.storageMode ?? state.storageMode });
   if (s.user?.username) void metaSet('username', s.user.username);
   if (s.idleMinutes) void metaSet('idleMinutes', s.idleMinutes);
@@ -70,6 +80,8 @@ export async function boot() {
   const idle = (await metaGet<number>('idleMinutes')) ?? 30;
   set({ username, idleMinutes: idle });
   const hasLocal = !!(await metaGet('wrap_pw'));
+  const caps = await metaGet<Capabilities>('capabilities');
+  if (caps) applyCaps(caps);
   let s: ServerSession;
   try { s = await api<ServerSession>('/api/auth/session'); }
   catch (e) {
@@ -77,7 +89,8 @@ export async function boot() {
     set({ phase: 'login', message: (e as Error).message }); return;
   }
   set({ offline: false });
-  if (!s.authenticated) { set({ phase: 'login' }); return; }
+  applyCaps(s.capabilities);
+  if (!s.authenticated) { set({ phase: s.setupRequired ? 'setup' : 'login', setupAvailable: !!s.setupAvailable }); return; }
   applyServer(s);
   if (s.mustChangePassword) { set({ phase: 'change_password' }); return; }
   const wrapS = await metaGet<Wrapped>('wrap_session');
@@ -85,6 +98,14 @@ export async function boot() {
     try { await openWith(await unwrapWithSession(wrapS, s.localKey)); return; } catch { /* session changed */ }
   }
   set({ phase: 'unlock' });
+}
+
+/** First-run owner setup on deployments without a server terminal (requires the setup token). */
+export async function setupOwner(token: string, username: string, password: string) {
+  const s = await api<ServerSession>('/api/setup', { body: { token, username, password } });
+  applyServer(s);
+  set({ offline: false });
+  await openWorkspace(password, s.localKey!);
 }
 
 export async function login(username: string, password: string) {

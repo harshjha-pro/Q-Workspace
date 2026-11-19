@@ -12,7 +12,7 @@
 import readline from 'node:readline';
 import { Writable } from 'node:stream';
 import crypto from 'node:crypto';
-import { db, now, setSetting } from '../server/db';
+import { q, now, setSetting, migrate } from '../server/db';
 import { hashPassword, passwordProblems } from '../server/auth';
 import { getMasterKey } from '../server/storage';
 import { config } from '../server/config';
@@ -33,11 +33,13 @@ const ask = (q: string, hidden = false) => new Promise<string>((res) => {
 async function readStdin() { let s = ''; for await (const c of process.stdin) s += c; return s.replace(/\r?\n$/, ''); }
 
 async function main() {
-  getMasterKey(); // creates data/keys/master.key on first run
-  const existing = db.prepare(`SELECT id, username FROM users`).get() as { id: string; username: string } | undefined;
+  if (!config.serverless) getMasterKey(); // creates data/keys/master.key on first run
+  await migrate();
+  const existing = await q.get<{ id: string; username: string }>(`SELECT id, username FROM users`);
   const reset = flag('--reset');
   if (existing && !reset) {
     console.log(`An owner account already exists ("${existing.username}"). Use "npm run setup -- --reset" to reset its password.`);
+    await q.close();
     process.exit(0);
   }
   if (!existing && reset) { console.log('No account exists yet; creating one.'); }
@@ -67,22 +69,22 @@ async function main() {
   const mode = opt('--mode');
   if (mode) {
     if (!['local', 'self_hosted', 'cloud'].includes(mode)) { console.error('--mode must be local, self_hosted or cloud'); process.exit(1); }
-    setSetting('storage_mode', mode as 'local');
-    if (mode === 'cloud') setSetting('blob_driver', 's3');
+    await setSetting('storage_mode', mode as 'local');
+    if (mode === 'cloud') await setSetting('blob_driver', config.databaseUrl ? 'db' : 's3');
     console.log(`Storage mode set to ${mode}.`);
   }
   const hash = await hashPassword(pw);
   if (existing) {
-    db.prepare(`UPDATE users SET password_hash=?, must_change_password=1, security_stamp=? WHERE id=?`).run(hash, crypto.randomUUID(), existing.id);
-    db.prepare(`DELETE FROM sessions`).run();
-    db.prepare(`DELETE FROM login_attempts`).run();
+    await q.run(`UPDATE users SET password_hash=?, must_change_password=1, security_stamp=? WHERE id=?`, hash, crypto.randomUUID(), existing.id);
+    await q.run(`DELETE FROM sessions`);
+    await q.run(`DELETE FROM login_attempts`);
     console.log(`\n✓ Password reset for "${existing.username}". All sessions were signed out.`);
   } else {
-    db.prepare(`INSERT INTO users (id, username, password_hash, must_change_password, created_at, security_stamp) VALUES (?,?,?,1,?,?)`).run(crypto.randomUUID(), username, hash, now(), crypto.randomUUID());
+    await q.run(`INSERT INTO users (id, username, password_hash, must_change_password, created_at, security_stamp) VALUES (?,?,?,1,?,?)`, crypto.randomUUID(), username, hash, now(), crypto.randomUUID());
     console.log(`\n✓ Owner account "${username}" created. Sign in and choose your permanent password.`);
   }
   console.log('  Keep data/keys/master.key safe: it encrypts your stored files.\n');
   rl.close();
-  db.close();
+  await q.close();
 }
 main().catch((e) => { console.error(e); process.exit(1); });

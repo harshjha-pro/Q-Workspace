@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Layers3, Lock, User, AlertCircle, ShieldCheck, WifiOff, Info } from 'lucide-react';
+import { Layers3, Lock, User, AlertCircle, ShieldCheck, WifiOff, Info, KeyRound } from 'lucide-react';
 import { Button, Field, Input, PasswordInput } from '../../components/ui';
-import { login, changePassword, unlock, useSession, getPendingPassword, discardLocalChangesAndContinue, logout } from '../../lib/session';
+import { login, changePassword, unlock, useSession, getPendingPassword, discardLocalChangesAndContinue, logout, setupOwner } from '../../lib/session';
 import { ApiError } from '../../lib/api';
 
 function AuthCard({ title, sub, children }: { title: string; sub: string; children: ReactNode }) {
@@ -140,6 +140,42 @@ export function UnlockScreen() {
         <Field label="Password" htmlFor="up"><PasswordInput id="up" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus /></Field>
         <Button type="submit" variant="primary" size="lg" block loading={busy} disabled={!password}>Unlock</Button>
         <Button variant="ghost" onClick={() => void logout(false)}>Sign in as a different session</Button>
+      </form>
+    </AuthCard>
+  );
+}
+
+export function SetupScreen() {
+  const sess = useSession();
+  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('ayushporwal');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (next !== confirm) { setError('Passwords do not match.'); return; }
+    setBusy(true); setError(null);
+    try { await setupOwner(token.trim(), username.trim(), next); }
+    catch (e) { setError((e as ApiError).data?.problems?.join(' ') || (e as Error).message); }
+    finally { setBusy(false); }
+  };
+  if (!sess.setupAvailable) {
+    return (
+      <AuthCard title="Finish setting up" sub="No owner account exists yet.">
+        <div className="alert info"><Info /><span>To create the account on this deployment, add a secret <b>PPM_SETUP_TOKEN</b> environment variable (any long random text) in your hosting settings, redeploy, and reload this page. Or run <code>npm run setup</code> against the same database.</span></div>
+      </AuthCard>
+    );
+  }
+  return (
+    <AuthCard title="Create your account" sub="One-time setup of the single owner account">
+      <div className="alert info"><KeyRound />Enter the setup token you saved in your hosting settings (PPM_SETUP_TOKEN). After setup, delete that variable.</div>
+      {error && <div className="alert err" role="alert"><AlertCircle />{error}</div>}
+      <form className="col gap-16" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+        <Field label="Setup token" htmlFor="st"><PasswordInput id="st" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" autoFocus /></Field>
+        <Field label="Username" htmlFor="su"><div className="input-wrap"><User /><Input id="su" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} /></div></Field>
+        <PasswordFields next={next} setNext={setNext} confirm={confirm} setConfirm={setConfirm} username={username} />
+        <Button type="submit" variant="primary" size="lg" block loading={busy} disabled={!token || !username || !next || next !== confirm}>Create account</Button>
       </form>
     </AuthCard>
   );

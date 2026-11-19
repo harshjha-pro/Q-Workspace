@@ -80,3 +80,44 @@ export function downloadUrl(path: string) {
   a.click();
   a.remove();
 }
+
+// ---------- Chunked transfers (deployments that cap request/response size, e.g. Vercel) ----------
+let transferChunk = 0;
+export const setTransferChunk = (n: number) => { transferChunk = n || 0; };
+export const getTransferChunk = () => transferChunk;
+
+/** Send a blob in parts; returns the id to finalise the upload with. */
+export async function uploadParts(blob: Blob, onProgress?: (f: number) => void, signal?: AbortSignal) {
+  const size = transferChunk || 3 * 1024 * 1024;
+  const uploadId = crypto.randomUUID();
+  const parts = Math.max(1, Math.ceil(blob.size / size));
+  for (let n = 0; n < parts; n++) {
+    if (signal?.aborted) throw new ApiError('Upload cancelled', 0, 'aborted');
+    const body = blob.slice(n * size, (n + 1) * size);
+    let res: Response;
+    try {
+      res = await fetch(apiUrl(`/api/uploads/${uploadId}/${n}`), { method: 'PUT', body, headers: { 'Content-Type': 'application/octet-stream', 'X-PPM-CSRF': csrf }, credentials: 'same-origin', signal });
+    } catch { throw new ApiError('Network error — you appear to be offline.', 0); }
+    if (!res.ok) await handle(res);
+    onProgress?.((n + 1) / parts);
+  }
+  return { upload_id: uploadId, parts };
+}
+
+/** Download an endpoint that supports ?part=n into one Blob. */
+export async function downloadParts(path: string, type = 'application/octet-stream', onProgress?: (f: number) => void): Promise<Blob> {
+  const parts: Blob[] = [];
+  const sep = path.includes('?') ? '&' : '?';
+  for (let n = 0; ; n++) {
+    const res = await fetch(apiUrl(`${path}${sep}part=${n}`), { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) await handle(res);
+    parts.push(await res.blob());
+    const total = Number(res.headers.get('X-PPM-Parts') || 1);
+    onProgress?.((n + 1) / total);
+    if (n + 1 >= total) break;
+  }
+  return new Blob(parts, { type });
+}
+
+/** Fetch a binary endpoint, in parts when the deployment requires it. */
+export const fetchBinary = (path: string, type?: string) => (transferChunk ? downloadParts(path, type) : apiBlob(path));

@@ -239,7 +239,15 @@ class Store {
   async flush() {
     if (this.flushing || !this.key) return;
     await this.persistChain;
-    const batch = this.outbox.filter((o) => !o.inflight).slice(0, 200);
+    // Keep each push well under platform request limits (~4.5 MB on Vercel).
+    const batch: OutboxItem[] = [];
+    let bytes = 0;
+    for (const o of this.outbox) {
+      if (o.inflight) continue;
+      const size = JSON.stringify(o.data ?? {}).length + JSON.stringify(o.base ?? {}).length + 200;
+      if (batch.length && (batch.length >= 200 || bytes + size > 1_500_000)) break;
+      batch.push(o); bytes += size;
+    }
     if (!batch.length) return;
     this.flushing = true;
     batch.forEach((b) => (b.inflight = true));

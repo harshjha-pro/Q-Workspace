@@ -17,7 +17,7 @@ import BulkImport from './pages/BulkImport';
 import LibraryPage, { TemplateDetail, TemplateEditor } from './pages/Library';
 import { SearchPage, FavouritesPage, AllCollectionsPage } from './pages/Global';
 import SettingsPage from './pages/settings/Settings';
-import { Login, ChangePasswordScreen, UnlockScreen } from './pages/auth/Auth';
+import { Login, ChangePasswordScreen, UnlockScreen, SetupScreen } from './pages/auth/Auth';
 import { DialogHost, ToastHost } from './components/overlay';
 import { Card, EmptyState } from './components/ui';
 import { useSession } from './lib/session';
@@ -85,6 +85,7 @@ export default function App() {
   return (
     <>
       {s.phase === 'boot' && <div className="loader-page" aria-busy>Loading…</div>}
+      {s.phase === 'setup' && <SetupScreen />}
       {s.phase === 'login' && <Login />}
       {s.phase === 'change_password' && <ChangePasswordScreen />}
       {s.phase === 'unlock' && <UnlockScreen />}

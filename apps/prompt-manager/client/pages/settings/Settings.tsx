@@ -4,20 +4,20 @@ import {
   User, ShieldCheck, HardDrive, RefreshCw, Archive, SlidersHorizontal, Tag as TagIcon, Trash2, Info, ChevronRight, KeyRound, Lock, LogOut, Monitor, Server, Cloud, Check, AlertTriangle,
   Download, Upload, RotateCcw, Database, Smartphone, GitMerge, CloudOff, Plus, Pencil, FileJson, X,
 } from 'lucide-react';
-import { api, downloadUrl, ApiError, uploadForm } from '../../lib/api';
+import { api, downloadUrl, ApiError, uploadForm, uploadParts, fetchBinary, getTransferChunk } from '../../lib/api';
 import { store, useStoreVersion, useSyncStatus } from '../../lib/store';
 import { useSession, changePassword, lock, logout, setIdleMinutes } from '../../lib/session';
 import { usePrefs, setPrefs } from '../../lib/prefs';
 import { useServerSettings, patchServerSettings, refreshServerSettings } from '../../lib/serverSettings';
 import { cacheUsage, clearFileCache, retryUpload, cancelUpload } from '../../lib/files';
 import { storageEstimate } from '../../lib/idb';
-import { formatBytes, formatDateTime, timeAgo, plural, useIsMobile, useOnline } from '../../lib/util';
+import { formatBytes, formatDateTime, timeAgo, plural, useIsMobile, useOnline, saveBlob } from '../../lib/util';
 import { Button, IconButton, Card, CardHead, Field, Input, Select, Segmented, Switch, ProgressBar, Badge, EmptyState, PasswordInput, Spinner } from '../../components/ui';
 import { Modal, confirmDialog, promptDialog, toast } from '../../components/overlay';
 import { DiffView } from '../../components/domain';
 import { PasswordFields } from '../auth/Auth';
 import { usePageMeta } from '../../layout/AppShell';
-import { ENTITIES, type EntityName } from '../../../shared/schema';
+import { ENTITIES, ENTITY_NAMES, type EntityName } from '../../../shared/schema';
 
 const SECTIONS = [
   { id: 'account', label: 'Account', icon: <User />, desc: 'Password, sessions, sign out' },
@@ -158,7 +158,7 @@ function SecuritySection() {
 }
 
 // ---------------- Storage ----------------
-interface StorageInfo { mode: 'local' | 'self_hosted' | 'cloud'; driver: string; encrypted: boolean; s3Configured: boolean; s3: { bucket: string; endpoint: string; prefix: string } | null; totals: { driver: string; n: number; bytes: number; stored: number }[]; dbBytes: number; disk: { total: number; free: number } | null; job: any; host: string; dataDir: string }
+interface StorageInfo { serverless?: boolean; database?: string; mode: 'local' | 'self_hosted' | 'cloud'; driver: string; encrypted: boolean; s3Configured: boolean; s3: { bucket: string; endpoint: string; prefix: string } | null; totals: { driver: string; n: number; bytes: number; stored: number }[]; dbBytes: number; disk: { total: number; free: number } | null; job: any; host: string; dataDir: string }
 const MODES = [
   { id: 'local' as const, label: 'Local-only', icon: <Monitor />, desc: 'Data stays on this device. The server only accepts connections from this computer; no other device can sync. Backups are local files.' },
   { id: 'self_hosted' as const, label: 'Self-hosted', icon: <Server />, desc: 'Runs on a server you control. Files and database live on that server; all your devices sync securely over HTTPS.' },
@@ -188,6 +188,24 @@ function StorageSection() {
     } catch (e) { toast.error((e as Error).message); }
   };
   const job = info?.job; const jd = job?.detail ? JSON.parse(job.detail) : null;
+  if (info?.serverless) return (
+    <>
+      <Card>
+        <CardHead title="Storage" sub="Cloud deployment" />
+        <div className="card-body col gap-12">
+          <div className="radio-card" style={{ borderColor: 'var(--primary)', background: 'var(--primary-soft)', cursor: 'default' }}>
+            <span className="icon-tile sm tone-indigo"><Cloud /></span>
+            <div className="grow col gap-4"><div className="row gap-8"><span className="strong">App on Vercel · data in your {info.database === 'mysql' ? 'MySQL' : ''} database</span><Badge tone="success">Active</Badge></div>
+              <span className="small muted">Projects, prompts, versions, notes and every uploaded file (encrypted with AES-256-GCM before it is stored) live in your database. Vercel keeps nothing between requests.</span></div>
+          </div>
+          <Row label="Database size" hint="Includes stored files and backups"><span className="num">{formatBytes(info.dbBytes)}</span></Row>
+          {info.totals.map((t) => <Row key={t.driver} label="Stored files"><span className="num">{plural(t.n, 'file')} · {formatBytes(t.bytes)}</span></Row>)}
+          <Row label="Encryption at rest"><Badge tone={info.encrypted ? 'success' : 'warning'}>{info.encrypted ? 'On' : 'Off'}</Badge></Row>
+        </div>
+      </Card>
+      <DeviceStorage cache={cache} est={est} setCache={setCache} />
+    </>
+  );
   return (
     <>
       <Card>
@@ -234,17 +252,24 @@ function StorageSection() {
           </>}
         </div>
       </Card>
-      <Card>
-        <CardHead title="On this device" sub="Encrypted offline copy used when you have no connection" />
-        <div className="card-body">
-          <Row label="Browser storage used" hint={est?.quota ? `of ${formatBytes(est.quota)} available to this app` : undefined}><span className="num">{est?.usage !== undefined ? formatBytes(est.usage) : '—'}</span></Row>
-          <Row label="Cached files" hint="Files you opened or marked “Available offline”."><span className="num">{cache ? `${plural(cache.files, 'file')} · ${formatBytes(cache.bytes)}` : '—'}</span></Row>
-          <Row label="Offline file cache limit"><Select value={String(prefs.offlineCacheMb)} onChange={(e) => setPrefs({ offlineCacheMb: Number(e.target.value) })} style={{ width: 140 }}>{[50, 100, 250, 500, 1000, 2000].map((m) => <option key={m} value={m}>{m >= 1000 ? `${m / 1000} GB` : `${m} MB`}</option>)}</Select></Row>
-          <Row label="Keep opened files for offline use"><Switch checked={prefs.cacheViewedFiles} onChange={(v) => setPrefs({ cacheViewedFiles: v })} /></Row>
-          <div className="mt-12"><Button icon={<Trash2 />} onClick={async () => { if (await confirmDialog({ title: 'Clear cached files?', message: 'Files will download again when opened. Your prompts, notes and other data are kept.', confirmLabel: 'Clear' })) { await clearFileCache(); setCache(await cacheUsage()); toast.success('File cache cleared'); } }}>Clear cached files</Button></div>
-        </div>
-      </Card>
+      <DeviceStorage cache={cache} est={est} setCache={setCache} />
     </>
+  );
+}
+
+function DeviceStorage({ cache, est, setCache }: { cache: { bytes: number; files: number } | null; est: StorageEstimate | undefined; setCache: (c: { bytes: number; files: number }) => void }) {
+  const prefs = usePrefs();
+  return (
+      <Card>
+      <CardHead title="On this device" sub="Encrypted offline copy used when you have no connection" />
+      <div className="card-body">
+        <Row label="Browser storage used" hint={est?.quota ? `of ${formatBytes(est.quota)} available to this app` : undefined}><span className="num">{est?.usage !== undefined ? formatBytes(est.usage) : '—'}</span></Row>
+        <Row label="Cached files" hint="Files you opened or marked “Available offline”."><span className="num">{cache ? `${plural(cache.files, 'file')} · ${formatBytes(cache.bytes)}` : '—'}</span></Row>
+        <Row label="Offline file cache limit"><Select value={String(prefs.offlineCacheMb)} onChange={(e) => setPrefs({ offlineCacheMb: Number(e.target.value) })} style={{ width: 140 }}>{[50, 100, 250, 500, 1000, 2000].map((m) => <option key={m} value={m}>{m >= 1000 ? `${m / 1000} GB` : `${m} MB`}</option>)}</Select></Row>
+        <Row label="Keep opened files for offline use"><Switch checked={prefs.cacheViewedFiles} onChange={(v) => setPrefs({ cacheViewedFiles: v })} /></Row>
+        <div className="mt-12"><Button icon={<Trash2 />} onClick={async () => { if (await confirmDialog({ title: 'Clear cached files?', message: 'Files will download again when opened. Your prompts, notes and other data are kept.', confirmLabel: 'Clear' })) { await clearFileCache(); setCache(await cacheUsage()); toast.success('File cache cleared'); } }}>Clear cached files</Button></div>
+      </div>
+    </Card>
   );
 }
 
@@ -310,6 +335,12 @@ function SyncSection() {
 
 // ---------------- Backup ----------------
 interface BackupItem { name: string; size: number; created_at: string; encrypted: boolean; kind: string }
+function exportAll() {
+  const out: Record<string, unknown> = { app: 'prompt-manager', exported_at: new Date().toISOString(), schema: 1 };
+  for (const e of ENTITY_NAMES) out[e] = store.all(e);
+  saveBlob(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }), `prompt-manager-export-${new Date().toISOString().slice(0, 10)}.json`);
+}
+
 function BackupSection() {
   const online = useOnline();
   const [data, setData] = useState<{ backups: BackupItem[]; settings: { backup_schedule: string; backup_keep: number; backup_last_at: string; backup_last_status: string } } | null>(null);
@@ -332,7 +363,8 @@ function BackupSection() {
     setBusy(true); setRerr(null);
     try {
       let r: { files: number; safetyBackup: string };
-      if (restore.file) { const f = new FormData(); f.append('passphrase', rpass); f.append('file', restore.file); r = await uploadForm('/api/backups/restore', f); }
+      if (restore.file && getTransferChunk()) { const up = await uploadParts(restore.file); r = await api('/api/backups/restore', { body: { ...up, passphrase: rpass } }); }
+      else if (restore.file) { const f = new FormData(); f.append('passphrase', rpass); f.append('file', restore.file); r = await uploadForm('/api/backups/restore', f); }
       else r = await api('/api/backups/restore', { body: { name: restore.name, passphrase: rpass } });
       toast.success(`Restored (${plural(r.files, 'file')}). Previous state saved as ${r.safetyBackup}.`);
       setRestore(null); setRpass('');
@@ -352,7 +384,7 @@ function BackupSection() {
             <div key={b.name} className="list-row">
               <Database style={{ width: 18, color: 'var(--text-3)' }} />
               <div className="grow"><div className="small truncate mono">{b.name}</div><div className="tiny muted">{formatDateTime(b.created_at)} · {formatBytes(b.size)} · {b.encrypted ? 'encrypted' : 'not encrypted'} · {b.kind}</div></div>
-              <IconButton size="sm" label="Download" icon={<Download />} onClick={() => downloadUrl(`/api/backups/${encodeURIComponent(b.name)}/download`)} />
+              <IconButton size="sm" label="Download" icon={<Download />} onClick={async () => { if (!getTransferChunk()) return downloadUrl(`/api/backups/${encodeURIComponent(b.name)}/download`); try { toast.info('Preparing download…'); saveBlob(await fetchBinary(`/api/backups/${encodeURIComponent(b.name)}/download`), b.name); } catch (e) { toast.error((e as Error).message); } }} />
               <IconButton size="sm" label="Restore" icon={<RotateCcw />} onClick={() => setRestore({ name: b.name })} />
               <IconButton size="sm" label="Delete" icon={<Trash2 />} onClick={async () => { if (await confirmDialog({ title: 'Delete backup?', message: b.name, danger: true, confirmLabel: 'Delete' })) { await api(`/api/backups/${encodeURIComponent(b.name)}`, { method: 'DELETE' }); void load(); } }} />
             </div>
@@ -368,7 +400,7 @@ function BackupSection() {
       </Card>
       <Card>
         <CardHead title="Export" />
-        <div className="card-body row row-wrap"><Button icon={<FileJson />} onClick={() => downloadUrl('/api/export')}>Export all data (JSON)</Button><span className="small muted">Projects, prompts, versions, templates, collections, tasks, notes and file metadata. Use a backup to include file contents.</span></div>
+        <div className="card-body row row-wrap"><Button icon={<FileJson />} onClick={exportAll}>Export all data (JSON)</Button><span className="small muted">Projects, prompts, versions, templates, collections, tasks, notes and file metadata. Use a backup to include file contents.</span></div>
       </Card>
       <Modal open={creating} onClose={() => setCreating(false)} title="Create backup" footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" loading={busy} onClick={create} disabled={!!pass && pass.length < 8}>Create backup</Button></>}>
         <Field label="Passphrase (recommended)" hint="Encrypts the backup so it can be stored anywhere and restored on any server. Leave blank to encrypt with this server's key instead." error={pass && pass.length < 8 ? 'Use at least 8 characters' : null}><PasswordInput value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" /></Field>

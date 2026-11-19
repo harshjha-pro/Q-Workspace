@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -6,14 +7,14 @@ import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import fastifyStatic from '@fastify/static';
 import { config } from './config';
-import { db, getSettings } from './db';
-import { authPlugin, purgeExpiredSessions } from './auth';
+import { q, getSettings, migrate } from './db';
+import { authPlugin, purgeExpiredSessions, userCount } from './auth';
 import { syncRoutes, purgeExpiredTrash } from './sync';
-import { fileRoutes, resumeExtraction } from './files';
+import { fileRoutes, resumeExtraction, purgeStaleParts } from './files';
 import { importRoutes } from './import';
 import { projectRoutes } from './projects';
 import { backupRoutes, runScheduledBackup } from './backup';
-import { searchRoutes, rebuildIndex } from './search';
+import { searchRoutes, rebuildIndex, indexIsEmpty } from './search';
 import { getMasterKey } from './storage';
 
 const LOCAL_TRUSTED = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', ...(process.env.PPM_LOCAL_TRUSTED_IPS || '').split(',').map((s) => s.trim()).filter(Boolean)]);
@@ -48,12 +49,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     hsts: config.cookieSecure === 'false' ? false : { maxAge: 31536000, includeSubDomains: false },
     referrerPolicy: { policy: 'no-referrer' },
   });
+  await migrate();
   await app.register(cookie);
+  // Raw bytes for chunked uploads.
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
   await app.register(multipart, { limits: { fieldNameSize: 100, parts: 30 } });
 
   // Local-only mode: refuse anything that isn't from this device.
   app.addHook('onRequest', async (req, reply) => {
-    if (getSettings().storage_mode === 'local' && !LOCAL_TRUSTED.has(req.ip)) {
+    if (!config.serverless && (await getSettings()).storage_mode === 'local' && !LOCAL_TRUSTED.has(req.ip)) {
       return reply.code(403).send({ error: 'This workspace is in Local-only mode and only accepts connections from this device.' });
     }
     // Defence in depth on top of SameSite cookies + CSRF token: reject cross-origin writes.
@@ -89,10 +93,17 @@ export async function buildApp(): Promise<FastifyInstance> {
     await projectRoutes(api);
     await backupRoutes(api);
     await searchRoutes(api);
+    // Periodic maintenance. Called by Vercel Cron (Authorization: Bearer CRON_SECRET) or the local timer.
+    api.get('/api/cron', async (req, reply) => {
+      const auth = String(req.headers.authorization || '');
+      const expected = `Bearer ${config.cronSecret}`;
+      if (!config.cronSecret || auth.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(expected))) return reply.code(401).send({ error: 'Unauthorized' });
+      return runMaintenance();
+    });
   }, { prefix });
 
-  // ---------- PWA static files ----------
-  if (fs.existsSync(path.join(config.clientDir, 'index.html'))) {
+  // ---------- PWA static files (on Vercel the platform serves them) ----------
+  if (!config.serverless && fs.existsSync(path.join(config.clientDir, 'index.html'))) {
     const indexHtml = fs.readFileSync(path.join(config.clientDir, 'index.html'));
     await app.register(fastifyStatic, {
       root: config.clientDir,
@@ -117,23 +128,31 @@ export async function buildApp(): Promise<FastifyInstance> {
   return app;
 }
 
+export async function runMaintenance() {
+  const done: string[] = [];
+  const step = async (name: string, fn: () => Promise<unknown>) => { try { await fn(); done.push(name); } catch (e) { done.push(`${name}: ${(e as Error).message}`); } };
+  await step('sessions', purgeExpiredSessions);
+  await step('uploads', purgeStaleParts);
+  await step('trash', purgeExpiredTrash);
+  await step('extraction', () => resumeExtraction(20));
+  await step('backup', runScheduledBackup);
+  return { ok: true, done };
+}
+
 async function main() {
   getMasterKey();
-  const users = (db.prepare(`SELECT COUNT(*) AS n FROM users`).get() as { n: number }).n;
-  if (!users) console.warn('\n  No account exists yet. Run "npm run setup" to create the owner account.\n');
-  if (!(db.prepare(`SELECT COUNT(*) AS n FROM search_fts`).get() as { n: number }).n) rebuildIndex();
+  await migrate();
+  if (!(await userCount())) console.warn('\n  No account exists yet. Run "npm run setup" to create the owner account.\n');
+  if (await indexIsEmpty()) await rebuildIndex();
   const app = await buildApp();
   await app.listen({ host: config.host, port: config.port });
-  console.log(`Prompt & Project Manager running at http://${config.host}:${config.port}${config.basePath} (storage mode: ${getSettings().storage_mode})`);
-  resumeExtraction();
-  const tick = async () => {
-    try { purgeExpiredSessions(); await purgeExpiredTrash(); await runScheduledBackup(); } catch (e) { app.log.error(e); }
-  };
+  console.log(`Prompt & Project Manager running at http://${config.host}:${config.port}${config.basePath} (storage mode: ${(await getSettings()).storage_mode}, database: ${config.databaseUrl ? 'MySQL' : 'SQLite'})`);
+  const tick = async () => { try { await runMaintenance(); } catch (e) { app.log.error(e); } };
   setInterval(tick, 15 * 60_000).unref();
   setTimeout(tick, 10_000).unref();
-  const shutdown = async () => { await app.close(); db.close(); process.exit(0); };
+  const shutdown = async () => { await app.close(); await q.close(); process.exit(0); };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
-if (process.env.PPM_NO_LISTEN !== '1') void main();
+if (process.env.PPM_NO_LISTEN !== '1' && !config.serverless) void main();

@@ -72,6 +72,46 @@ The compose file already sets `PPM_TRUST_PROXY=true` and `PPM_COOKIE_SECURE=true
 at runtime. The service worker scope, manifest and cookie path then follow that path, so other apps on the
 same domain are unaffected.
 
+## 4b. Vercel (app) + Hostinger MySQL (data)
+
+The PWA and its API run on Vercel. Everything durable (projects, prompts, versions, notes, tasks,
+settings, backups and every uploaded file, encrypted before storage) lives in your MySQL/MariaDB database,
+for example on Hostinger. Vercel itself keeps nothing between requests.
+
+**1. Hostinger database.** In hPanel go to **Databases → MySQL Databases**, create a database and a user,
+and note the database name, user, password and the **MySQL hostname** (hPanel shows it, e.g. `srv123.hstgr.io`
+or an IP address). Then open **Databases → Remote MySQL** and add **Any Host** (`%`), because Vercel connects
+from changing addresses.
+
+**2. Vercel environment variables.** In Vercel go to **Project → Settings → Environment Variables**, add these
+for *Production* (and *Preview* if you use preview links), mark them **Sensitive**, then redeploy:
+
+| Variable | Value |
+|---|---|
+| `PPM_DATABASE_URL` | `mysql://USER:PASSWORD@HOST:3306/DATABASE`. URL-encode special characters in the password (`@` → `%40`, `#` → `%23`, `/` → `%2F`, `:` → `%3A`) |
+| `PPM_MASTER_KEY` | A random value of **at least 32 characters** (use a password generator). It encrypts your stored files. **Keep a copy**: without it, stored files and server-key backups cannot be decrypted |
+| `PPM_SETUP_TOKEN` | Any long random text. Only needed once, to create your account (step 3) |
+| `CRON_SECRET` | Any long random text. Lets Vercel run the daily maintenance job (scheduled backups, trash and session cleanup) |
+| `PPM_DB_SSL` *(optional)* | `preferred` (default: use TLS when the server offers it), `required` (refuse unencrypted connections) or `off` |
+
+**3. Create your account.** Open the site. It shows **Create your account**. Enter the setup token, your
+username and a strong password. Then delete `PPM_SETUP_TOKEN` from Vercel and redeploy. The setup screen
+only works while no account exists.
+
+**4. Install.** Open the site on each device and use **Install app** (or iOS Safari → Share → Add to Home Screen).
+
+Notes:
+* **Region.** `vercel.json` runs the API in Mumbai (`bom1`). Put it in the region closest to your Hostinger
+  server (Settings → Functions → Region, or edit `regions`), because each request makes several database round trips.
+* **Large files** move in 3 MB parts automatically, since Vercel limits each request to about 4.5 MB. Uploads
+  are still capped by *Settings → Application → Maximum upload size*.
+* **Storage limits.** Files are stored in the database, so watch your Hostinger database size (shown in
+  Settings → Storage) and delete old backups you no longer need.
+* **Maintenance.** Vercel Cron calls `/api/cron` daily (set in `vercel.json`).
+* **Encryption in transit.** Browser ↔ Vercel is always HTTPS. Vercel ↔ Hostinger uses TLS when your MySQL
+  server supports it. Use `PPM_DB_SSL=required` to enforce it if Hostinger offers TLS on your plan. File
+  contents are encrypted before they leave Vercel either way.
+
 ## 5. Private cloud (S3-compatible)
 
 Add these to the environment and restart:
@@ -96,6 +136,7 @@ Keep the bucket private, with block-public-access on.
 | `PPM_HOST` | `127.0.0.1` | Interface to listen on (`0.0.0.0` in Docker) |
 | `PPM_PORT` | `8787` | Port |
 | `PPM_DATA_DIR` | `./data` | Database, encrypted files, keys, backups |
+| `PPM_DATABASE_URL` | – | Use MySQL/MariaDB instead of the local SQLite file (`mysql://user:pass@host:3306/db`) |
 | `PPM_BASE_PATH` | `/` | URL sub-path (build-time and run-time) |
 | `PPM_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` from your reverse proxy |
 | `PPM_COOKIE_SECURE` | `auto` | `true` behind HTTPS proxies; `auto` = secure when the request is HTTPS |

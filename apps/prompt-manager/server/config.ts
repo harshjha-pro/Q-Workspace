@@ -7,7 +7,10 @@ function bool(v: string | undefined, d: boolean) {
 }
 
 const root = process.cwd();
-const dataDir = path.resolve(process.env.PPM_DATA_DIR || path.join(root, 'data'));
+// Serverless platforms (Vercel) only allow writing to /tmp, and it is not persistent:
+// there, everything durable lives in the database (PPM_DATABASE_URL).
+const serverless = process.env.PPM_SERVERLESS === '1' || !!process.env.VERCEL;
+const dataDir = path.resolve(process.env.PPM_DATA_DIR || (serverless ? '/tmp/ppm' : path.join(root, 'data')));
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
@@ -16,6 +19,13 @@ export const config = {
   port: Number(process.env.PPM_PORT || 8787),
   basePath: (process.env.PPM_BASE_PATH || '/').replace(/\/?$/, '/'),
   dataDir,
+  serverless,
+  /** mysql://user:pass@host:3306/db (MySQL/MariaDB, e.g. Hostinger). Empty = local SQLite file. */
+  databaseUrl: process.env.PPM_DATABASE_URL || '',
+  /** Max request/response body per call on the platform; files and backups move in parts of this size. */
+  transferChunk: serverless ? Number(process.env.PPM_TRANSFER_CHUNK || 3 * 1024 * 1024) : 0,
+  setupToken: process.env.PPM_SETUP_TOKEN || '',
+  cronSecret: process.env.CRON_SECRET || '',
   dbPath: path.join(dataDir, 'ppm.sqlite'),
   blobDir: path.join(dataDir, 'blobs'),
   backupDir: path.join(dataDir, 'backups'),
@@ -24,7 +34,7 @@ export const config = {
   clientDir: path.resolve(process.env.PPM_CLIENT_DIR || path.join(root, 'dist', 'client')),
   /** 'auto' = Secure when the request arrived over HTTPS (directly or via a trusted proxy). */
   cookieSecure: (process.env.PPM_COOKIE_SECURE || 'auto') as 'auto' | 'true' | 'false',
-  trustProxy: bool(process.env.PPM_TRUST_PROXY, false),
+  trustProxy: bool(process.env.PPM_TRUST_PROXY, serverless),
   /** Comma-separated origins allowed to make state-changing requests (defaults to same-origin). */
   allowedOrigins: (process.env.PPM_ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
   s3: {
