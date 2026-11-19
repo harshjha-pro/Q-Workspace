@@ -1,0 +1,24 @@
+# Self-hosted / private-cloud deployment. Put an HTTPS reverse proxy (e.g. Caddy) in front.
+services:
+  prompt-manager:
+    build: .
+    image: prompt-manager:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"   # reachable only through your reverse proxy
+    volumes:
+      - ppm-data:/data
+    environment:
+      PPM_TRUST_PROXY: "true"     # the proxy terminates HTTPS
+      PPM_COOKIE_SECURE: "true"
+      # PPM_MASTER_KEY: ""        # optional: supply the file-encryption key instead of /data/keys/master.key
+      # Private cloud (S3-compatible) storage:
+      # PPM_S3_BUCKET: ""
+      # PPM_S3_REGION: "auto"
+      # PPM_S3_ENDPOINT: ""       # e.g. https://<account>.r2.cloudflarestorage.com
+      # PPM_S3_ACCESS_KEY_ID: ""
+      # PPM_S3_SECRET_ACCESS_KEY: ""
+      # Optional ClamAV malware scanning:
+      # PPM_CLAMD_HOST: "clamav"
+volumes:
+  ppm-data:
