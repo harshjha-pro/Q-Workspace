@@ -85,6 +85,7 @@ export async function boot() {
   let s: ServerSession;
   try { s = await api<ServerSession>('/api/auth/session'); }
   catch (e) {
+    if (e instanceof ApiError && e.code === 'not_configured') { set({ phase: 'login', message: `Server setup incomplete: ${e.message}` }); return; }
     if (isNetworkError(e) || (e instanceof ApiError && e.status >= 500)) { set({ phase: hasLocal ? 'unlock' : 'login', offline: true, message: hasLocal ? null : 'You are offline. Connect once to sign in on this device.' }); return; }
     set({ phase: 'login', message: (e as Error).message }); return;
   }
