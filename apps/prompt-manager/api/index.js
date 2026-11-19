@@ -1,3 +1,3 @@
-// Vercel Function entry. The server is bundled during the build (npm run build:server) so that
-// Node's ESM resolution doesn't depend on per-file TypeScript compilation.
-export { default } from '../dist/server/server/vercel.mjs';
+// Vercel Function entry. The server and its JavaScript dependencies are bundled during the build
+// (npm run build:vercel-fn) into one ES module; only native modules stay in node_modules.
+export { default } from '../dist/fn/vercel.mjs';

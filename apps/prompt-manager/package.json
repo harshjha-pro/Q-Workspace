@@ -19,7 +19,8 @@
     "setup:prod": "node dist/server/scripts/setup.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "build:vercel": "npm run build:client && npm run build:server"
+    "build:vercel": "npm run build:client && npm run build:vercel-fn",
+    "build:vercel-fn": "esbuild server/vercel.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/fn/vercel.mjs --external:@node-rs/argon2 --external:better-sqlite3 --external:pdfjs-dist --external:tesseract.js \"--banner:js=import { createRequire as __cr } from 'module'; import { fileURLToPath as __fu } from 'url'; import { dirname as __dn } from 'path'; const require = __cr(import.meta.url); const __filename = __fu(import.meta.url); const __dirname = __dn(__filename);\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1172.0",
