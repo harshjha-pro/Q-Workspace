@@ -5,7 +5,7 @@
   "description": "Private Prompt & Project Manager - single-user installable PWA",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "concurrently -k -n api,web \"npm:dev:server\" \"npm:dev:client\"",
@@ -28,7 +28,6 @@
     "@fastify/static": "^10.1.11",
     "@node-rs/argon2": "^2.2.2",
     "archiver": "^8.0.0",
-    "better-sqlite3": "^13.2.0",
     "exceljs": "^4.4.0",
     "fastify": "^5.12.8",
     "file-type": "^22.3.0",
@@ -71,5 +70,8 @@
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1",
     "workbox-strategies": "^7.4.1"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^13.2.0"
   }
 }
