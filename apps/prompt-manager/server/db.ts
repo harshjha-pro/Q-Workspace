@@ -5,7 +5,8 @@ import { ENTITIES, ENTITY_NAMES, type EntityName, type FieldType } from '../shar
 
 export { q };
 ensureDirs();
-connect({ url: config.databaseUrl, sqliteFile: config.dbPath });
+// On serverless hosting a database URL is mandatory (checked in buildApp); never open a throwaway SQLite file there.
+if (!config.serverless || config.databaseUrl) void connect({ url: config.databaseUrl, sqliteFile: config.dbPath }).catch(() => {});
 
 const SCHEMA_VERSION = '3';
 

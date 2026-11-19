@@ -15,7 +15,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     console.error('Startup failed:', (e as Error).message);
     res.statusCode = 503;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'The server could not start. Check the database settings (PPM_DATABASE_URL) and PPM_MASTER_KEY in Vercel.' }));
+    const msg = (e as Error).message || '';
+    const safe = /PPM_DATABASE_URL|PPM_MASTER_KEY/.test(msg) ? msg : 'The server could not connect to its database. Check PPM_DATABASE_URL in Vercel and that Remote MySQL allows connections.';
+    res.end(JSON.stringify({ error: safe, code: 'not_configured' }));
   }
 }
 

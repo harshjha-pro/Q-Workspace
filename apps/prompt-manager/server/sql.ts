@@ -110,12 +110,22 @@ async function mysqlBackend(url: string): Promise<Backend> {
 // ---------------- Public API ----------------
 let backend: Backend | null = null;
 let ready: Promise<Backend> | null = null;
+let lastOpts: { url?: string; sqliteFile: string } | null = null;
 
+/** Connect lazily; a failed connection is retried on the next query instead of crashing the process. */
 export function connect(opts: { url?: string; sqliteFile: string }) {
-  ready ??= (async () => (backend = opts.url && /^mysql|^mariadb/.test(opts.url) ? await mysqlBackend(opts.url.replace(/^mariadb/, 'mysql')) : await sqliteBackend(opts.sqliteFile)))();
+  lastOpts = opts;
+  if (!ready) {
+    ready = (async () => (backend = opts.url && /^mysql|^mariadb/.test(opts.url) ? await mysqlBackend(opts.url.replace(/^mariadb/, 'mysql')) : await sqliteBackend(opts.sqliteFile)))();
+    ready.catch(() => { ready = null; backend = null; });
+  }
   return ready;
 }
-const b = async () => backend ?? (await ready!) ;
+const b = async () => {
+  if (backend) return backend;
+  if (!ready && !lastOpts) throw new Error('Database connection is closed');
+  return ready ?? connect(lastOpts!);
+};
 
 export const dialect = () => backend?.dialect ?? 'sqlite';
 export const isMysql = () => dialect() === 'mysql';
@@ -128,7 +138,7 @@ export const q = {
   exec: async (sqlText: string) => { for (const s of sqlText.split(/;\s*\n/).map((x) => x.trim()).filter(Boolean)) await (await b()).run(s.replace(/;$/, ''), []); },
   tx: async <T>(fn: () => Promise<T>) => (await b()).tx(fn),
   inTx: () => !!txStore.getStore(),
-  close: async () => { if (backend) await backend.close(); backend = null; ready = null; },
+  close: async () => { const cur = backend ?? (ready ? await ready.catch(() => null) : null); lastOpts = null; backend = null; ready = null; if (cur) await cur.close(); },
 };
 
 /** INSERT ... or update the non-key columns when the key already exists. */

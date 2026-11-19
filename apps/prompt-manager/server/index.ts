@@ -20,6 +20,11 @@ import { getMasterKey } from './storage';
 const LOCAL_TRUSTED = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', ...(process.env.PPM_LOCAL_TRUSTED_IPS || '').split(',').map((s) => s.trim()).filter(Boolean)]);
 
 export async function buildApp(): Promise<FastifyInstance> {
+  if (config.serverless) {
+    // Never fall back to a temporary database or key on serverless hosting: data would be lost.
+    if (!/^(mysql|mariadb):\/\//.test(config.databaseUrl)) throw new Error('PPM_DATABASE_URL is not set. Add your MySQL connection string in the hosting environment variables and redeploy.');
+    getMasterKey();
+  }
   const app = Fastify({
     trustProxy: config.trustProxy,
     bodyLimit: 2 * 1024 * 1024,
