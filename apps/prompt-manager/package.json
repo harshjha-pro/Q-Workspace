@@ -13,12 +13,13 @@
     "dev:client": "vite",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
-    "build:server": "esbuild server/index.ts scripts/setup.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outdir=dist/server --out-extension:.js=.mjs",
+    "build:server": "esbuild server/index.ts server/vercel.ts scripts/setup.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outdir=dist/server --out-extension:.js=.mjs",
     "start": "NODE_ENV=production node dist/server/server/index.mjs",
     "setup": "tsx scripts/setup.ts",
     "setup:prod": "node dist/server/scripts/setup.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "build:vercel": "npm run build:client && npm run build:server"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1172.0",

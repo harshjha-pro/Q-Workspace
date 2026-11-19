@@ -127,7 +127,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       if (req.method === 'GET' && req.url.startsWith(config.basePath) && !req.url.startsWith(config.basePath + 'api/') && !path.extname(req.url.split('?')[0])) return sendIndex(req, reply);
       reply.code(404).send({ error: 'Not found' });
     });
-  } else {
+  } else if (!config.serverless) {
     app.log.warn(`Client build not found at ${config.clientDir}. Run "npm run build:client" (or use "npm run dev").`);
   }
   return app;

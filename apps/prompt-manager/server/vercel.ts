@@ -1,6 +1,7 @@
-// Vercel Function: every /api/* request is routed here (see vercel.json) and handed to Fastify.
+// Vercel Function handler: every /api/* request is routed to api/index.js (see vercel.json), which loads
+// this module from the bundled build (dist/server/server/vercel.mjs) and hands the request to Fastify.
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { buildApp } from '../server/index';
+import { buildApp } from './index';
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 let appPromise: Promise<App> | null = null;
