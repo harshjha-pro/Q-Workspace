@@ -84,7 +84,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.setErrorHandler((err: any, req, reply) => {
     const status = err.statusCode && err.statusCode < 500 ? err.statusCode : 500;
-    if (status >= 500) req.log.error(err);
+    if (status >= 500) { req.log.error(err); console.error(`[${req.method} ${req.url.split('?')[0]}]`, err?.code || '', err?.message || err); }
     const msg = status === 413 ? 'The upload is too large.' : status < 500 ? (err.validation ? 'Some of the information sent was invalid.' : err.message) : 'Something went wrong on the server. Please try again.';
     reply.code(status).send({ error: msg });
   });

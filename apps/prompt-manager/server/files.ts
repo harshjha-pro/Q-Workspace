@@ -8,6 +8,7 @@ import { q, getRow, insertRow, patchRow, uuid, UUID_RE, getSettings } from './db
 import { ALLOWED_EXTENSIONS, FILE_CATEGORIES, type FileRec, type FileVersion } from '../shared/schema';
 import { storeBlob, readBlob, readBlobBuffer, readBlobRange, blobKeyForVersion } from './storage';
 import { validateContent, scanFile, extract } from './extract';
+import { binaryBudget } from './sql';
 import { logActivity } from './activity';
 import { reindex } from './search';
 
@@ -19,9 +20,15 @@ function cleanName(n: string) {
 }
 
 // ---------- Chunked uploads (platforms that cap request bodies, e.g. Vercel) ----------
+// Each received part is stored as one or more rows small enough for the database's packet limit.
+// Row number = part * SUB + piece, so pieces sort back into order.
+const SUB = 10_000;
 export async function savePart(uploadId: string, n: number, data: Buffer) {
-  await q.run(`DELETE FROM upload_parts WHERE upload_id=? AND n=?`, uploadId, n);
-  await q.run(`INSERT INTO upload_parts (upload_id, n, data, created_at) VALUES (?,?,?,?)`, uploadId, n, data, Date.now());
+  const size = await binaryBudget();
+  await q.run(`DELETE FROM upload_parts WHERE upload_id=? AND n>=? AND n<?`, uploadId, n * SUB, (n + 1) * SUB);
+  for (let o = 0, i = 0; o < data.length; o += size, i++) {
+    await q.run(`INSERT INTO upload_parts (upload_id, n, data, created_at) VALUES (?,?,?,?)`, uploadId, n * SUB + i, data.subarray(o, o + size), Date.now());
+  }
 }
 /** Reassemble uploaded parts into a temp file; parts are removed afterwards. */
 export async function assembleUpload(uploadId: string, parts: number, maxBytes: number): Promise<{ file: string; size: number }> {
@@ -30,11 +37,13 @@ export async function assembleUpload(uploadId: string, parts: number, maxBytes: 
   let size = 0;
   try {
     for (let n = 0; n < parts; n++) {
-      const r = await q.get<{ data: Buffer }>(`SELECT data FROM upload_parts WHERE upload_id=? AND n=?`, uploadId, n);
-      if (!r) throw Object.assign(new Error('Part of the upload is missing. Please try again.'), { statusCode: 400 });
-      size += r.data.length;
-      if (size > maxBytes) throw Object.assign(new Error(`File is larger than the ${Math.round(maxBytes / 1048576)} MB limit.`), { statusCode: 413 });
-      if (!out.write(Buffer.from(r.data))) await new Promise((res) => out.once('drain', res));
+      const pieces = await q.all<{ data: Buffer }>(`SELECT data FROM upload_parts WHERE upload_id=? AND n>=? AND n<? ORDER BY n`, uploadId, n * SUB, (n + 1) * SUB);
+      if (!pieces.length) throw Object.assign(new Error('Part of the upload is missing. Please try again.'), { statusCode: 400 });
+      for (const r of pieces) {
+        size += r.data.length;
+        if (size > maxBytes) throw Object.assign(new Error(`File is larger than the ${Math.round(maxBytes / 1048576)} MB limit.`), { statusCode: 413 });
+        if (!out.write(Buffer.from(r.data))) await new Promise((res) => out.once('drain', res));
+      }
     }
     await new Promise<void>((res, rej) => out.end((e?: Error | null) => (e ? rej(e) : res())));
     return { file, size };

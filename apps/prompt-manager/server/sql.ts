@@ -16,6 +16,8 @@ interface Backend {
   run(sql: string, params: unknown[], conn?: unknown): Promise<RunResult>;
   tx<T>(fn: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
+  /** Largest single statement the server accepts (bytes). */
+  maxPacket: number;
 }
 
 const txStore = new AsyncLocalStorage<{ conn: unknown }>();
@@ -57,6 +59,7 @@ async function sqliteBackend(file: string): Promise<Backend> {
       } finally { release(); }
     },
     async close() { db.close(); },
+    maxPacket: Number.MAX_SAFE_INTEGER,
   };
 }
 
@@ -86,10 +89,14 @@ async function mysqlBackend(url: string): Promise<Backend> {
   }
   const norm = (p: unknown[]) => p.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v === undefined ? null : v));
   const target = () => (txStore.getStore()?.conn as any) ?? pool;
+  let maxPacket = 1024 * 1024;
+  try { const [r] = await pool.query('SELECT @@max_allowed_packet AS m'); maxPacket = Number((r as any)[0]?.m) || maxPacket; } catch { /* keep the safe default */ }
   return {
     dialect: 'mysql',
-    async all(sql, params) { const [rows] = await target().query(sql, norm(params)); return rows as Row[]; },
-    async run(sql, params) { const [r] = await target().query(sql, norm(params)); return { changes: (r as any).affectedRows ?? 0, insertId: Number((r as any).insertId ?? 0) }; },
+    // Statements carrying binary data use the binary protocol (prepared statements): bytes are sent
+    // as-is instead of hex text, which would double their size against max_allowed_packet.
+    async all(sql, params) { const p = norm(params); const [rows] = p.some(Buffer.isBuffer) ? await target().execute(sql, p) : await target().query(sql, p); return rows as Row[]; },
+    async run(sql, params) { const p = norm(params); const [r] = p.some(Buffer.isBuffer) ? await target().execute(sql, p) : await target().query(sql, p); return { changes: (r as any).affectedRows ?? 0, insertId: Number((r as any).insertId ?? 0) }; },
     async tx(fn) {
       if (txStore.getStore()) return fn();
       const conn = await pool.getConnection();
@@ -104,6 +111,7 @@ async function mysqlBackend(url: string): Promise<Backend> {
       } finally { conn.release(); }
     },
     async close() { await pool.end(); },
+    maxPacket,
   };
 }
 
@@ -128,6 +136,8 @@ const b = async () => {
 };
 
 export const dialect = () => backend?.dialect ?? 'sqlite';
+/** Safe byte budget for binary data in one statement (leaves room for protocol overhead). */
+export const binaryBudget = async () => { const m = (await b()).maxPacket; return Math.max(32 * 1024, Math.min(2 * 1024 * 1024, Math.floor(m * 0.6))); };
 export const isMysql = () => dialect() === 'mysql';
 
 export const q = {

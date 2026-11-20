@@ -6,7 +6,7 @@ import { Readable, Transform, type TransformCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { config, s3Configured } from './config';
 import { q, now, uuid, getSettings, setSetting } from './db';
-import { isMysql } from './sql';
+import { isMysql, binaryBudget } from './sql';
 
 // ======================= Encryption (AES-256-GCM, chunked) =======================
 // Format: "PPMENC01" | chunkSize(u32) | then repeated [nonce(12) | len(u32) | ciphertext(len) | tag(16)]
@@ -181,8 +181,10 @@ export const dbDriver: Driver = {
       while (o < buf.length) { const len = buf.readUInt32BE(o + 12); const end = o + 16 + len + 16; rows.push(buf.subarray(o, end)); o = end; }
     } else for (let o = 0; o < buf.length; o += CHUNK) rows.push(buf.subarray(o, o + CHUNK));
     await q.run(`DELETE FROM blob_frames WHERE blob_key=?`, key);
-    for (let i = 0; i < rows.length; i += FRAMES_PER_INSERT) {
-      const batch = rows.slice(i, i + FRAMES_PER_INSERT);
+    // As many frames per statement as the database's packet limit comfortably allows.
+    const per = Math.max(1, Math.min(FRAMES_PER_INSERT, Math.floor((await binaryBudget()) / (CHUNK + 64))));
+    for (let i = 0; i < rows.length; i += per) {
+      const batch = rows.slice(i, i + per);
       await q.run(`INSERT INTO blob_frames (blob_key, idx, data) VALUES ${batch.map(() => '(?,?,?)').join(',')}`, ...batch.flatMap((d, j) => [key, i + j, d]));
     }
   },
