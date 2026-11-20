@@ -66,10 +66,9 @@ export function AiTemplateHelper({ forLibrary, onPasteAnswer }: { forLibrary: bo
         <Button variant="primary" size="sm" icon={<Copy />} onClick={async () => { await copyText(text); toast.success('AI instruction copied — paste it into your AI chat'); }}>Copy AI instruction</Button>
         {onPasteAnswer && <Button size="sm" icon={<ClipboardPaste />} onClick={onPasteAnswer}>Paste the AI answer</Button>}
       </div>
-      <details>
-        <summary className="small muted" style={{ cursor: 'pointer' }}>Show the instruction</summary>
-        <pre className="ai-helper-text">{text}</pre>
-      </details>
+      <Field label="AI instruction (copy this into your AI chat)">
+        <pre className="ai-helper-text" tabIndex={0}>{text}</pre>
+      </Field>
     </div>
   );
 }

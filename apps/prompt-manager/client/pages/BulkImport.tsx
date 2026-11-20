@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Upload, Download, FileSpreadsheet, FileJson, FileText, ClipboardPaste, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Copy, ShieldCheck, Library, FolderKanban, RefreshCw, CloudOff, FileUp, ArrowRight } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, FileJson, FileText, ClipboardPaste, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Copy, ShieldCheck, Library, FolderKanban, RefreshCw, CloudOff, FileUp, ArrowRight, Sparkles } from 'lucide-react';
 import { useStoreVersion, store } from '../lib/store';
 import { api, apiUrl, downloadUrl, ApiError, uploadParts, getTransferChunk } from '../lib/api';
 import { topProjects, projectLabel } from '../lib/data';
@@ -110,6 +110,7 @@ export default function BulkImport() {
               <label className="radio-card"><input type="radio" checked={dest === 'library'} onChange={() => setDest('library')} /><span><span className="strong row gap-4"><Library style={{ width: 16 }} />Global Prompt Template Library</span><span className="small muted">Reusable templates for any project. Collection names become tags.</span></span></label>
             </div>
             {dest === 'project' && (topProjects(true).length ? <Field label="Project or subproject" htmlFor="dest"><ProjectSelect id="dest" value={projectId} onChange={setProjectId} /></Field> : <div className="alert info">Create a project first, or import into the template library.</div>)}
+            <div className="alert info"><Sparkles />Next: download the template, or use the ready-made AI prompt to have ChatGPT / Claude fill it for you.</div>
           </div>
         </Card>
       )}
