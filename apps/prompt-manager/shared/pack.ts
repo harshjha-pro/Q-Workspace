@@ -1,6 +1,7 @@
-import { fillVariables } from './variables';
+import { fillVariables, fillPrompt, humanizeVariable } from './variables';
+import type { VariableMeta } from './schema';
 
-export interface PackItem { title: string; content: string; type: 'mandatory' | 'optional'; instructions?: string; description?: string; stepInstructions?: string }
+export interface PackItem { title: string; content: string; type: 'mandatory' | 'optional'; instructions?: string; description?: string; stepInstructions?: string; inputs?: VariableMeta[] }
 export interface PackInput {
   projectName: string;
   subprojectName?: string;
@@ -24,14 +25,14 @@ export function buildPackText(p: PackInput): string {
   lines.push(`Prompts: ${p.items.length} (${p.items.filter((i) => i.type === 'mandatory').length} mandatory)`);
   const vars = Object.entries(p.values).filter(([, v]) => v.trim());
   if (vars.length) {
-    lines.push('', 'Variables:');
-    for (const [k, v] of vars) lines.push(`  ${k} = ${v}`);
+    lines.push('', 'Inputs:');
+    for (const [k, v] of vars) lines.push(`  ${humanizeVariable(k)} = ${v}`);
   }
   lines.push(`Generated: ${p.generatedAt.toLocaleString()}`, rule, '');
   p.items.forEach((it, i) => {
     lines.push(`[${i + 1}/${p.items.length}] ${it.title} (${it.type === 'mandatory' ? 'Mandatory' : 'Optional'})`, thin);
     if (it.stepInstructions) lines.push(`Step instructions: ${fillVariables(it.stepInstructions, p.values)}`, '');
-    lines.push(fillVariables(it.content, p.values));
+    lines.push(fillPrompt(it.content, it.inputs, p.values));
     if (it.instructions) lines.push('', `Additional instructions: ${fillVariables(it.instructions, p.values)}`);
     lines.push('', rule, '');
   });
@@ -47,15 +48,15 @@ export function buildPackMarkdown(p: PackInput): string {
   lines.push(`**Generated:** ${p.generatedAt.toLocaleString()}`, '');
   const vars = Object.entries(p.values).filter(([, v]) => v.trim());
   if (vars.length) {
-    lines.push('## Variables', '', '| Variable | Value |', '|---|---|');
-    for (const [k, v] of vars) lines.push(`| \`${k}\` | ${v.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`);
+    lines.push('## Inputs', '', '| Input | Value |', '|---|---|');
+    for (const [k, v] of vars) lines.push(`| ${humanizeVariable(k).replace(/\|/g, '\\|')} | ${v.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`);
     lines.push('');
   }
   p.items.forEach((it, i) => {
     lines.push('---', '', `## ${i + 1}. ${it.title}`, '', `*${it.type === 'mandatory' ? 'Mandatory' : 'Optional'}*`, '');
     if (it.stepInstructions) lines.push(`> ${fillVariables(it.stepInstructions, p.values).replace(/\n/g, '\n> ')}`, '');
     // Fenced so formatting, line breaks and special characters survive verbatim.
-    const body = fillVariables(it.content, p.values);
+    const body = fillPrompt(it.content, it.inputs, p.values);
     const fence = body.includes('```') ? '~~~~' : '```';
     lines.push(fence + 'text', body, fence, '');
     if (it.instructions) lines.push(`**Additional instructions:** ${fillVariables(it.instructions, p.values)}`, '');

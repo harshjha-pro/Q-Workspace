@@ -25,6 +25,15 @@ export function PromptForm({ initial, onSave, onCancel, kind, saveLabel }: {
   const saved = useRef(false);
   const dirty = JSON.stringify(v) !== JSON.stringify(initial);
   const meta = useMemo(() => mergeVariableMeta(v.content, v.variables, v.instructions), [v.content, v.variables, v.instructions]);
+  const insertInput = (name: string) => {
+    const ta = document.getElementById('pc') as HTMLTextAreaElement | null;
+    const tag = `{${name}}`;
+    setPreview(false);
+    setV((s) => {
+      const at = ta && document.activeElement !== null ? ta.selectionStart ?? s.content.length : s.content.length;
+      return { ...s, content: s.content.slice(0, at) + tag + s.content.slice(at) };
+    });
+  };
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) => { setV((s) => ({ ...s, [k]: val })); setErrors((e) => ({ ...e, [k]: '' })); };
 
   // Guard against losing unsaved edits (in-app navigation and tab close).
@@ -58,7 +67,7 @@ export function PromptForm({ initial, onSave, onCancel, kind, saveLabel }: {
     <div className="full-editor">
       <Card pad className="col gap-16">
         <Field label="Prompt title" required error={errors.title} htmlFor="pt"><Input id="pt" value={v.title} onChange={(e) => set('title', e.target.value)} maxLength={300} placeholder="e.g. Market Research Prompt" autoFocus={!initial.title} invalid={!!errors.title} /></Field>
-        <Field label="Prompt content" required error={errors.content} htmlFor="pc" hint={<>Use <span className="var-chip">{'{variable_name}'}</span> for fillable fields. Line breaks and formatting are preserved.</>}
+        <Field label="Prompt content" required error={errors.content} htmlFor="pc" hint={<>Write the prompt as usual. To fill an input in place, type its title in braces, e.g. <span className="var-chip">{'{Company name}'}</span>. Line breaks and formatting are preserved.</>}
           action={meta.length > 0 && <Button size="sm" variant="ghost" icon={<Wand2 />} onClick={() => setPreview(!preview)}>{preview ? 'Edit' : 'Preview'}</Button>}>
           {preview ? <PromptText content={v.content} /> : <Textarea id="pc" className="editor-area" value={v.content} onChange={(e) => set('content', e.target.value)} placeholder="Write the full prompt…" invalid={!!errors.content} spellCheck />}
         </Field>
@@ -69,16 +78,16 @@ export function PromptForm({ initial, onSave, onCancel, kind, saveLabel }: {
           </div>
         </Field>
       </Card>
+      <Card pad className="col gap-12">
+        <div className="row between row-wrap"><h3>Inputs</h3><span className="tiny muted">Fields to fill each time the prompt is used</span></div>
+        <VariableMetaEditor meta={meta} onChange={(m) => set('variables', m)} onInsert={insertInput} />
+      </Card>
       <Card pad className="col gap-16">
         <h3>Organisation</h3>
         <Field label="Description"><Input value={v.description} onChange={(e) => set('description', e.target.value)} placeholder="Short summary shown in lists" /></Field>
         <Field label="Purpose / intended use"><Input value={v.purpose} onChange={(e) => set('purpose', e.target.value)} placeholder="When should this prompt be used?" /></Field>
         <Field label="Tags" hint="Press Enter or comma to add"><TagInput value={v.tags} onChange={(t) => set('tags', t)} /></Field>
         <Field label="Additional instructions" hint="Appended after the prompt when copied or included in packs."><Textarea rows={3} value={v.instructions} onChange={(e) => set('instructions', e.target.value)} placeholder="e.g. Respond in a table. Cite sources." /></Field>
-      </Card>
-      <Card pad className="col gap-12">
-        <div className="row between"><h3>Variables</h3><span className="tiny muted">Detected automatically from the content</span></div>
-        <VariableMetaEditor meta={meta} onChange={(m) => set('variables', m)} />
       </Card>
       {kind === 'prompt' && initial.title && (
         <Card pad><Field label="Change description (optional)" hint="Saved with this version in the history."><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Tightened scope to EU markets" /></Field></Card>

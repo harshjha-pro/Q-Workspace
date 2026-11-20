@@ -55,7 +55,7 @@ export default function PromptPackPage() {
   }, [finalList.map((e) => e.key).join()]);
   const missing = missingRequired(meta, values);
 
-  const items: PackItem[] = finalList.map((e) => ({ title: e.group ? `${e.prompt.title} — ${e.group}` : e.prompt.title, content: e.prompt.content, type: e.prompt.type, instructions: e.prompt.instructions, stepInstructions: e.stepInstructions }));
+  const items: PackItem[] = finalList.map((e) => ({ title: e.group ? `${e.prompt.title} — ${e.group}` : e.prompt.title, content: e.prompt.content, type: e.prompt.type, instructions: e.prompt.instructions, stepInstructions: e.stepInstructions, inputs: e.prompt.variables }));
   const input = { projectName: parent ? parent.name : project.name, subprojectName: parent ? project.name : undefined, collectionName: collection?.name, description: collection?.description || project.description, items, values: Object.fromEntries(meta.map((m) => [m.name, values[m.name] ?? ''])), generatedAt: new Date() };
   const text = useMemo(() => (step === 2 ? (format === 'md' ? buildPackMarkdown(input) : buildPackText(input)) : ''), [step, format, JSON.stringify(items), JSON.stringify(values)]);
   const fileBase = safeFileName(`${collection?.name || project.name}-prompt-pack`);
@@ -74,7 +74,7 @@ export default function PromptPackPage() {
   const next = async () => {
     if (step === 0 && !finalList.length) { toast.error('Select at least one prompt.'); return; }
     if (!guardMandatory()) return;
-    if (step === 1 && missing.length && !(await confirmDialog({ title: 'Some required variables are empty', message: `Missing: ${missing.map(humanizeVariable).join(', ')}. They will stay as {placeholders} in the pack.`, confirmLabel: 'Generate anyway' }))) return;
+    if (step === 1 && missing.length && !(await confirmDialog({ title: 'Some required inputs are empty', message: `Missing: ${missing.map(humanizeVariable).join(', ')}. They will stay as {placeholders} in the pack.`, confirmLabel: 'Generate anyway' }))) return;
     setStep(step + 1);
     window.scrollTo(0, 0);
   };
@@ -91,7 +91,7 @@ export default function PromptPackPage() {
   return (
     <div className="col gap-16" style={{ maxWidth: 960 }}>
       <div><h2 className="row gap-8"><PackageOpen style={{ width: 20 }} />Generate prompt pack</h2><p className="small muted">{collection ? `From collection “${collection.name}”` : parent ? `${parent.name} › ${project.name}` : project.name} · mandatory prompts are always included.</p></div>
-      <Stepper steps={['Select prompts', 'Fill variables', 'Review & export']} current={step} />
+      <Stepper steps={['Select prompts', 'Fill inputs', 'Review & export']} current={step} />
 
       {step === 0 && (
         <Card>
@@ -117,7 +117,7 @@ export default function PromptPackPage() {
       {step === 1 && (
         <>
           <Card>
-            <CardHead title="Variables" sub={meta.length ? `${meta.length} across the selected prompts${missing.length ? ` · ${missing.length} required empty` : ''}` : 'No variables in the selected prompts'} actions={meta.length > 0 && <Button size="sm" variant="ghost" icon={<Save />} onClick={saveValues}>Save to project</Button>} />
+            <CardHead title="Inputs" sub={meta.length ? `${meta.length} across the selected prompts${missing.length ? ` · ${missing.length} required empty` : ''}` : 'No inputs in the selected prompts'} actions={meta.length > 0 && <Button size="sm" variant="ghost" icon={<Save />} onClick={saveValues}>Save to project</Button>} />
             <div className="card-body"><VariableForm meta={meta} values={values} onChange={setValues} /></div>
           </Card>
           <Card>

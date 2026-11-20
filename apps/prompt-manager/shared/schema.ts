@@ -23,8 +23,8 @@ const base = { id: 'text', rev: 'int', deleted: 'int', deleted_at: 'text', delet
 const ENTITY_DEFS = {
   projects: {
     table: 'projects', label: 'Project', titleField: 'name', clientWritable: true, projectKey: 'id',
-    fields: { ...base, parent_id: 'text', name: 'text', description: 'text', icon: 'text', color: 'text', status: 'text', tags: 'json', favourite: 'bool', pinned: 'bool', archived: 'bool', sort: 'real', variable_values: 'json', last_accessed_at: 'text' },
-    writable: ['parent_id', 'name', 'description', 'icon', 'color', 'status', 'tags', 'favourite', 'pinned', 'archived', 'sort', 'variable_values', 'last_accessed_at'],
+    fields: { ...base, parent_id: 'text', name: 'text', description: 'text', icon: 'text', avatar: 'text', color: 'text', status: 'text', tags: 'json', favourite: 'bool', pinned: 'bool', archived: 'bool', sort: 'real', variable_values: 'json', last_accessed_at: 'text' },
+    writable: ['parent_id', 'name', 'description', 'icon', 'avatar', 'color', 'status', 'tags', 'favourite', 'pinned', 'archived', 'sort', 'variable_values', 'last_accessed_at'],
     conflictFields: ['name', 'description'],
   },
   prompts: {
@@ -105,9 +105,10 @@ interface BaseRow { id: string; rev: number; deleted: number; deleted_at: string
 export type Status = 'not_started' | 'in_progress' | 'completed';
 export type PromptType = 'mandatory' | 'optional';
 export type FileCategory = 'reference' | 'additional' | 'output';
-export interface VariableMeta { name: string; required: boolean; description?: string }
+/** An input of a prompt. `declared` = added by the user (kept even if not placed in the text as {Name}). */
+export interface VariableMeta { name: string; required: boolean; description?: string; declared?: boolean }
 
-export interface Project extends BaseRow { parent_id: string | null; name: string; description: string; icon: string; color: string; status: Status; tags: string[]; favourite: boolean; pinned: boolean; archived: boolean; sort: number; variable_values: Record<string, string>; last_accessed_at: string | null }
+export interface Project extends BaseRow { parent_id: string | null; name: string; description: string; icon: string; avatar: string; color: string; status: Status; tags: string[]; favourite: boolean; pinned: boolean; archived: boolean; sort: number; variable_values: Record<string, string>; last_accessed_at: string | null }
 export interface Prompt extends BaseRow { project_id: string; title: string; content: string; description: string; purpose: string; type: PromptType; tags: string[]; instructions: string; variables: VariableMeta[]; sort: number; version_no: number; source_template_id: string | null; import_job_id: string | null }
 export interface PromptVersion extends BaseRow { prompt_id: string; version_no: number; title: string; content: string; description: string; purpose: string; type: PromptType; tags: string[]; instructions: string; change_note: string }
 export interface Template extends BaseRow { title: string; content: string; description: string; purpose: string; type: PromptType; tags: string[]; instructions: string; variables: VariableMeta[]; favourite: boolean; sort: number; import_job_id: string | null }
@@ -128,7 +129,7 @@ export interface RowMap {
 }
 
 export const DEFAULTS: { [K in EntityName]?: Partial<RowMap[K]> } = {
-  projects: { parent_id: null, description: '', icon: 'folder', color: 'indigo', status: 'not_started', tags: [], favourite: false, pinned: false, archived: false, sort: 0, variable_values: {}, last_accessed_at: null },
+  projects: { parent_id: null, description: '', icon: 'folder', avatar: '', color: 'indigo', status: 'not_started', tags: [], favourite: false, pinned: false, archived: false, sort: 0, variable_values: {}, last_accessed_at: null },
   prompts: { description: '', purpose: '', type: 'optional', tags: [], instructions: '', variables: [], sort: 0, version_no: 1, source_template_id: null, import_job_id: null },
   templates: { description: '', purpose: '', type: 'optional', tags: [], instructions: '', variables: [], favourite: false, sort: 0, import_job_id: null },
   collections: { description: '', sort: 0, workflow_status: 'idle', current_step_id: null, started_at: null, finished_at: null },

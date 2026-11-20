@@ -80,7 +80,7 @@ export default function Overview() {
             <div className="card-body col gap-8">{actions.map((a) => <Button key={a.label} icon={a.icon} onClick={a.onClick} block style={{ justifyContent: 'flex-start' }}>{a.label}</Button>)}</div>
           </Card>
           <Card>
-            <CardHead title={<span className="row gap-4"><Variable style={{ width: 16, height: 16 }} />Saved variable values</span>} actions={<Button size="sm" variant="ghost" onClick={() => setVarsOpen(true)}>Edit</Button>} />
+            <CardHead title={<span className="row gap-4"><Variable style={{ width: 16, height: 16 }} />Saved input values</span>} actions={<Button size="sm" variant="ghost" onClick={() => setVarsOpen(true)}>Edit</Button>} />
             <div className="card-body small muted">{varCount ? Object.entries(project.variable_values).filter(([, v]) => v).slice(0, 6).map(([k, v]) => <div key={k} className="row between gap-12"><span className="var-chip">{k}</span><span className="truncate" style={{ maxWidth: '60%' }}>{v}</span></div>) : 'Values you fill in prompts and packs are remembered here for this project.'}</div>
           </Card>
           {outputs.length > 0 && (
@@ -128,7 +128,7 @@ function VariablesModal({ open, onClose }: { open: boolean; onClose: () => void 
   if (!open) return null;
   const list = [...names].sort();
   return (
-    <Modal open onClose={onClose} title="Saved variable values" footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" onClick={() => { store.update('projects', project.id, { variable_values: vals }); toast.success('Saved'); onClose(); }}>Save</Button></>}>
+    <Modal open onClose={onClose} title="Saved input values" footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" onClick={() => { store.update('projects', project.id, { variable_values: vals }); toast.success('Saved'); onClose(); }}>Save</Button></>}>
       <p className="small muted">These values pre-fill prompts and prompt packs in this {project.parent_id ? 'subproject' : 'project'}. The prompts themselves are never changed.</p>
       {list.length ? list.map((n) => <Field key={n} label={humanizeVariable(n)} hint={`{${n}}`}><Input value={vals[n] ?? ''} onChange={(e) => setVals({ ...vals, [n]: e.target.value })} /></Field>) : <p className="muted">No variables in this project's prompts yet.</p>}
     </Modal>

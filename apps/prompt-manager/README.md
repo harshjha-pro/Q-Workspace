@@ -27,16 +27,18 @@ For development, run `npm run dev`. This starts the API on :8787 and Vite on :51
 | Area | Highlights |
 |---|---|
 | Auth | Single account, no registration, Argon2id, forced first-login password change, rate limiting with progressive lockout, HttpOnly SameSite=Strict cookie bound to the browser, CSRF token, idle timeout, session list and revoke |
-| Projects | Projects and one level of subprojects, each with its own Overview, Prompts, Collections, Reference / Additional / AI Output files, Tasks, Notes and Activity. Status, tags, favourites, pins, archive, duplicate, trash with restore |
-| Prompts | Mandatory and Optional types, variables (`{like_this}`) with required/optional and descriptions, fill-in forms with live preview, copy completed prompt, version history with compare and restore, reorder, move, save as template |
-| Bulk import | CSV, XLSX and JSON files, or pasted text. Simple and Advanced downloadable templates, default classification, preview, validation, duplicate handling (skip / import / rename), collections and sequences, downloadable error report |
+| Projects | Projects and one level of subprojects, each with its own Overview, Prompts, Collections, Reference / Additional / AI Output files, Tasks, Notes and Activity. Icon and colour or an uploaded display picture, status, tags, favourites, pins, archive, duplicate, trash with restore |
+| Prompts | Mandatory and Optional types, titled inputs (e.g. "Company name") that are filled in place when written as `{Company name}` or appended at the end otherwise, required/optional with help text, fill-in forms with live preview, copy completed prompt, version history with compare and restore, reorder, move, save as template |
+| Bulk import | CSV, XLSX and JSON files, or pasted text. Simple and Advanced downloadable templates (Prompt Title, Prompt Content, Input 1 Title, Input 2 Title…), a copyable "fill the template with AI" instruction whose answer can be pasted straight back, default classification, preview, validation, duplicate handling (skip / import / rename), collections and sequences, downloadable error report |
 | Templates | Global library, tag filters, favourites, "Use template" creates an independent project copy |
 | Collections | Ordered workflows with per-step instructions, a step-by-step runner, progress tracking and resume |
-| Prompt packs | Mandatory prompts are always included (locked), optional ones are selectable, variables are filled, sequence is editable. Copy, TXT or Markdown |
+| Prompt packs | Mandatory prompts are always included (locked), optional ones are selectable, inputs are filled, sequence is editable. Copy, TXT or Markdown |
 | Files | Three independent categories, multi-file upload (also offline), magic-byte validation, encryption at rest, optional ClamAV scan, versions (minor/major), downloads, in-app preview (PDF, DOCX, XLSX/CSV, PPTX, images, TXT/MD) and side-by-side text comparison |
+| Attachment Vault | Every file version across all projects in one list, each linked to where it belongs (Project › Subproject › Category), with search, filters, download and a "latest versions only" toggle |
 | Search | SQLite FTS5 across names, prompts, templates, notes and the extracted text of documents and AI outputs, with filters. Falls back to on-device search when offline |
 | Offline | Encrypted local replica (AES-256-GCM), outbox sync, field-level conflict detection with a resolver, offline unlock with your password, offline file cache |
 | Storage | Local-only, self-hosted or private cloud (S3-compatible), with verified migration between them |
+| Theme | White, black and green design with an optional dark mode |
 | Backup | Passphrase-encrypted backups, scheduled backups, checksum-verified restore with an automatic safety backup, JSON export |
 
 Deploy it on your own machine or server (SQLite), or on **Vercel with a MySQL database such as Hostinger**

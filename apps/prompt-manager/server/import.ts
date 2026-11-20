@@ -8,10 +8,10 @@ import fsp from 'node:fs/promises';
 import { detectVariables } from '../shared/variables';
 
 type PType = 'mandatory' | 'optional';
-interface RawRec { title?: unknown; content?: unknown; type?: unknown; description?: unknown; tags?: unknown; collection?: unknown; sequence?: unknown; variables?: unknown }
+interface RawRec { title?: unknown; content?: unknown; type?: unknown; description?: unknown; tags?: unknown; collection?: unknown; sequence?: unknown; variables?: unknown; inputs?: unknown }
 export interface PreviewRow {
   row: number; title: string; content: string; type: PType; typeFromFile: boolean; description: string; tags: string[];
-  collection: string; sequence: number | null; variables: { name: string; required: boolean }[];
+  collection: string; sequence: number | null; variables: { name: string; required: boolean; description?: string; declared?: boolean }[];
   status: 'ok' | 'error' | 'duplicate'; errors: string[]; warnings: string[]; duplicateOf?: string;
 }
 
@@ -24,37 +24,46 @@ const ALIASES: Record<keyof RawRec, string[]> = {
   collection: ['collection', 'collectionname', 'workflow'],
   sequence: ['sequence', 'sequencenumber', 'seq', 'order', 'step', 'sequenceno'],
   variables: ['variables', 'vars', 'variable'],
+  inputs: ['inputs', 'inputtitles', 'inputnames', 'fields'],
 };
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
+/** "Input 1 Title", "Input 2", "Input Title 3", "Input 1 Name" → numbered input columns. */
+const INPUT_COL = /^(?:input|field|variable)(?:title|name)?(\d{1,2})(?:title|name)?$/;
+function inputColumns(headers: string[]) {
+  return headers.map((h, i) => ({ i, m: norm(h).match(INPUT_COL) })).filter((x) => x.m).sort((a, b) => Number(a.m![1]) - Number(b.m![1])).map((x) => x.i);
+}
 function mapHeaders(headers: string[]) {
   const map: Partial<Record<keyof RawRec, number>> = {};
   headers.forEach((h, i) => {
     const n = norm(h);
+    if (INPUT_COL.test(n)) return;
     for (const [k, list] of Object.entries(ALIASES) as [keyof RawRec, string[]][]) if (list.includes(n) && map[k] === undefined) map[k] = i;
   });
   return map;
 }
 
+const INPUT_HEADERS = ['Input 1 Title', 'Input 2 Title', 'Input 3 Title'];
+const SIMPLE_HEADERS = ['Prompt Title', 'Prompt Content', ...INPUT_HEADERS];
 const SIMPLE_SAMPLE = [
-  ['Market Research', 'Conduct detailed market research for {company_name}.'],
-  ['Competitor Analysis', 'Analyze the major competitors in {industry}.'],
-  ['Business Strategy', 'Develop a comprehensive strategy for {company_name}.'],
+  ['Market Research', 'Conduct detailed market research for {Company name}. Cover market size, growth and key customer segments.', 'Company name', 'Industry', 'Region'],
+  ['Competitor Analysis', 'Identify and compare the five most important competitors. Summarise each in a table.', 'Company name', 'Industry', ''],
+  ['Business Strategy', 'Develop a 12-month growth strategy with clear priorities and milestones.', 'Company name', 'Target customers', 'Budget'],
 ];
-const ADV_HEADERS = ['Prompt Title', 'Prompt Content', 'Prompt Type', 'Description', 'Tags', 'Collection', 'Sequence', 'Variables'];
+const ADV_HEADERS = ['Prompt Title', 'Prompt Content', 'Prompt Type', 'Description', 'Tags', 'Collection', 'Sequence', ...INPUT_HEADERS];
 const ADV_SAMPLE = [
-  ['Market Research', 'Conduct detailed market research for {company_name}.', 'Mandatory', 'Market analysis', 'research,market', 'Business Research', '1', 'company_name'],
-  ['Competitor Analysis', 'Analyze the major competitors in {industry}.', 'Mandatory', 'Competitor research', 'competitors,research', 'Business Research', '2', 'industry'],
-  ['SWOT Analysis', 'Prepare a SWOT analysis for {company_name}.\nInclude:\n- Strengths\n- Weaknesses\n- Opportunities\n- Threats', 'Optional', 'Strategic analysis', 'strategy,swot', 'Business Research', '3', 'company_name'],
+  ['Market Research', 'Conduct detailed market research for {Company name}. Cover market size, growth and key customer segments.', 'Mandatory', 'Market analysis', 'research,market', 'Business Research', '1', 'Company name', 'Industry', 'Region'],
+  ['Competitor Analysis', 'Identify and compare the five most important competitors. Summarise each in a table.', 'Mandatory', 'Competitor research', 'competitors,research', 'Business Research', '2', 'Company name', 'Industry', ''],
+  ['SWOT Analysis', 'Prepare a SWOT analysis for {Company name}.\nInclude:\n- Strengths\n- Weaknesses\n- Opportunities\n- Threats', 'Optional', 'Strategic analysis', 'strategy,swot', 'Business Research', '3', 'Company name', 'Time horizon?', ''],
 ];
 
 async function buildTemplate(kind: 'simple' | 'advanced', format: 'csv' | 'xlsx' | 'json'): Promise<{ body: Buffer; mime: string; name: string }> {
-  const headers = kind === 'simple' ? ['Prompt Title', 'Prompt Content'] : ADV_HEADERS;
+  const headers = kind === 'simple' ? SIMPLE_HEADERS : ADV_HEADERS;
   const rows = kind === 'simple' ? SIMPLE_SAMPLE : ADV_SAMPLE;
   const name = `prompt-import-${kind}`;
   if (format === 'csv') return { body: Buffer.from('﻿' + Papa.unparse([headers, ...rows], { newline: '\r\n' })), mime: 'text/csv', name: name + '.csv' };
   if (format === 'json') {
-    const prompts = rows.map((r) => kind === 'simple' ? { title: r[0], content: r[1] } : {
-      title: r[0], content: r[1], type: r[2].toLowerCase(), description: r[3], tags: r[4].split(','), collection: r[5], sequence: Number(r[6]), variables: r[7].split(','),
+    const prompts = rows.map((r) => kind === 'simple' ? { title: r[0], content: r[1], inputs: r.slice(2).filter(Boolean) } : {
+      title: r[0], content: r[1], type: r[2].toLowerCase(), description: r[3], tags: r[4].split(','), collection: r[5], sequence: Number(r[6]), inputs: r.slice(7).filter(Boolean),
     });
     return { body: Buffer.from(JSON.stringify({ prompts }, null, 2)), mime: 'application/json', name: name + '.json' };
   }
@@ -64,8 +73,8 @@ async function buildTemplate(kind: 'simple' | 'advanced', format: 'csv' | 'xlsx'
   ws.addRow(headers);
   rows.forEach((r) => ws.addRow(kind === 'advanced' ? r.map((v, i) => (i === 6 ? Number(v) : v)) : r));
   ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3F51A3' } };
-  ws.columns.forEach((c, i) => { c.width = i === 1 ? 70 : i === 0 ? 28 : 18; c.alignment = { wrapText: true, vertical: 'top' }; });
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+  ws.columns.forEach((c, i) => { c.width = i === 1 ? 70 : i === 0 ? 28 : 20; c.alignment = { wrapText: true, vertical: 'top' }; });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   if (kind === 'advanced') {
     (ws as any).dataValidations?.add?.('C2:C5000', { type: 'list', allowBlank: true, formulae: ['"Mandatory,Optional"'] });
@@ -74,12 +83,13 @@ async function buildTemplate(kind: 'simple' | 'advanced', format: 'csv' | 'xlsx'
   const lines = [
     'Fill one prompt per row on the "Prompts" sheet. Keep the header row.',
     'Prompt Title and Prompt Content are required. Line breaks inside a cell are preserved.',
-    'Use {variable_name} inside the content for fillable fields.',
+    'Inputs: put each input title (e.g. "Company name", "Industry") in its own "Input N Title" column. Add more columns (Input 4 Title, Input 5 Title, …) if needed.',
+    'To fill an input inside the text, write its title in braces, e.g. {Company name}. Inputs not written in the text are added at the end of the completed prompt.',
+    'Add ? after an input title to make it optional, e.g. "Region?".',
     ...(kind === 'advanced' ? [
       'Prompt Type: Mandatory or Optional. Leave blank to use the default you choose during import.',
       'Tags: separate with commas. Collection: prompts with the same collection name are grouped.',
       'Sequence: a whole number setting the order inside the collection.',
-      'Variables: optional, comma-separated. Add ? to mark a variable optional, e.g. "industry?".',
     ] : []),
     'Existing prompts are never overwritten. Duplicates are shown for review before import.',
   ];
@@ -97,9 +107,11 @@ function fromTable(rows: unknown[][]): { recs: RawRec[]; structure: string[] } {
   if (map.title === undefined || map.content === undefined) {
     return { recs: [], structure: [`Missing required columns. Expected "Prompt Title" and "Prompt Content" in the first row; found: ${headers.filter(Boolean).join(', ') || 'nothing'}.`] };
   }
+  const inCols = inputColumns(headers);
   const recs = nonEmpty.slice(1).map((r) => {
     const o: RawRec = {};
     for (const [k, i] of Object.entries(map) as [keyof RawRec, number][]) o[k] = r[i];
+    if (inCols.length) o.inputs = [...splitList(o.inputs), ...inCols.map((i) => String(r[i] ?? '').trim()).filter(Boolean)];
     return o;
   });
   return { recs, structure: [] };
@@ -130,7 +142,10 @@ function parseJson(text: string) {
   const recs: RawRec[] = list.map((p: any) => {
     if (!p || typeof p !== 'object') return {};
     const g = (...keys: string[]) => { for (const k of Object.keys(p)) if (keys.includes(norm(k))) return p[k]; return undefined; };
-    return { title: g(...ALIASES.title), content: g(...ALIASES.content), type: g(...ALIASES.type), description: g(...ALIASES.description), tags: g(...ALIASES.tags), collection: g(...ALIASES.collection), sequence: g(...ALIASES.sequence), variables: g(...ALIASES.variables) };
+    const numbered = Object.keys(p).map((k) => ({ k, m: norm(k).match(INPUT_COL) })).filter((x) => x.m).sort((a, b) => Number(a.m![1]) - Number(b.m![1])).map((x) => p[x.k]);
+    const listed = g(...ALIASES.inputs);
+    const inputs = [...(Array.isArray(listed) ? listed : listed != null ? [listed] : []), ...numbered];
+    return { title: g(...ALIASES.title), content: g(...ALIASES.content), type: g(...ALIASES.type), description: g(...ALIASES.description), tags: g(...ALIASES.tags), collection: g(...ALIASES.collection), sequence: g(...ALIASES.sequence), variables: g(...ALIASES.variables), inputs };
   });
   return { recs, structure: [] };
 }
@@ -146,9 +161,18 @@ function parseCsv(text: string, delimiter?: string) {
 
 /** Pasted text: spreadsheet copy (tab separated) or blocks separated by '---'. */
 function parsePaste(text: string) {
-  const t = text.replace(/\r\n?/g, '\n').trim();
+  let t = text.replace(/\r\n?/g, '\n').trim();
+  // AI answers often wrap the result in a ``` code block, sometimes with a sentence around it.
+  const fence = t.match(/```[a-zA-Z]*\n([\s\S]*?)\n```/);
+  if (fence) t = fence[1].trim();
   if (!t) return { recs: [], structure: ['Paste at least one prompt.'] };
+  if (/^[[{]/.test(t)) return parseJson(t);
   const firstLine = t.split('\n')[0];
+  if (!firstLine.includes('\t') && /,|;/.test(firstLine)) {
+    const delim = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+    const hm = mapHeaders(Papa.parse<string[]>(firstLine, { delimiter: delim }).data[0] || []);
+    if (hm.title !== undefined && hm.content !== undefined) return parseCsv(t, delim);
+  }
   if (firstLine.includes('\t')) {
     const r = Papa.parse<string[]>(t, { delimiter: '\t', skipEmptyLines: 'greedy' });
     const map = mapHeaders(r.data[0] || []);
@@ -209,9 +233,23 @@ async function validate(recs: RawRec[], defaultType: PType, destination: 'librar
       }
     }
     const detected = detectVariables(content);
+    const k = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
     const listed = splitList(r.variables).map((v) => v.replace(/^\{|\}$/g, ''));
-    const variables = detected.map((name) => ({ name, required: !listed.some((l) => l === name + '?') }));
-    for (const l of listed) { const n = l.replace(/\?$/, ''); if (n && !detected.includes(n)) warnings.push(`Variable "${n}" is listed but not used in the content`); }
+    const declared: PreviewRow['variables'] = [];
+    for (const raw of (Array.isArray(r.inputs) ? r.inputs : splitList(r.inputs))) {
+      const item = raw && typeof raw === 'object' ? raw as any : { title: raw };
+      const t0 = String(item.title ?? item.name ?? '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+      const optional = t0.endsWith('?') || item.required === false;
+      const name = t0.replace(/\?$/, '').trim().slice(0, 64);
+      if (!name || declared.some((d) => k(d.name) === k(name))) continue;
+      declared.push({ name, required: !optional, description: String(item.description ?? '').slice(0, 500), declared: true });
+    }
+    if (declared.length > 50) { warnings.push('Only the first 50 inputs are kept'); declared.length = 50; }
+    const variables = [
+      ...declared,
+      ...detected.filter((n) => !declared.some((d) => k(d.name) === k(n))).map((name) => ({ name, required: !listed.some((l) => k(l) === k(name) + '?'), description: '', declared: false })),
+    ];
+    for (const l of listed) { const n = l.replace(/\?$/, ''); if (n && !detected.some((d) => k(d) === k(n)) && !declared.some((d) => k(d.name) === k(n))) warnings.push(`Variable "${n}" is listed but not used in the content`); }
     const tags = splitList(r.tags).slice(0, 50).map((t) => t.slice(0, 50));
     let status: PreviewRow['status'] = errors.length ? 'error' : 'ok';
     let duplicateOf: string | undefined;

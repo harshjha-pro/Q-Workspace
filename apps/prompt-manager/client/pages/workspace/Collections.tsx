@@ -6,7 +6,7 @@ import {
 import { store, useStoreVersion } from '../../lib/store';
 import { collectionsOf, stepsOf, promptsOf, getProject } from '../../lib/data';
 import { copyText, timeAgo, plural, useIsMobile, matches, cx } from '../../lib/util';
-import { fillVariables, mergeVariableMeta, missingRequired } from '../../../shared/variables';
+import { fillVariables, fillPrompt, withAppendedInputs, mergeVariableMeta, missingRequired } from '../../../shared/variables';
 import { Button, IconButton, Card, CardHead, EmptyState, Field, Input, Textarea, ProgressBar, TypeBadge, Checkbox, SearchBox, Badge } from '../../components/ui';
 import { ActionMenu, Modal, confirmDialog, promptDialog, toast } from '../../components/overlay';
 import { PromptText, VariableForm } from '../../components/domain';
@@ -241,7 +241,7 @@ function WorkflowRunner({ c, onExit }: { c: Collection; onExit: () => void }) {
   if (!step) return null;
   const p: Prompt = step.prompt;
   const meta = mergeVariableMeta(p.content, p.variables, p.instructions);
-  const text = fillVariables(p.content, values) + (p.instructions ? `\n\n${fillVariables(p.instructions, values)}` : '');
+  const text = fillPrompt(p.content, meta, values) + (p.instructions ? `\n\n${fillVariables(p.instructions, values)}` : '');
   const missing = missingRequired(meta, values);
   const saveVals = () => {
     const keep = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
@@ -287,9 +287,9 @@ function WorkflowRunner({ c, onExit }: { c: Collection; onExit: () => void }) {
           <div className="card-body col gap-16">
             {step.instructions && <div className="alert info pre"><FileText />{fillVariables(step.instructions, values)}</div>}
             {meta.length > 0 && <VariableForm meta={meta} values={values} onChange={setValues} compact={mobile} />}
-            <PromptText content={p.content} values={values} />
+            <PromptText content={withAppendedInputs(p.content, meta, values)} values={values} />
             {p.instructions && <div className="small"><span className="strong">Additional instructions: </span>{fillVariables(p.instructions, values)}</div>}
-            {missing.length > 0 && <div className="tiny warning-text">{missing.length} required variable{missing.length === 1 ? '' : 's'} not filled.</div>}
+            {missing.length > 0 && <div className="tiny warning-text">{missing.length} required input{missing.length === 1 ? '' : 's'} not filled.</div>}
             <ol className="small muted" style={{ margin: 0, paddingLeft: 18 }}><li>Copy the prompt.</li><li>Run it in your AI tool.</li><li>Upload the result under AI Outputs, then mark this step complete.</li></ol>
           </div>
           <div className="sticky-actions" style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '0 0 12px 12px', flexWrap: 'wrap' }}>

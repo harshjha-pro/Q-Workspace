@@ -1,8 +1,8 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { diffWords, diffLines } from 'diff';
 import {
   Folder, Briefcase, BarChart3, Rocket, Lightbulb, Target, BookOpen, Megaphone, DollarSign, Users, FlaskConical, Globe, Layers, Sparkles,
-  FileText, FileSpreadsheet, Presentation, Image as ImageIcon, FileType2, FileCode2, X, Plus, Check,
+  FileText, FileSpreadsheet, Presentation, Image as ImageIcon, FileType2, FileCode2, X, Plus, Check, Upload, Trash2,
 } from 'lucide-react';
 import { Button, Field, Input, Textarea, Select, Segmented, Switch, Chip } from './ui';
 import { Modal, toast } from './overlay';
@@ -18,11 +18,28 @@ export const PROJECT_ICONS: Record<string, (p: { className?: string }) => ReactN
   dollar: (p) => <DollarSign {...p} />, users: (p) => <Users {...p} />, flask: (p) => <FlaskConical {...p} />, globe: (p) => <Globe {...p} />,
   layers: (p) => <Layers {...p} />, sparkles: (p) => <Sparkles {...p} />,
 };
-export const TONES = ['indigo', 'blue', 'green', 'amber', 'red', 'violet', 'teal', 'pink', 'slate'];
+export const TONES = ['black', 'green', 'blue', 'indigo', 'teal', 'amber', 'red', 'pink', 'violet', 'slate'];
 
-export function ProjectIcon({ project, size }: { project?: Pick<Project, 'icon' | 'color'>; size?: 'sm' | 'lg' }) {
+export function ProjectIcon({ project, size }: { project?: Pick<Project, 'icon' | 'color'> & { avatar?: string }; size?: 'sm' | 'lg' }) {
+  if (project?.avatar) return <span className={cx('icon-tile has-img', size)} aria-hidden><img src={project.avatar} alt="" draggable={false} /></span>;
   const I = PROJECT_ICONS[project?.icon || 'folder'] ?? PROJECT_ICONS.folder;
   return <span className={cx('icon-tile', size, `tone-${project?.color || 'indigo'}`)} aria-hidden><I /></span>;
+}
+
+/** Square-crop and shrink a picture to a small data URL suitable for a project avatar. */
+export async function imageToAvatar(file: File, size = 256): Promise<string> {
+  if (!/^image\/(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.type)) throw new Error('Choose a PNG, JPEG or WebP picture.');
+  if (file.size > 25 * 1024 * 1024) throw new Error('That picture is too large (max 25 MB).');
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error('This picture could not be read.'); });
+  const s = Math.min(bmp.width, bmp.height);
+  const c = document.createElement('canvas'); c.width = size; c.height = size;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, size, size);
+  bmp.close?.();
+  let url = c.toDataURL('image/webp', 0.85);
+  if (!url.startsWith('data:image/webp')) url = c.toDataURL('image/jpeg', 0.85);
+  return url;
 }
 
 const IMG = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
@@ -65,11 +82,13 @@ export function TagInput({ value, onChange, placeholder = 'Add tag…' }: { valu
 export function PromptText({ content, values, className }: { content: string; values?: Record<string, string>; className?: string }) {
   const parts = useMemo(() => {
     const out: ReactNode[] = [];
-    const re = /(?<!\{)\{([A-Za-z_][A-Za-z0-9_.-]{0,63})\}(?!\})/g;
+    const re = /(?<!\{)\{([A-Za-z_][A-Za-z0-9_ .-]{0,63}?)\s*\}(?!\})/g;
+    const norm = (k: string) => k.trim().toLowerCase().replace(/\s+/g, ' ');
+    const vals = new Map(Object.entries(values || {}).map(([k, v]) => [norm(k), v]));
     let last = 0; let m: RegExpExecArray | null; let i = 0;
     while ((m = re.exec(content))) {
       out.push(content.slice(last, m.index));
-      const v = values?.[m[1]];
+      const v = vals.get(norm(m[1]));
       out.push(v ? <span key={i++} className="var filled" title={`{${m[1]}}`}>{v}</span> : <span key={i++} className="var">{m[0]}</span>);
       last = m.index + m[0].length;
     }
@@ -81,13 +100,13 @@ export function PromptText({ content, values, className }: { content: string; va
 
 export function VariableForm({ meta, values, onChange, compact }: { meta: VariableMeta[]; values: Record<string, string>; onChange: (v: Record<string, string>) => void; compact?: boolean }) {
   const uid = useId();
-  if (!meta.length) return <p className="small muted">This prompt has no variables. Add <span className="var-chip">{'{like_this}'}</span> to the content to create fillable fields.</p>;
+  if (!meta.length) return <p className="small muted">This prompt has no inputs. Edit it to add inputs such as “Company name”, or type <span className="var-chip">{'{Company name}'}</span> in the text.</p>;
   return (
     <div className={cx('grid', !compact && 'grid-2')} style={{ gap: 12 }}>
       {meta.map((m) => {
         const long = (values[m.name] || '').length > 60;
         return (
-          <Field key={m.name} label={humanizeVariable(m.name)} required={m.required} hint={m.description || `{${m.name}}`} htmlFor={`${uid}-${m.name}`}>
+          <Field key={m.name} label={humanizeVariable(m.name)} required={m.required} hint={m.description || (m.declared ? 'Added at the end of the prompt unless placed in the text' : `{${m.name}}`)} htmlFor={`${uid}-${m.name}`}>
             {long ? <Textarea id={`${uid}-${m.name}`} rows={3} value={values[m.name] ?? ''} onChange={(e) => onChange({ ...values, [m.name]: e.target.value })} />
               : <Input id={`${uid}-${m.name}`} value={values[m.name] ?? ''} placeholder={m.required ? 'Required' : 'Optional'} onChange={(e) => onChange({ ...values, [m.name]: e.target.value })} />}
           </Field>
@@ -97,18 +116,45 @@ export function VariableForm({ meta, values, onChange, compact }: { meta: Variab
   );
 }
 
-/** Editor for variable metadata (required flag + description). */
-export function VariableMetaEditor({ meta, onChange }: { meta: VariableMeta[]; onChange: (m: VariableMeta[]) => void }) {
-  if (!meta.length) return <p className="small muted">No variables detected. Type <span className="var-chip">{'{company_name}'}</span> in the content to add one.</p>;
+/**
+ * Inputs editor. Inputs can be added by title (e.g. "Company name") or come from {placeholders} in the text.
+ * Declared inputs not placed in the text are appended to the end of the completed prompt.
+ */
+export function VariableMetaEditor({ meta, onChange, onInsert }: { meta: VariableMeta[]; onChange: (m: VariableMeta[]) => void; onInsert?: (name: string) => void }) {
+  const [draft, setDraft] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const add = () => {
+    const name = draft.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+    if (!name) return;
+    if (name.length > 64) { setErr('Keep the input title under 64 characters'); return; }
+    if (meta.some((m) => m.name.toLowerCase() === name.toLowerCase())) { setErr('That input already exists'); return; }
+    onChange([...meta, { name, required: true, description: '', declared: true }]);
+    setDraft(''); setErr(null);
+  };
+  const set = (i: number, patch: Partial<VariableMeta>) => onChange(meta.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
     <div className="col gap-12">
+      {meta.length === 0 && <p className="small muted">No inputs yet. Add one below (for example “Company name”, “Industry”), or type <span className="var-chip">{'{Company name}'}</span> in the prompt to fill it in place.</p>}
       {meta.map((m, i) => (
-        <div key={m.name} className="row gap-12 row-wrap" style={{ alignItems: 'flex-start' }}>
-          <span className="var-chip" style={{ marginTop: 10 }}>{`{${m.name}}`}</span>
-          <Input className="grow" style={{ flex: '1 1 180px' }} placeholder="Description (optional)" value={m.description || ''} onChange={(e) => onChange(meta.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} />
-          <Segmented label="Required" value={m.required ? 'req' : 'opt'} onChange={(v) => onChange(meta.map((x, j) => (j === i ? { ...x, required: v === 'req' } : x)))} options={[{ value: 'req', label: 'Required' }, { value: 'opt', label: 'Optional' }]} />
+        <div key={m.name} className="input-row">
+          <div className="row gap-8" style={{ minWidth: 0 }}>
+            <span className="strong truncate">{humanizeVariable(m.name)}</span>
+            <span className="badge">{m.declared ? 'Input' : 'In text'}</span>
+          </div>
+          <Input className="grow" style={{ flex: '1 1 180px' }} placeholder="Help text (optional)" value={m.description || ''} onChange={(e) => set(i, { description: e.target.value })} />
+          <div className="row gap-4">
+            <Segmented label="Required" value={m.required ? 'req' : 'opt'} onChange={(v) => set(i, { required: v === 'req' })} options={[{ value: 'req', label: 'Required' }, { value: 'opt', label: 'Optional' }]} />
+            {onInsert && m.declared && <Button size="sm" variant="ghost" title="Place this input in the prompt text" onClick={() => onInsert(m.name)}>Insert</Button>}
+            {m.declared && <Button size="sm" variant="ghost" icon={<X />} aria-label={`Remove ${m.name}`} onClick={() => onChange(meta.filter((_, j) => j !== i))} />}
+          </div>
         </div>
       ))}
+      <div className="row gap-8">
+        <Input className="grow" value={draft} maxLength={64} placeholder="New input title, e.g. Company name" aria-label="New input title" onChange={(e) => { setDraft(e.target.value); setErr(null); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); add(); } }} />
+        <Button icon={<Plus />} onClick={add} disabled={!draft.trim()}>Add input</Button>
+      </div>
+      {err && <p className="tiny danger-text">{err}</p>}
+      <p className="tiny faint">Inputs written in the text as {'{Title}'} are filled in place. Other inputs are added at the end of the completed prompt as an “Inputs” list.</p>
     </div>
   );
 }
@@ -177,14 +223,20 @@ function ProjectFormInner({ open, onClose, project, parentId, onSaved }: Project
   const [tags, setTags] = useState<string[]>(project?.tags ?? []);
   const [status, setStatus] = useState<Status>(project?.status ?? 'not_started');
   const [icon, setIcon] = useState(project?.icon ?? (isSub ? 'layers' : 'folder'));
-  const [color, setColor] = useState(project?.color ?? 'indigo');
+  const [color, setColor] = useState(project?.color ?? 'black');
+  const [avatar, setAvatar] = useState(project?.avatar ?? '');
+  const pickRef = useRef<HTMLInputElement>(null);
+  const onPick = async (f?: File) => {
+    if (!f) return;
+    try { setAvatar(await imageToAvatar(f)); } catch (e) { toast.error((e as Error).message); }
+  };
   const [pinned, setPinned] = useState(project?.pinned ?? false);
   const [favourite, setFavourite] = useState(project?.favourite ?? false);
   const [error, setError] = useState<string | null>(null);
   const save = () => {
     if (!name.trim()) { setError('Enter a name'); return; }
     registerTags(tags);
-    const data = { name: name.trim(), description: description.trim(), tags, status, icon, color, pinned, favourite };
+    const data = { name: name.trim(), description: description.trim(), tags, status, icon, avatar, color, pinned, favourite };
     let saved: Project;
     if (editing) { store.update('projects', project!.id, data); saved = { ...project!, ...data }; toast.success(`${isSub ? 'Subproject' : 'Project'} updated`); }
     else {
@@ -203,18 +255,28 @@ function ProjectFormInner({ open, onClose, project, parentId, onSaved }: Project
         <Field label="Description"><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this workspace for?" /></Field>
         <Field label="Tags" hint="Press Enter or comma to add"><TagInput value={tags} onChange={setTags} /></Field>
         <Field label="Status"><StatusSelect value={status} onChange={setStatus} /></Field>
-        <Field label="Icon">
-          <div className="row row-wrap gap-4">
-            {Object.keys(PROJECT_ICONS).map((k) => (
-              <button key={k} type="button" aria-label={k} aria-pressed={icon === k} onClick={() => setIcon(k)} className="btn btn-ghost btn-icon" style={{ outline: icon === k ? '2px solid var(--primary)' : undefined }}>
-                <ProjectIcon project={{ icon: k, color }} size="sm" />
-              </button>
-            ))}
+        <Field label="Display picture" hint="Optional. Shown instead of the icon.">
+          <div className="row gap-12 row-wrap">
+            <ProjectIcon project={{ icon, color, avatar }} size="lg" />
+            <input ref={pickRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { void onPick(e.target.files?.[0]); e.target.value = ''; }} />
+            <Button size="sm" icon={<Upload />} onClick={() => pickRef.current?.click()}>{avatar ? 'Change picture' : 'Upload picture'}</Button>
+            {avatar && <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => setAvatar('')}>Use icon instead</Button>}
           </div>
         </Field>
-        <Field label="Colour">
-          <div className="row row-wrap gap-4">{TONES.map((t) => <button key={t} type="button" aria-label={t} aria-pressed={color === t} onClick={() => setColor(t)} className={cx('icon-tile sm', `tone-${t}`)} style={{ border: color === t ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}>{color === t && <Check />}</button>)}</div>
-        </Field>
+        {!avatar && <>
+          <Field label="Icon">
+            <div className="row row-wrap gap-4">
+              {Object.keys(PROJECT_ICONS).map((k) => (
+                <button key={k} type="button" aria-label={k} aria-pressed={icon === k} onClick={() => setIcon(k)} className="btn btn-ghost btn-icon" style={{ outline: icon === k ? '2px solid var(--text)' : undefined }}>
+                  <ProjectIcon project={{ icon: k, color }} size="sm" />
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Colour">
+            <div className="row row-wrap gap-8">{TONES.map((t) => <button key={t} type="button" aria-label={t} title={t[0].toUpperCase() + t.slice(1)} aria-pressed={color === t} onClick={() => setColor(t)} className={cx('swatch', `tone-${t}`)}>{color === t && <Check />}</button>)}</div>
+          </Field>
+        </>}
         <div className="col gap-12">
           <Switch label="Pin to dashboard" checked={pinned} onChange={setPinned} />
           <Switch label="Favourite" checked={favourite} onChange={setFavourite} />

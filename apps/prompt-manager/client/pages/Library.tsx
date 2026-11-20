@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Library as LibraryIcon, Plus, Upload, MoreVertical, Pencil, CopyPlus, Trash2, Star, FolderInput, Copy, ArrowRight, Eye } from 'lucide-react';
+import { Library as LibraryIcon, Plus, Upload, MoreVertical, Pencil, CopyPlus, Trash2, Star, FolderInput, Copy, ArrowRight, Eye, Sparkles } from 'lucide-react';
 import { store, useStoreVersion } from '../lib/store';
 import { registerTags, topProjects, projectLabel, promptsOf, byUpdated } from '../lib/data';
 import { copyText, matches, plural, timeAgo, useIsMobile, formatDateTime } from '../lib/util';
-import { fillVariables } from '../../shared/variables';
+import { fillVariables, fillPrompt, withAppendedInputs } from '../../shared/variables';
 import { Button, IconButton, Card, CardHead, EmptyState, PageHead, SearchBox, Chip, TypeBadge, Tags, FavStar, Field, Input, Segmented, Stepper, ButtonLink } from '../components/ui';
 import { ActionMenu, Modal, confirmDialog, toast } from '../components/overlay';
 import { PromptText, VariableForm, ProjectSelect } from '../components/domain';
@@ -23,10 +23,10 @@ export function UseTemplateModal({ template: t, onClose, defaultProject }: { tem
   const [type, setType] = useState<PromptType>(t.type);
   const vals = { ...(project?.variable_values || {}), ...values };
   const save = () => {
-    const content = fill === 'fill' ? fillVariables(t.content, vals) : t.content;
+    const content = fill === 'fill' ? fillPrompt(t.content, t.variables, vals) : t.content;
     const p = store.create('prompts', {
       project_id: target, title: title.trim() || t.title, content, description: t.description, purpose: t.purpose, type, tags: t.tags,
-      instructions: fill === 'fill' ? fillVariables(t.instructions, vals) : t.instructions, variables: t.variables, source_template_id: t.id, sort: promptsOf(target).length + 1,
+      instructions: fill === 'fill' ? fillVariables(t.instructions, vals) : t.instructions, variables: fill === 'fill' ? t.variables.filter((m) => !vals[m.name]?.trim()) : t.variables, source_template_id: t.id, sort: promptsOf(target).length + 1,
     }, { note: `Created from template “${t.title}”` });
     const filled = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
     if (Object.keys(filled).length && project) store.update('projects', target, { variable_values: { ...project.variable_values, ...filled } });
@@ -38,13 +38,13 @@ export function UseTemplateModal({ template: t, onClose, defaultProject }: { tem
   return (
     <Modal open onClose={onClose} size="wide" title={`Use template · ${t.title}`}
       footer={hasProjects ? <>{step > 0 ? <Button onClick={() => setStep(step - 1)}>Back</Button> : <Button onClick={onClose}>Cancel</Button>}{step < 2 ? <Button variant="primary" disabled={!target} onClick={() => setStep(step + 1)}>Next</Button> : <Button variant="primary" onClick={save}>Save to project</Button>}</> : <ButtonLink to="/projects" variant="primary">Create a project first</ButtonLink>}>
-      <Stepper steps={['Destination', 'Variables', 'Preview']} current={step} />
+      <Stepper steps={['Destination', 'Inputs', 'Preview']} current={step} />
       {step === 0 && <Field label="Add to project or subproject"><ProjectSelect value={target} onChange={setTarget} /></Field>}
       {step === 0 && <p className="small muted">A project-specific copy is created. Editing it never changes this template.</p>}
       {step === 1 && (
         <>
           <VariableForm meta={t.variables} values={vals} onChange={(v) => setValues(v)} />
-          {t.variables.length > 0 && <Field label="When saving"><Segmented label="Variable handling" value={fill} onChange={setFill} options={[{ value: 'keep', label: 'Keep as fillable fields' }, { value: 'fill', label: 'Insert these values' }]} /></Field>}
+          {t.variables.length > 0 && <Field label="When saving"><Segmented label="Input handling" value={fill} onChange={setFill} options={[{ value: 'keep', label: 'Keep as fillable inputs' }, { value: 'fill', label: 'Insert these values' }]} /></Field>}
           <Field label="Prompt title"><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           <Field label="Classification"><Segmented label="Classification" value={type} onChange={setType} options={[{ value: 'mandatory', label: 'Mandatory' }, { value: 'optional', label: 'Optional' }]} /></Field>
         </>
@@ -52,8 +52,8 @@ export function UseTemplateModal({ template: t, onClose, defaultProject }: { tem
       {step === 2 && (
         <>
           <div className="row gap-8 row-wrap"><span className="strong">{title}</span><TypeBadge type={type} /><span className="small muted">→ {projectLabel(target)}</span></div>
-          <PromptText content={fill === 'fill' ? fillVariables(t.content, vals) : t.content} values={fill === 'keep' ? vals : undefined} />
-          <Button size="sm" icon={<Copy />} onClick={async () => { await copyText(fillVariables(t.content, vals)); toast.success('Completed prompt copied'); }}>Copy completed prompt</Button>
+          <PromptText content={fill === 'fill' ? fillPrompt(t.content, t.variables, vals) : withAppendedInputs(t.content, t.variables, vals)} values={fill === 'keep' ? vals : undefined} />
+          <Button size="sm" icon={<Copy />} onClick={async () => { await copyText(fillPrompt(t.content, t.variables, vals)); toast.success('Completed prompt copied'); }}>Copy completed prompt</Button>
         </>
       )}
     </Modal>
@@ -90,7 +90,7 @@ export default function LibraryPage() {
   return (
     <>
       <PageHead title="Prompt Template Library" sub={`${plural(all.length, 'reusable template')} available across every project`}
-        actions={!mobile && <><Button icon={<Upload />} onClick={() => nav('/import?dest=library')}>Import templates</Button><Button variant="primary" icon={<Plus />} onClick={() => nav('/library/new')}>Create template</Button></>} />
+        actions={!mobile && <><Button icon={<Sparkles />} onClick={() => nav('/import?dest=library')}>Create with AI</Button><Button icon={<Upload />} onClick={() => nav('/import?dest=library')}>Import templates</Button><Button variant="primary" icon={<Plus />} onClick={() => nav('/library/new')}>Create template</Button></>} />
       <SearchBox value={q} onChange={setQ} placeholder="Search templates…" />
       <div className="chips mt-12" style={{ marginBottom: 16 }}>
         <Chip active={!tag && !favOnly} onClick={() => { setTag(''); setFavOnly(false); }}>All</Chip>
@@ -98,7 +98,7 @@ export default function LibraryPage() {
         {tags.map((t) => <Chip key={t} active={tag === t} onClick={() => setTag(tag === t ? '' : t)}>{t}</Chip>)}
       </div>
       {!list.length ? (
-        <Card><EmptyState icon={<LibraryIcon />} title={all.length ? 'No matching templates' : 'Your library is empty'} action={!all.length && <><Button variant="primary" icon={<Plus />} onClick={() => nav('/library/new')}>Create template</Button><Button icon={<Upload />} onClick={() => nav('/import?dest=library')}>Bulk import</Button></>}>{all.length ? 'Try a different search or tag.' : 'Save prompts you reuse — market analysis, SWOT, summaries — and insert them into any project with variables filled in.'}</EmptyState></Card>
+        <Card><EmptyState icon={<LibraryIcon />} title={all.length ? 'No matching templates' : 'Your library is empty'} action={!all.length && <><Button variant="primary" icon={<Plus />} onClick={() => nav('/library/new')}>Create template</Button><Button icon={<Upload />} onClick={() => nav('/import?dest=library')}>Bulk import</Button></>}>{all.length ? 'Try a different search or tag.' : 'Save prompts you reuse — market analysis, SWOT, summaries — and insert them into any project with inputs filled in.'}</EmptyState></Card>
       ) : (
         <div className="grid grid-cards">
           {list.map((t) => (
@@ -107,7 +107,7 @@ export default function LibraryPage() {
                 <div className="row between"><span className="icon-tile sm tone-indigo"><LibraryIcon /></span><span className="row" onClick={(e) => e.preventDefault()}><FavStar on={t.favourite} onToggle={() => store.update('templates', t.id, { favourite: !t.favourite })} /><TemplateMenu t={t} onUse={() => setUsing(t)} /></span></div>
                 <div className="strong">{t.title}</div>
                 <div className="small muted clamp-2">{t.description || t.content}</div>
-                <div className="row gap-4 row-wrap mt-4"><TypeBadge type={t.type} />{t.variables.length > 0 && <span className="badge badge-outline">{plural(t.variables.length, 'variable')}</span>}<Tags tags={t.tags} max={2} /></div>
+                <div className="row gap-4 row-wrap mt-4"><TypeBadge type={t.type} />{t.variables.length > 0 && <span className="badge badge-outline">{plural(t.variables.length, 'input')}</span>}<Tags tags={t.tags} max={2} /></div>
               </Link>
               <div className="row between" style={{ padding: '0 20px 16px' }}>
                 <span className="tiny faint">Updated {timeAgo(t.updated_at)}</span>
@@ -118,7 +118,7 @@ export default function LibraryPage() {
         </div>
       )}
       {mobile && <button className="fab" aria-label="Create template" onClick={() => nav('/library/new')}><Plus /></button>}
-      {mobile && <div className="mt-16"><Button block icon={<Upload />} onClick={() => nav('/import?dest=library')}>Bulk import templates</Button></div>}
+      {mobile && <div className="mt-16 col gap-8"><Button block icon={<Upload />} onClick={() => nav('/import?dest=library')}>Bulk import templates</Button><Button block icon={<Sparkles />} onClick={() => nav('/import?dest=library')}>Create templates with AI</Button></div>}
       {using && <UseTemplateModal template={using} onClose={() => setUsing(null)} />}
     </>
   );
@@ -145,7 +145,7 @@ export function TemplateDetail() {
             {t.variables.length > 0 && <><h3>Try it with values</h3><VariableForm meta={t.variables} values={values} onChange={setValues} /></>}
             <PromptText content={t.content} values={values} />
             {t.instructions && <div className="small"><span className="strong">Additional instructions: </span>{t.instructions}</div>}
-            <div className="row row-wrap"><Button icon={<Copy />} onClick={async () => { await copyText(fillVariables(t.content, values)); toast.success('Copied'); }}>Copy {t.variables.length ? 'completed' : ''}</Button><Button variant="primary" icon={<FolderInput />} onClick={() => setUsing(true)}>Use in a project</Button></div>
+            <div className="row row-wrap"><Button icon={<Copy />} onClick={async () => { await copyText(fillPrompt(t.content, t.variables, values)); toast.success('Copied'); }}>Copy {t.variables.length ? 'completed' : ''}</Button><Button variant="primary" icon={<FolderInput />} onClick={() => setUsing(true)}>Use in a project</Button></div>
           </div>
         </Card>
         <Card>

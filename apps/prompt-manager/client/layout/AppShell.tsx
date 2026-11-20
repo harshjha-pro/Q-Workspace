@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-do
 import {
   LayoutDashboard, FolderKanban, Library, ListOrdered, Search, Star, Settings, Upload, Plus, Layers3, CloudOff, RefreshCw, CheckCircle2, AlertTriangle,
   Lock, LogOut, MoreHorizontal, ArrowLeft, FileUp, PackageOpen, FilePlus2, FolderPlus, KeyRound, Pin, GitMerge, ShieldCheck,
+  Archive,
 } from 'lucide-react';
 import { useSyncStatus, store, useStoreVersion } from '../lib/store';
 import { useSession, lock, logout, reauthenticate } from '../lib/session';
@@ -130,6 +131,7 @@ const NAV = [
   { to: '/collections', label: 'Collections', icon: <ListOrdered /> },
   { to: '/search', label: 'Search', icon: <Search /> },
   { to: '/favourites', label: 'Favourites', icon: <Star /> },
+  { to: '/vault', label: 'Attachment Vault', icon: <Archive /> },
   { to: '/import', label: 'Bulk Import', icon: <Upload /> },
 ];
 
@@ -189,6 +191,7 @@ function MoreSheet({ open, onClose, onSignOut }: { open: boolean; onClose: () =>
   const items: { label: string; icon: ReactNode; to?: string; onClick?: () => void; danger?: boolean }[] = [
     { label: 'Collections', icon: <ListOrdered />, to: '/collections' },
     { label: 'Favourites & pinned', icon: <Star />, to: '/favourites' },
+    { label: 'Attachment Vault', icon: <Archive />, to: '/vault' },
     { label: 'Bulk import prompts', icon: <Upload />, to: '/import' },
     { label: s.authRequired ? 'Sign in to sync' : s.online ? `Sync · ${s.pending + s.uploads ? `${s.pending + s.uploads} pending` : 'up to date'}` : 'Offline · view sync', icon: <RefreshCw />, to: '/settings/sync' },
     { label: 'Settings', icon: <Settings />, to: '/settings' },

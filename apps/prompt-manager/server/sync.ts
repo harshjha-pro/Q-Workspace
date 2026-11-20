@@ -26,6 +26,11 @@ function validateValue(_entity: EntityName, field: string, t: FieldType, v: unkn
   switch (t) {
     case 'text': {
       if (typeof v !== 'string') throw new MutationError(`${field} must be text`);
+      if (field === 'avatar') {
+        if (v.length > 400_000) throw new MutationError('The display picture is too large');
+        if (v && !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v)) throw new MutationError('The display picture must be a PNG, JPEG or WebP image');
+        return v;
+      }
       const max = LONG_TEXT.has(field) ? 500_000 : field.endsWith('_id') ? 64 : 2_000;
       if (v.length > max) throw new MutationError(`${field} is too long`);
       if (ENUMS[field] && !ENUMS[field].includes(v)) throw new MutationError(`${field} has an invalid value`);
@@ -49,7 +54,7 @@ function validateValue(_entity: EntityName, field: string, t: FieldType, v: unkn
       }
       if (field === 'variables') {
         if (!Array.isArray(v) || v.length > 200) throw new MutationError('Invalid variables');
-        return v.map((m: any) => ({ name: String(m?.name ?? '').slice(0, 64), required: !!m?.required, description: String(m?.description ?? '').slice(0, 500) })).filter((m) => m.name);
+        return v.map((m: any) => ({ name: String(m?.name ?? '').replace(/[{}]/g, '').trim().slice(0, 64), required: !!m?.required, description: String(m?.description ?? '').slice(0, 500), declared: !!m?.declared })).filter((m) => m.name);
       }
       if (field === 'variable_values') {
         if (typeof v !== 'object' || Array.isArray(v)) throw new MutationError('Invalid variable values');

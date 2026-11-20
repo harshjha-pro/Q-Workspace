@@ -186,6 +186,34 @@ test('bulk import: preview, validation, duplicates, collections, error report', 
   assert.equal(json.json.rows[0].type, 'mandatory');
 });
 
+test('bulk import: input title columns, AI-pasted CSV/JSON, project picture', async () => {
+  const ai = 'Here you go:\n```csv\nPrompt Title,Prompt Content,Input 1 Title,Input 2 Title,Input 3 Title,Input 4 Title\n' +
+    '"Launch Plan","Write a launch plan for {Company name}.\nUse a table.","Company name","Industry","Region?","Budget"\n' +
+    '"Pricing","Suggest pricing tiers.","Company name","","",""\n```\nHope this helps!';
+  const r = await call('POST', '/api/import/preview', { destination: 'library', default_type: 'optional', paste: ai });
+  assert.equal(r.json.summary.valid, 2, JSON.stringify(r.json.structureErrors));
+  const v = r.json.rows[0].variables;
+  assert.deepEqual(v.map((x: any) => [x.name, x.required, x.declared]), [['Company name', true, true], ['Industry', true, true], ['Region', false, true], ['Budget', true, true]]);
+  assert.equal(r.json.rows[0].content, 'Write a launch plan for {Company name}.\nUse a table.');
+  const j = await call('POST', '/api/import/preview', { destination: 'library', default_type: 'optional', paste: '```json\n[{"title":"A","content":"Do {Topic}","Input 1 Title":"Topic","inputs":["Tone?"]}]\n```' });
+  assert.equal(j.json.summary.valid, 1);
+  assert.deepEqual(j.json.rows[0].variables.map((x: any) => x.name), ['Tone', 'Topic']);
+  const c = await call('POST', '/api/import/commit', { previewId: r.json.previewId });
+  assert.equal(c.json.imported, 2);
+  const saved = (await q.get(`SELECT variables FROM templates WHERE title='Launch Plan' AND deleted=0`)) as any;
+  assert.equal(JSON.parse(saved.variables).length, 4, 'declared inputs survive save');
+  for (const kind of ['simple', 'advanced']) {
+    const t = await call('GET', `/api/import/template?kind=${kind}&format=csv`);
+    assert.match(t.raw.body, /Input 1 Title,Input 2 Title,Input 3 Title/);
+  }
+  // Project display picture: small data URLs only.
+  const pid = uid();
+  const ok = await push([{ entity: 'projects', op: 'create', id: pid, data: { name: 'Pic', avatar: 'data:image/webp;base64,UklGRg==' } }]);
+  assert.equal(ok.json.results[0].status, 'ok', JSON.stringify(ok.json));
+  const bad = await push([{ entity: 'projects', op: 'update', id: pid, data: { avatar: 'javascript:alert(1)' } }]);
+  assert.equal(bad.json.results[0].status, 'error');
+});
+
 test('templates: insert creates an independent copy', async () => {
   const tid = uid();
   await push([{ entity: 'templates', op: 'create', id: tid, data: { title: 'SWOT', content: 'SWOT for {company_name}' } }]);

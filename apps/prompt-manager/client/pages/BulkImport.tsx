@@ -8,10 +8,11 @@ import { plural, useIsMobile, useOnline, cx } from '../lib/util';
 import { Button, Card, CardHead, Field, Input, Select, Stepper, Segmented, Chip, Textarea, Badge, EmptyState } from '../components/ui';
 import { toast } from '../components/overlay';
 import { ProjectSelect } from '../components/domain';
+import { AiTemplateHelper } from '../components/AiTemplateHelper';
 import { usePageMeta } from '../layout/AppShell';
 
 type Fmt = 'csv' | 'xlsx' | 'json';
-interface Row { row: number; title: string; content: string; type: 'mandatory' | 'optional'; typeFromFile: boolean; description: string; tags: string[]; collection: string; sequence: number | null; variables: { name: string; required: boolean }[]; status: 'ok' | 'error' | 'duplicate'; errors: string[]; warnings: string[]; duplicateOf?: string }
+interface Row { row: number; title: string; content: string; type: 'mandatory' | 'optional'; typeFromFile: boolean; description: string; tags: string[]; collection: string; sequence: number | null; variables: { name: string; required: boolean; declared?: boolean }[]; status: 'ok' | 'error' | 'duplicate'; errors: string[]; warnings: string[]; duplicateOf?: string }
 interface Preview { previewId: string; filename: string; destination: string; projectId: string | null; defaultType: string; structureErrors: string[]; rows: Row[]; summary: { total: number; valid: number; duplicates: number; errors: number } }
 interface Result { jobId: string; total: number; imported: number; skipped: number; failed: number; duplicates: number; collections: number }
 
@@ -123,8 +124,9 @@ export default function BulkImport() {
                 <Button size="sm" variant="soft" icon={<Download />} onClick={() => downloadUrl(`/api/import/template?kind=simple&format=${fmt}`)}>Simple template</Button>
                 <Button size="sm" variant="ghost" icon={<Download />} onClick={() => downloadUrl(`/api/import/template?kind=advanced&format=${fmt}`)}>Advanced template</Button>
               </div>
-              <span className="hint">Simple: Prompt Title + Prompt Content. Advanced adds Prompt Type, Description, Tags, Collection, Sequence and Variables.</span>
+              <span className="hint">Simple: Prompt Title, Prompt Content, Input 1 Title, Input 2 Title… Advanced adds Prompt Type, Description, Tags, Collection and Sequence.</span>
             </Field>
+            <AiTemplateHelper forLibrary={dest === 'library'} onPasteAnswer={() => { setMode('paste'); setTimeout(() => document.getElementById('paste-box')?.focus(), 50); }} />
             <Field label="2. Add your prompts">
               <Segmented label="Input" value={mode} onChange={setMode} options={[{ value: 'file', label: 'Upload file', icon: <Upload style={{ width: 14 }} /> }, { value: 'paste', label: 'Paste multiple prompts', icon: <ClipboardPaste style={{ width: 14 }} /> }]} />
             </Field>
@@ -136,8 +138,8 @@ export default function BulkImport() {
                 <input ref={inputRef} type="file" accept=".csv,.tsv,.xlsx,.json,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { setFile(e.target.files?.[0] ?? null); e.target.value = ''; }} />
               </div>
             ) : (
-              <Field hint={<>Paste rows copied from a spreadsheet (title ⇥ content), or write prompts separated by a line with <code>---</code>. The first line of each block is its title.</>}>
-                <Textarea rows={mobile ? 10 : 12} className="code" value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'Market Research\nConduct detailed market research for {company_name}.\n---\nCompetitor Analysis\nAnalyze the major competitors in {industry}.'} />
+              <Field hint={<>Paste the AI’s answer (CSV or JSON, with or without the ``` block), rows copied from a spreadsheet, or prompts separated by a line with <code>---</code> (first line of each block is its title).</>}>
+                <Textarea id="paste-box" rows={mobile ? 10 : 12} className="code" value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'Prompt Title,Prompt Content,Input 1 Title,Input 2 Title\n"Market Research","Conduct detailed market research for {Company name}.","Company name","Industry"'} />
               </Field>
             )}
             <Field label="3. Default classification" hint="Applied to prompts that don’t specify a Prompt Type.">
@@ -177,7 +179,7 @@ export default function BulkImport() {
                 ) : (
                   <div className="table-wrap" style={{ maxHeight: '60vh' }}>
                     <table className="table">
-                      <thead><tr><th>Row</th><th>Status</th><th>Prompt title</th><th>Content</th><th>Type</th><th>Tags</th><th>Collection</th><th>Seq.</th><th>Variables</th></tr></thead>
+                      <thead><tr><th>Row</th><th>Status</th><th>Prompt title</th><th>Content</th><th>Type</th><th>Tags</th><th>Collection</th><th>Seq.</th><th>Inputs</th></tr></thead>
                       <tbody>{rows.map((r) => (
                         <tr key={r.row} className={r.status === 'error' ? 'row-error' : r.status === 'duplicate' ? 'row-dup' : ''}>
                           <td className="num muted">{r.row}</td>

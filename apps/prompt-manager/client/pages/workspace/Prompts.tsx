@@ -8,7 +8,7 @@ import { store, useStoreVersion } from '../../lib/store';
 import { promptsOf, collectionsOf, stepsOf, versionsOfPrompt, getProject, projectLabel, registerTags } from '../../lib/data';
 import { api } from '../../lib/api';
 import { copyText, matches, timeAgo, formatDateTime, useIsMobile, plural, cx } from '../../lib/util';
-import { fillVariables, missingRequired, humanizeVariable } from '../../../shared/variables';
+import { fillVariables, fillPrompt, withAppendedInputs, missingRequired, humanizeVariable } from '../../../shared/variables';
 import { Button, IconButton, Card, CardHead, EmptyState, SearchBox, TypeBadge, Tags, Segmented, Field, Select, Input, Tabs, Chip, ButtonLink } from '../../components/ui';
 import { ActionMenu, Modal, confirmDialog, toast } from '../../components/overlay';
 import { PromptText, VariableForm, DiffView, ProjectSelect } from '../../components/domain';
@@ -115,7 +115,7 @@ export default function PromptsPage() {
                 <div className="grow">
                   <div className="row gap-4"><span className="strong truncate">{p.title}</span></div>
                   <div className="meta truncate">{p.description || p.content.replace(/\s+/g, ' ').slice(0, 140)}</div>
-                  <div className="row gap-4 mt-4 row-wrap"><TypeBadge type={p.type} />{p.variables.length > 0 && <span className="badge badge-outline">{plural(p.variables.length, 'variable')}</span>}<Tags tags={p.tags} max={2} />{store.isLocal('prompts', p.id) && <span className="badge badge-warning">Not synced</span>}</div>
+                  <div className="row gap-4 mt-4 row-wrap"><TypeBadge type={p.type} />{p.variables.length > 0 && <span className="badge badge-outline">{plural(p.variables.length, 'input')}</span>}<Tags tags={p.tags} max={2} />{store.isLocal('prompts', p.id) && <span className="badge badge-warning">Not synced</span>}</div>
                 </div>
                 {reorder ? (
                   <span className="row gap-4" onClick={(e) => e.stopPropagation()}>
@@ -152,7 +152,7 @@ export default function PromptsPage() {
       <div className="split-3">
         <div className="sticky-panel">{rail}</div>
         <div>{listView}</div>
-        <div className="sticky-panel">{selected ? <PromptDetail prompt={selected} embedded /> : <Card><EmptyState icon={<Eye />} title="Select a prompt">Pick a prompt to fill its variables, copy it, view its history or edit it.</EmptyState></Card>}</div>
+        <div className="sticky-panel">{selected ? <PromptDetail prompt={selected} embedded /> : <Card><EmptyState icon={<Eye />} title="Select a prompt">Pick a prompt to fill its inputs, copy it, view its history or edit it.</EmptyState></Card>}</div>
       </div>
     </>
   );
@@ -223,12 +223,12 @@ export function PromptDetail({ prompt: p, embedded }: { prompt: Prompt; embedded
   const project = getProject(p.project_id)!;
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(project?.variable_values || {}) }));
   useEffect(() => { setValues({ ...(getProject(p.project_id)?.variable_values || {}) }); }, [p.id]);
-  const filled = fillVariables(p.content, values);
+  const filled = fillPrompt(p.content, p.variables, values);
   const missing = missingRequired(p.variables, values);
   const versions = versionsOfPrompt(p.id);
   const base = `/p/${p.project_id}`;
   const remember = () => {
-    const keep = Object.fromEntries(Object.entries(values).filter(([k, v]) => p.variables.some((m) => m.name === k) && v.trim()));
+    const keep = Object.fromEntries(Object.entries(values).filter(([k, v]) => p.variables.some((m) => m.name.toLowerCase() === k.toLowerCase()) && v.trim()));
     if (Object.keys(keep).length) store.update('projects', p.project_id, { variable_values: { ...project.variable_values, ...keep } });
   };
   const copyFilled = async () => {
@@ -254,17 +254,17 @@ export function PromptDetail({ prompt: p, embedded }: { prompt: Prompt; embedded
       <div className="card-body col gap-16">
         {tab === 'use' && (
           <>
-            {p.variables.length > 0 && <div className="col gap-8"><h3>Fill variables</h3><VariableForm meta={p.variables} values={values} onChange={setValues} compact={embedded} /></div>}
+            {p.variables.length > 0 && <div className="col gap-8"><h3>Fill inputs</h3><VariableForm meta={p.variables} values={values} onChange={setValues} compact={embedded} /></div>}
             <div className="col gap-8">
               <div className="row between"><h3>{p.variables.length ? 'Completed prompt' : 'Prompt'}</h3>{missing.length > 0 && <span className="tiny warning-text">{missing.length} required field{missing.length === 1 ? '' : 's'} empty</span>}</div>
-              <PromptText content={p.content} values={values} />
+              <PromptText content={withAppendedInputs(p.content, p.variables, values)} values={values} />
               {p.instructions && <div className="alert info" style={{ whiteSpace: 'pre-wrap' }}><span><span className="strong">Additional instructions: </span>{fillVariables(p.instructions, values)}</span></div>}
             </div>
             <div className="row row-wrap">
               <Button variant="primary" icon={<Copy />} onClick={copyFilled}>{p.variables.length ? 'Copy completed prompt' : 'Copy prompt'}</Button>
               {p.variables.length > 0 && <Button icon={<Copy />} onClick={async () => { await copyText(p.content); toast.success('Original template copied'); }}>Copy original</Button>}
             </div>
-            <p className="tiny faint">Filling variables never changes the saved prompt.</p>
+            <p className="tiny faint">Filling inputs never changes the saved prompt.</p>
           </>
         )}
         {tab === 'details' && (
@@ -273,7 +273,7 @@ export function PromptDetail({ prompt: p, embedded }: { prompt: Prompt; embedded
             <Detail label="Purpose / intended use" value={p.purpose} />
             <Detail label="Additional instructions" value={p.instructions} />
             <Detail label="Tags" value={p.tags.length ? <Tags tags={p.tags} max={20} /> : ''} />
-            <Detail label="Variables" value={p.variables.length ? <div className="col gap-4">{p.variables.map((v) => <div key={v.name} className="row gap-8 row-wrap"><span className="var-chip">{`{${v.name}}`}</span><span className="tiny">{v.required ? 'Required' : 'Optional'}</span>{v.description && <span className="tiny muted">— {v.description}</span>}</div>)}</div> : ''} />
+            <Detail label="Inputs" value={p.variables.length ? <div className="col gap-4">{p.variables.map((v) => <div key={v.name} className="row gap-8 row-wrap"><span className="strong small">{humanizeVariable(v.name)}</span><span className="tiny">{v.required ? 'Required' : 'Optional'}</span>{v.description && <span className="tiny muted">— {v.description}</span>}</div>)}</div> : ''} />
             <Detail label="Collections" value={store.all('collection_steps').filter((s) => s.prompt_id === p.id).map((s) => store.get('collections', s.collection_id)).filter(Boolean).map((c) => <Link key={c!.id} to={`/p/${c!.project_id}/collections/${c!.id}`} className="tag">{c!.name}</Link>)} />
             <Detail label="Location" value={projectLabel(p.project_id)} />
             {p.source_template_id && <Detail label="Created from template" value={store.get('templates', p.source_template_id)?.title ?? 'Deleted template'} />}

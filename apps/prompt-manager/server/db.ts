@@ -8,7 +8,7 @@ ensureDirs();
 // On serverless hosting a database URL is mandatory (checked in buildApp); never open a throwaway SQLite file there.
 if (!config.serverless || config.databaseUrl) void connect({ url: config.databaseUrl, sqliteFile: config.dbPath }).catch(() => {});
 
-const SCHEMA_VERSION = '3';
+const SCHEMA_VERSION = '4';
 
 // ---------- Portable column types ----------
 type Col = 'id' | 'key' | 'ts' | 'text' | 'long' | 'int' | 'real' | 'blob';
@@ -16,7 +16,7 @@ const colType = (t: Col) => isMysql()
   ? ({ id: 'VARCHAR(64)', key: 'VARCHAR(191)', ts: 'VARCHAR(40)', text: 'TEXT', long: 'MEDIUMTEXT', int: 'BIGINT', real: 'DOUBLE', blob: 'LONGBLOB' })[t]
   : ({ id: 'TEXT', key: 'TEXT', ts: 'TEXT', text: 'TEXT', long: 'TEXT', int: 'INTEGER', real: 'REAL', blob: 'BLOB' })[t];
 
-const LONG_FIELDS = new Set(['content', 'body', 'instructions', 'description', 'tags', 'variables', 'variable_values', 'prompt_ids', 'summary']);
+const LONG_FIELDS = new Set(['content', 'body', 'instructions', 'description', 'tags', 'variables', 'variable_values', 'prompt_ids', 'summary', 'avatar']);
 function entityCol(field: string, t: FieldType): Col {
   if (t === 'int' || t === 'bool') return 'int';
   if (t === 'real') return 'real';

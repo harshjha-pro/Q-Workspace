@@ -14,6 +14,7 @@ import FilesTab from './pages/workspace/Files';
 import FileDetail, { FileCompare } from './pages/workspace/FileDetail';
 import { TasksTab, NotesTab, ActivityTab } from './pages/workspace/Productivity';
 import BulkImport from './pages/BulkImport';
+import VaultPage from './pages/Vault';
 import LibraryPage, { TemplateDetail, TemplateEditor } from './pages/Library';
 import { SearchPage, FavouritesPage, AllCollectionsPage } from './pages/Global';
 import SettingsPage from './pages/settings/Settings';
@@ -66,6 +67,7 @@ function makeRouter() {
         { path: 'search', element: <SearchPage /> },
         { path: 'favourites', element: <FavouritesPage /> },
         { path: 'import', element: <BulkImport /> },
+        { path: 'vault', element: <VaultPage /> },
         { path: 'settings', element: <SettingsPage /> },
         { path: 'settings/:section', element: <SettingsPage /> },
         { path: '*', element: <NotFound /> },
